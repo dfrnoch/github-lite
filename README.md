@@ -54,14 +54,18 @@ bun run build
   token-exchange endpoint: `GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… bun dist/server/node.js`
   (`PORT`/`HOST` configurable).
 
-### Cloudflare Pages
+### Cloudflare Workers
 
-- Build command: `bun run build` — Build output directory: `dist/client`
-- Environment variable **`BUN_VERSION` = `1.4.3`** (Pages picks the Bun version only from
-  this variable; its default Bun is too old for `bun.lock`)
-- No `404.html` is emitted, so Pages serves `index.html` for every route (SPA mode).
-- OAuth sign-in needs the Node server and is not available on Pages; use a personal
-  access token there.
+`wrangler.jsonc` configures everything: static files from `dist/client` with SPA
+fallback, and the server bundle as the Worker (OAuth token exchange + code
+search proxy).
+
+- Build command: `bun run build` — Deploy command: `bunx wrangler deploy`
+- Build variable **`BUN_VERSION` = `1.4.3`** (the build image's default Bun is too
+  old for `bun.lock`)
+- Optional OAuth: add `GITHUB_CLIENT_ID` as a variable and `GITHUB_CLIENT_SECRET`
+  as a secret on the Worker (Settings → Variables and secrets), with the OAuth
+  App callback URL `https://<your-domain>/login/callback`.
 
 ## How it works
 

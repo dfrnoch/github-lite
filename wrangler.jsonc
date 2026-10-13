@@ -1,0 +1,19 @@
+{
+  // Cloudflare Workers deployment (Workers Builds runs `bunx wrangler deploy`
+  // after `bun run build`). Static files come from dist/client with SPA
+  // fallback; everything else — the server-function endpoint used for the
+  // OAuth token exchange and code search — goes to the built server bundle.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "github-lite",
+  "main": "dist/server/server.js",
+  "compatibility_date": "2026-10-01",
+  // nodejs_compat: AsyncLocalStorage for request scoping, and process.env
+  // populated from vars/secrets (GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET).
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": { "enabled": true }
+}
