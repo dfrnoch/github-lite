@@ -59,7 +59,7 @@ export default function MilestonesPage() {
           </Loading>
           <div class="flex-1" />
           <Dropdown
-            class="btn-invisible btn-sm text-fg-muted!"
+            class="btn btn-invisible btn-sm text-fg-muted!"
             align="right"
             button={
               <>

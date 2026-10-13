@@ -132,7 +132,7 @@ function ActivityFilterMenu(props: { path: string }) {
   const current = () => activityFilter(props.path);
   return (
     <Dropdown
-      class="btn-invisible btn-sm text-fg-muted! font-normal! px-2! rgh-conversation-activity-filter"
+      class="btn btn-invisible btn-sm text-fg-muted! font-normal! px-2! rgh-conversation-activity-filter"
       title="Conversation activity filter (h)"
       menuClass="w-72"
       button={

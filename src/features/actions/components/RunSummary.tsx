@@ -7,17 +7,16 @@ import { formatBytes, formatDuration, pluralize, shortSha } from '../../../lib/f
 import { useRepo } from '../../repo/context';
 import { downloadArtifact, getAnnotations, getRunArtifacts, getSuiteCheckRuns } from '../api';
 import { useRun } from '../context';
-import { duration, elapsed, eventLabel, isDone, runState, stateLabel } from '../status';
-import type { Annotation, Artifact, Job } from '../types';
-import { workflowFile } from './ActionsShell';
-import StatusIcon from './StatusIcon';
+import { elapsed, eventLabel, isDone, runState, stateLabel } from '../status';
+import type { Annotation, Artifact } from '../types';
+import WorkflowGraph from './WorkflowGraph';
 
 /** /actions/runs/:id — summary card, jobs graph, annotations, artifacts. */
 export default function RunSummary() {
   return (
     <div class="flex flex-col gap-4">
       <SummaryCard />
-      <JobsGraph />
+      <WorkflowGraph />
       <Loading fallback={<div class="Box p-4 text-sm text-fg-muted">Loading annotations…</div>}>
         <Annotations />
       </Loading>
@@ -101,69 +100,6 @@ function SummaryCard() {
             </Show>
           </Loading>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/** Matrix jobs ("build (ubuntu, 20)") are grouped into one card like github.com's graph. */
-function groupJobs(jobs: Job[]) {
-  const groups: { name: string; jobs: Job[]; matrix: boolean }[] = [];
-  const byName = new Map<string, (typeof groups)[number]>();
-  for (const job of jobs) {
-    const m = /^(.+?) \((.+)\)$/.exec(job.name);
-    const key = m ? m[1]! : job.name;
-    let g = byName.get(key);
-    if (!g || !m) {
-      g = { name: key, jobs: [], matrix: !!m };
-      if (m) byName.set(key, g);
-      groups.push(g);
-    }
-    g.jobs.push(job);
-  }
-  return groups.map((g) => (g.jobs.length === 1 ? { ...g, name: g.jobs[0]!.name, matrix: false } : g));
-}
-
-function JobsGraph() {
-  const rc = useRun();
-  const groups = createMemo(() => groupJobs(rc.jobs()));
-  const JobLink = (p: { job: Job }) => (
-    <a class="flex items-center gap-2 min-w-0 w-full link-plain" href={`${rc.href()}/job/${p.job.id}`}>
-      <StatusIcon status={p.job.status} conclusion={p.job.conclusion} />
-      <span class="truncate flex-1 font-semibold">{p.job.name}</span>
-      <span class="text-xs text-fg-muted shrink-0">
-        {p.job.status === 'completed' && p.job.conclusion === 'skipped' ? '' : duration(p.job.started_at, p.job.completed_at)}
-      </span>
-    </a>
-  );
-  return (
-    <div class="Box overflow-hidden">
-      <div class="px-4 md:px-6 pt-4 pb-3 bg-canvas-muted">
-        <h2 class="font-semibold">{workflowFile(rc.run().path.replace(/@.*$/, ''))}</h2>
-        <div class="text-xs text-fg-muted">on: {rc.run().event}</div>
-      </div>
-      <div class="run-graph p-4 md:p-6 flex flex-wrap gap-4 items-start">
-        <Loading fallback={<div class="text-sm text-fg-muted">Loading jobs…</div>}>
-          <For each={groups()} fallback={<div class="text-sm text-fg-muted">No jobs</div>}>
-            {(g) => (
-              <Show
-                when={g.matrix}
-                fallback={
-                  <div class="run-job-card">
-                    <JobLink job={g.jobs[0]!} />
-                  </div>
-                }
-              >
-                <div class="run-job-card flex-col! items-stretch! gap-2!">
-                  <div class="text-xs text-fg-muted">
-                    Matrix: <span class="font-semibold text-fg">{g.name}</span>
-                  </div>
-                  <For each={g.jobs}>{(job) => <JobLink job={job} />}</For>
-                </div>
-              </Show>
-            )}
-          </For>
-        </Loading>
       </div>
     </div>
   );

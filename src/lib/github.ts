@@ -182,7 +182,9 @@ export async function ghPage<T = any>(
   options: RequestOptions & { page?: number; perPage?: number; pick?: (data: any) => T[] } = {},
 ): Promise<Page<T> & { total?: number }> {
   const { page = 1, perPage = 30, pick, query, ...rest } = options;
-  const res = await request(path, { ...rest, query: { ...query, page, per_page: perPage } });
+  // Page 1 is the default; some endpoints (e.g. Actions jobs of big runs) time
+  // out with a 502 when `page=1` is sent explicitly, so leave it off.
+  const res = await request(path, { ...rest, query: { ...query, page: page > 1 ? page : undefined, per_page: perPage } });
   const data = await res.json();
   const links = parseLink(res.headers.get('link'));
   const items: T[] = pick ? pick(data) : Array.isArray(data) ? data : (data.items ?? []);

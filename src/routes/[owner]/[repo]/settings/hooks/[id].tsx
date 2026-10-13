@@ -98,7 +98,7 @@ function Deliveries(props: { hookId: number }) {
           <div class="Box-row p-0!">
             <button
               type="button"
-              class="w-full flex items-center gap-2 px-4 py-3 text-left text-sm hover:bg-canvas-muted"
+              class="w-full flex items-center gap-2 px-4 py-3 text-left text-sm hover:bg-canvas-muted rounded-md"
               onClick={() => setOpen(open() === d.id ? null : d.id)}
             >
               <Octicon icon={open() === d.id ? chevronDownIcon : chevronRightIcon} class="text-fg-muted" />

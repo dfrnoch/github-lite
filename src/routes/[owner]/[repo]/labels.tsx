@@ -95,7 +95,7 @@ export default function LabelsPage() {
             <Loading fallback="Labels">{pluralize(visible().length, 'label')}</Loading>
           </h2>
           <Dropdown
-            class="btn-invisible btn-sm text-fg-muted!"
+            class="btn btn-invisible btn-sm text-fg-muted!"
             align="right"
             button={
               <>

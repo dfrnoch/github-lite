@@ -28,7 +28,7 @@ export default function InsightsLayout(props: { children: JSX.Element }) {
             {(item) => (
               <Show when={!item.admin || ctx.repo().permissions?.push}>
                 <a
-                  class="block px-4 py-2 text-sm border-b border-line-muted last:border-b-0 link-plain hover:bg-canvas-muted border-l-2"
+                  class="block px-4 py-2 text-sm border-b border-line-muted last:border-b-0 link-plain hover:bg-canvas-muted rounded-md border-l-2"
                   style={{
                     'border-left-color': current().startsWith(item.path) ? 'var(--underlineNav-borderColor-active)' : 'transparent',
                   }}

@@ -196,28 +196,137 @@ html[data-color-mode='dark'] .job-log {
 .ansi-italic { font-style: italic; }
 .ansi-underline { text-decoration: underline; }
 
-/* Workflow graph-lite: job cards on a dotted canvas. */
-.run-graph {
+/* Workflow run graph (WorkflowGraph.tsx): a pannable, zoomable dotted canvas. */
+.run-graph-viewport {
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   background-color: var(--bgColor-muted);
-  background-image: radial-gradient(var(--borderColor-muted) 1px, transparent 1px);
-  background-size: 16px 16px;
+  background-image: radial-gradient(var(--borderColor-default) 1px, transparent 1px);
 }
-.run-job-card {
+.run-graph-viewport.is-dragging {
+  cursor: grabbing;
+}
+.run-graph-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.run-graph-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.run-graph-edges path {
+  fill: none;
+  stroke: var(--borderColor-emphasis);
+  stroke-width: 2;
+  transition: stroke 120ms ease;
+}
+.run-graph-edges path.is-active {
+  stroke: var(--borderColor-accent-emphasis);
+}
+.run-graph-columns {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 260px;
-  padding: 12px;
+  align-items: flex-start;
+  gap: 64px;
+  width: max-content;
+  padding: 24px;
+}
+.run-graph-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.run-graph-card {
+  position: relative;
+  width: 264px;
+  padding: 4px;
   background-color: var(--bgColor-default);
   border: 1px solid var(--borderColor-default);
   border-radius: 6px;
-  box-shadow: var(--shadow-resting-small, 0 1px 0 rgba(31, 35, 40, 0.04));
+  box-shadow: var(--shadow-resting-small);
+  cursor: default;
+}
+.run-graph-card:hover {
+  border-color: var(--borderColor-accent-emphasis);
+}
+/* Connector dots where edges meet the cards. */
+.run-graph-card.has-in::before,
+.run-graph-card.has-out::after {
+  content: '';
+  position: absolute;
+  top: min(50%, 22px);
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  background-color: var(--bgColor-default);
+  border: 2px solid var(--borderColor-emphasis);
+  border-radius: 50%;
+}
+.run-graph-card.has-in::before {
+  left: -5px;
+}
+.run-graph-card.has-out::after {
+  right: -5px;
+}
+.run-graph-job {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 14px;
   color: var(--fgColor-default);
+  border-radius: 6px;
+  text-decoration: none !important;
+}
+.run-graph-job:hover {
+  background-color: var(--bgColor-neutral-muted);
+}
+.run-graph-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 4px;
   font-size: 14px;
 }
-.run-job-card:hover {
-  border-color: var(--borderColor-accent-emphasis);
-  text-decoration: none;
+.run-graph-card.is-group .run-graph-job {
+  font-size: 13px;
+}
+.run-graph-more {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: left;
+  color: var(--fgColor-accent);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.run-graph-more:hover {
+  background-color: var(--bgColor-neutral-muted);
+}
+/* Fullscreen: the graph box covers the window. */
+.run-graph-box.is-fullscreen {
+  position: fixed;
+  inset: 16px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  /* Dim the page around the graph. */
+  box-shadow:
+    0 0 0 100vmax var(--overlay-backdrop-bgColor),
+    var(--shadow-floating-large);
+}
+.run-graph-box.is-fullscreen .run-graph-viewport {
+  flex: 1;
 }
 
 /* Run list rows: title column grows, the rest stays put. */

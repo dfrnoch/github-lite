@@ -163,6 +163,7 @@ svg.octicon {
   background-color: var(--button-danger-bgColor-active);
 }
 .btn-invisible {
+  border-radius: 6px;
   border-color: transparent;
   background-color: transparent;
   box-shadow: none;

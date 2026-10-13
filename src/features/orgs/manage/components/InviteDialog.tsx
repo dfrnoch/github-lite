@@ -122,7 +122,7 @@ function TeamPicker(props: { org: string; value: number[]; onChange: (ids: numbe
         <div class="max-h-[200px] overflow-auto py-1">
           <For each={visible()}>
             {(t) => (
-              <label class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-canvas-muted">
+              <label class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-canvas-muted rounded-md">
                 <input
                   type="checkbox"
                   checked={props.value.includes(t.id)}

@@ -131,7 +131,7 @@ function GroupRow(props: { group: CheckGroup; selectedId: number }) {
   };
   return (
     <div class="border-b border-line-muted">
-      <button type="button" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted" onClick={() => setToggled((v) => !v)}>
+      <button type="button" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted rounded-md" onClick={() => setToggled((v) => !v)}>
         <Octicon icon={open() ? chevronDownIcon : chevronRightIcon} class="text-fg-muted shrink-0" />
         <StatusIcon state={state()} />
         <span class="flex-1 min-w-0">
@@ -174,7 +174,7 @@ function StatusesGroup(props: { statuses: CommitStatus[] }) {
   const STATE: Record<CommitStatus['state'], string> = { success: 'success', failure: 'failure', error: 'failure', pending: 'queued' };
   return (
     <div class="border-b border-line-muted">
-      <button type="button" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted" onClick={() => setOpen((v) => !v)}>
+      <button type="button" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-canvas-muted rounded-md" onClick={() => setOpen((v) => !v)}>
         <Octicon icon={open() ? chevronDownIcon : chevronRightIcon} class="text-fg-muted shrink-0" />
         <span class="flex-1 font-semibold">Commit statuses</span>
       </button>
