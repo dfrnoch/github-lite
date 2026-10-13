@@ -57,7 +57,7 @@ export default function LatestCommit(props: { owner: string; repo: string; gitRe
             </For>
           </span>
           <CommitMessage
-            message={c().messageHeadline}
+            message={c().message.split('\n', 1)[0] ?? c().messageHeadline}
             base={base()}
             href={`${base()}/commit/${c().oid}`}
             class="truncate min-w-0 flex-1 basis-40"

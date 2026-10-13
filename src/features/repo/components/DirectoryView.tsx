@@ -1,16 +1,18 @@
-import { createMemo, Loading, Show } from 'solid-js';
+import { createMemo, Loading, Show, untrack } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Dropdown, PageSpinner } from '../../../components/ui';
-import { gitBranchIcon, plusIcon, tagIcon, triangleDownIcon, uploadIcon } from '../../../icons/octicons';
+import { gitBranchIcon, plusIcon, searchIcon, tagIcon, triangleDownIcon, uploadIcon } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
 import { encodePath, GitHubError } from '../../../lib/github';
 import type { Repository } from '../../../lib/types';
 import { getReadme, getRepoOverview, getTree } from '../api';
 import Breadcrumbs from './Breadcrumbs';
 import CodeButton from './CodeButton';
+import { useFileTreeOpen, useFinderHotkey } from './CodeLayout';
 import FileTable from './FileTable';
 import LatestCommit from './LatestCommit';
 import ReadmeBox from './ReadmeBox';
+import { readmePathFromHtml } from '../../../lib/markdown';
 import RefPicker from './RefPicker';
 
 /** File list + README for a directory at a ref (repo root or any sub-folder). */
@@ -28,17 +30,23 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
   const overview = createMemo(() => getRepoOverview(owner(), name()));
   const isRoot = () => !props.path;
   const canPush = () => !!props.repo.permissions?.push;
+  const inTree = useFileTreeOpen();
+  const findHref = () => `${base()}/find/${encodePath(props.gitRef)}`;
+  // The tree/blob layout registers the `t` hotkey itself; the repo home does it here.
+  if (!untrack(inTree)) useFinderHotkey(findHref);
 
   return (
     <>
       <div class="flex flex-wrap items-center gap-2 mb-4">
-        <RefPicker
+        <div class={{ 'lg:hidden': inTree() }}>
+          <RefPicker
           owner={owner()}
           repo={name()}
           current={props.gitRef}
           defaultBranch={props.repo.default_branch}
-          hrefFor={(ref) => (props.path ? `${base()}/tree/${encodePath(ref)}/${encodePath(props.path)}` : `${base()}/tree/${encodePath(ref)}`)}
-        />
+            hrefFor={(ref) => (props.path ? `${base()}/tree/${encodePath(ref)}/${encodePath(props.path)}` : `${base()}/tree/${encodePath(ref)}`)}
+          />
+        </div>
         <Show
           when={isRoot()}
           fallback={
@@ -59,6 +67,13 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
           </Loading>
         </Show>
         <div class="flex-1" />
+        <Show when={isRoot() && !inTree()}>
+          <a class="form-control form-control-sm hidden! md:flex! items-center gap-2 w-56 text-fg-muted! no-underline!" href={findHref()}>
+            <Octicon icon={searchIcon} />
+            <span class="flex-1">Go to file</span>
+            <kbd class="text-xs border border-line rounded px-1">t</kbd>
+          </a>
+        </Show>
         <Show when={canPush()}>
           <Dropdown
             class="btn btn-sm"
@@ -105,7 +120,18 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
 
       <Loading>
         <Show when={readme()}>
-          {(html) => <ReadmeBox html={html()} />}
+          {(html) => (
+            <ReadmeBox
+              html={html()}
+              file={{
+                owner: owner(),
+                repo: name(),
+                gitRef: props.gitRef,
+                path: readmePathFromHtml(html()) ?? (props.path ? `${props.path}/README.md` : 'README.md'),
+                private: props.repo.private,
+              }}
+            />
+          )}
         </Show>
       </Loading>
     </>

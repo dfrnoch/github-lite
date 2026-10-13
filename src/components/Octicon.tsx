@@ -1,3 +1,4 @@
+import type { JSX } from '@solidjs/web';
 import { For } from 'solid-js';
 import type { OcticonData } from '../icons/octicons';
 
@@ -12,7 +13,7 @@ import type { OcticonData } from '../icons/octicons';
 export default function Octicon(props: {
   icon: OcticonData;
   size?: number;
-  class?: string;
+  class?: JSX.SvgSVGAttributes<SVGSVGElement>['class'];
   'aria-label'?: string;
 }) {
   const design = () => {

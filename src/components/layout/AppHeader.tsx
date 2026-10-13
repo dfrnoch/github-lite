@@ -39,7 +39,7 @@ export default function AppHeader() {
   const [navOpen, setNavOpen] = createSignal(false);
   const [userOpen, setUserOpen] = createSignal(false);
   // Repo and org pages continue the header's background into their tab bar.
-  const bordered = () => ctx().kind !== 'repo' && ctx().kind !== 'org';
+  const bordered = () => ctx().kind !== 'repo' && ctx().kind !== 'org' && ctx().kind !== 'owner';
 
   return (
     <header class={['AppHeader', { 'AppHeader--bordered': bordered() }]}>

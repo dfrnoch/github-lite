@@ -6,4 +6,5 @@ import { fileRoutes } from '@solidjs/router/fs';
 // so swapping the host of any GitHub URL lands on the same page here.
 export const Router = createRouter({ routes: fileRoutes(pageRoutes), preloadLinks: intentPreload() });
 
-export const { paths } = Router;
+// Typed `paths` (Router.paths) are not re-exported: with this many routes the
+// typed-path union exceeds TypeScript's instantiation depth (TS2589).

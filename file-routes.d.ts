@@ -44,6 +44,66 @@ declare module "virtual:file-routes" {
       path: "/:owner/:repo";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]")>;
+    },
+    {
+      path: "/:owner/:repo/actions/caches";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/caches")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/runners";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runners")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/runs/:id";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/runs/:id/attempts/:attempt";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]/attempts/[attempt]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/runs/:id/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/runs/:id/job/:jobId";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]/job/[jobId]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/actions/workflows/:file";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/workflows/[file]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/activity";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/activity")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/blame/*path";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/blame/[...path]")>;
       $$route?: undefined;
     },
     {
@@ -53,9 +113,423 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/:owner/:repo/branches/:view?";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/branches/[[view]]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/commit/:sha";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/commit/[sha]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/commits/*path";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/commits/[...path]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/compare/*spec";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/compare/[...spec]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/discussions/:number";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/[number]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/discussions/categories/:slug";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/categories/[slug]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/discussions/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/discussions/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/edit/*path";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/edit/[...path]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/find/*ref";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/find/[...ref]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/fork";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/fork")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/forks";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/forks")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/graphs";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/graphs/code-frequency";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/code-frequency")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/graphs/commit-activity";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/commit-activity")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/graphs/contributors";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/contributors")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/graphs/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/graphs/traffic";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/traffic")>;
+      $$route?: undefined;
+    },
+    {
       path: "/:owner/:repo/";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/index")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]/index")>;
+    },
+    {
+      path: "/:owner/:repo/issues/:number";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/issues/[number]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/issues/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/issues/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/issues/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/issues/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/labels";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/labels")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/milestone/:number";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestone/[number]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/milestones/:number/edit";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestones/[number]/edit")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/milestones/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestones/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/milestones/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestones/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/new/*path";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/new/[...path]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/projects";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/projects")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pull/:number";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pull/:number/checks";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/checks")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pull/:number/commits";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/commits")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pull/:number/files";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/files")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pull/:number/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pulls";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pulls")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/pulse/:period?";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pulse/[[period]]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/releases/edit/*tag";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/edit/[...tag]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/releases/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/releases/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/releases/tag/*tag";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/tag/[...tag]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/security";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/security/advisories/:ghsa";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/advisories/[ghsa]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/security/advisories/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/advisories/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/security/dependabot";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/dependabot")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/security/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/security/policy";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/policy")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/access";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/access")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/actions";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/actions")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/branch_protection_rules/:id";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/branch_protection_rules/[id]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/branch_protection_rules/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/branch_protection_rules/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/branches";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/branches")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/hooks/:id";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/hooks/[id]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/hooks/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/hooks/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/hooks/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/hooks/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/keys/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/keys/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/keys/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/keys/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/pages";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/pages")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/rules/:id";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/rules/[id]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/rules/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/rules/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/rules/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/rules/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/secrets/actions/:name";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/secrets/actions/[name]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/secrets/actions/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/secrets/actions/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/secrets/actions/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/secrets/actions/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/variables/actions/:name";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/variables/actions/[name]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/variables/actions/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/variables/actions/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/settings/variables/actions/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/variables/actions/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/stargazers";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/stargazers")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/tags";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/tags")>;
       $$route?: undefined;
     },
     {
@@ -65,9 +539,33 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
+      path: "/:owner/:repo/watchers";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/watchers")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/index")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/index")>;
+    },
+    {
+      path: "/explore";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/explore")>;
+      $$route?: undefined;
+    },
+    {
       path: "/";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/index")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/index")>;
+    },
+    {
+      path: "/issues";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/issues")>;
       $$route?: undefined;
     },
     {
@@ -80,6 +578,234 @@ declare module "virtual:file-routes" {
       path: "/login/";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/login/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/new")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/notifications";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/notifications")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/organizations/:org/settings/*rest";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/organizations/[org]/settings/[...rest]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/outside-collaborators";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/outside-collaborators")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/packages";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/packages")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/people";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/people/failed_invitations";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people/failed_invitations")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/people/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/people/pending_invitations";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people/pending_invitations")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/projects";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/projects")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/repositories";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/repositories")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/settings";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/settings/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/settings/member_privileges";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings/member_privileges")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/settings/profile";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings/profile")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/teams/:team";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/teams/:team/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/teams/:team/members";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]/members")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/teams/:team/repositories";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]/repositories")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/orgs/:org/teams/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/pulls";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/pulls")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/search";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/search")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/admin";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/admin")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/appearance";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/appearance")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/blocked_users";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/blocked_users")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/emails";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/emails")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/keys";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/keys")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/notifications";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/notifications")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/organizations";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/organizations")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/profile";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/profile")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/settings/tokens";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings/tokens")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/stars";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/stars")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/topics/:topic";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/topics/[topic]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/topics/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/topics/index")>;
       $$route?: undefined;
     }
   ];
@@ -92,6 +818,14 @@ declare module "virtual:file-routes" {
       id: "/";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/index")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/index")>;
+      children?: undefined;
+    },
+    {
+      path: "/new";
+      id: "/new";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/new")>;
       $$route?: undefined;
       children?: undefined;
     },
@@ -104,6 +838,30 @@ declare module "virtual:file-routes" {
       children?: undefined;
     },
     {
+      path: "/pulls";
+      id: "/pulls";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/pulls")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/stars";
+      id: "/stars";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/stars")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/issues";
+      id: "/issues";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/issues")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
       path: "/login/";
       id: "/login/";
       page: true;
@@ -112,17 +870,673 @@ declare module "virtual:file-routes" {
       children?: undefined;
     },
     {
-      path: "/:owner/:repo";
-      id: "/:owner/:repo";
+      path: "/search";
+      id: "/search";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/search")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/:owner/";
+      id: "/:owner/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/index")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/index")>;
+      children?: undefined;
+    },
+    {
+      path: "/explore";
+      id: "/explore";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/explore")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/topics/";
+      id: "/topics/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/topics/index")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/settings";
+      id: "/settings";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/settings")>;
       $$route?: undefined;
       children: readonly [
         {
           path: "/";
           id: "/";
           page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/keys";
+          id: "/keys";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/keys")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/admin";
+          id: "/admin";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/admin")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/emails";
+          id: "/emails";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/emails")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/tokens";
+          id: "/tokens";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/tokens")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/profile";
+          id: "/profile";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/profile")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/appearance";
+          id: "/appearance";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/appearance")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/blocked_users";
+          id: "/blocked_users";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/blocked_users")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/notifications";
+          id: "/notifications";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/notifications")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/organizations";
+          id: "/organizations";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/settings/organizations")>;
+          $$route?: undefined;
+          children?: undefined;
+        }
+      ];
+    },
+    {
+      path: "/orgs/:org";
+      id: "/orgs/:org";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]")>;
+      $$route?: undefined;
+      children: readonly [
+        {
+          path: "/";
+          id: "/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/people";
+          id: "/people";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/failed_invitations";
+              id: "/failed_invitations";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people/failed_invitations")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/pending_invitations";
+              id: "/pending_invitations";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/people/pending_invitations")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/teams/";
+          id: "/teams/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/packages";
+          id: "/packages";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/packages")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/projects";
+          id: "/projects";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/projects")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/settings";
+          id: "/settings";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/profile";
+              id: "/profile";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings/profile")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/member_privileges";
+              id: "/member_privileges";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/settings/member_privileges")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/teams/:team";
+          id: "/teams/:team";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/members";
+              id: "/members";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]/members")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/repositories";
+              id: "/repositories";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/teams/[team]/repositories")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/repositories";
+          id: "/repositories";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/repositories")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/outside-collaborators";
+          id: "/outside-collaborators";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/orgs/[org]/outside-collaborators")>;
+          $$route?: undefined;
+          children?: undefined;
+        }
+      ];
+    },
+    {
+      path: "/:owner/:repo";
+      id: "/:owner/:repo";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]")>;
+      children: readonly [
+        {
+          path: "/";
+          id: "/";
+          page: true;
           $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/index")>;
+          $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]/index")>;
+          children?: undefined;
+        },
+        {
+          path: "/fork";
+          id: "/fork";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/fork")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/tags";
+          id: "/tags";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/tags")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/forks";
+          id: "/forks";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/forks")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/pulls";
+          id: "/pulls";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pulls")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/graphs";
+          id: "/graphs";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/traffic";
+              id: "/traffic";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/traffic")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/contributors";
+              id: "/contributors";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/contributors")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/code-frequency";
+              id: "/code-frequency";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/code-frequency")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/commit-activity";
+              id: "/commit-activity";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/graphs/commit-activity")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/labels";
+          id: "/labels";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/labels")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/issues/";
+          id: "/issues/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/issues/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/actions/";
+          id: "/actions/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/activity";
+          id: "/activity";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/activity")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/projects";
+          id: "/projects";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/projects")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/security";
+          id: "/security";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/policy";
+              id: "/policy";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/policy")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/dependabot";
+              id: "/dependabot";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/dependabot")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/advisories/";
+              id: "/advisories/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/advisories/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/advisories/:ghsa";
+              id: "/advisories/:ghsa";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/security/advisories/[ghsa]")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/settings";
+          id: "/settings";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/keys/";
+              id: "/keys/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/keys/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/pages";
+              id: "/pages";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/pages")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/access";
+              id: "/access";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/access")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/hooks/";
+              id: "/hooks/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/hooks/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/rules/";
+              id: "/rules/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/rules/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/actions";
+              id: "/actions";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/actions")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/branches";
+              id: "/branches";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/branches")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/keys/new";
+              id: "/keys/new";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/keys/new")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/hooks/:id";
+              id: "/hooks/:id";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/hooks/[id]")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/hooks/new";
+              id: "/hooks/new";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/hooks/new")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/rules/:id";
+              id: "/rules/:id";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/rules/[id]")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/rules/new";
+              id: "/rules/new";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/rules/new")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/secrets/actions/";
+              id: "/secrets/actions/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/secrets/actions/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/variables/actions/";
+              id: "/variables/actions/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/variables/actions/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/secrets/actions/new";
+              id: "/secrets/actions/new";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/secrets/actions/new")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/secrets/actions/:name";
+              id: "/secrets/actions/:name";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/secrets/actions/[name]")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/variables/actions/new";
+              id: "/variables/actions/new";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/variables/actions/new")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/variables/actions/:name";
+              id: "/variables/actions/:name";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/variables/actions/[name]")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/branch_protection_rules/:id";
+              id: "/branch_protection_rules/:id";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/branch_protection_rules/[id]")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/branch_protection_rules/new";
+              id: "/branch_protection_rules/new";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/settings/branch_protection_rules/new")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/watchers";
+          id: "/watchers";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/watchers")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/find/*ref";
+          id: "/find/*ref";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/find/[...ref]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/new/*path";
+          id: "/new/*path";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/new/[...path]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/releases/";
+          id: "/releases/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/index")>;
           $$route?: undefined;
           children?: undefined;
         },
@@ -135,20 +1549,310 @@ declare module "virtual:file-routes" {
           children?: undefined;
         },
         {
+          path: "/edit/*path";
+          id: "/edit/*path";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/edit/[...path]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/issues/new";
+          id: "/issues/new";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/issues/new")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/stargazers";
+          id: "/stargazers";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/stargazers")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
           path: "/tree/*path";
           id: "/tree/*path";
           page: true;
           $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/tree/[...path]")>;
           $$route?: undefined;
           children?: undefined;
+        },
+        {
+          path: "/blame/*path";
+          id: "/blame/*path";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/blame/[...path]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/commit/:sha";
+          id: "/commit/:sha";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/commit/[sha]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/milestones/";
+          id: "/milestones/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestones/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/discussions/";
+          id: "/discussions/";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/index")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/pull/:number";
+          id: "/pull/:number";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/files";
+              id: "/files";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/files")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/checks";
+              id: "/checks";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/checks")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/commits";
+              id: "/commits";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pull/[number]/commits")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/releases/new";
+          id: "/releases/new";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/new")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/commits/*path";
+          id: "/commits/*path";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/commits/[...path]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/compare/*spec";
+          id: "/compare/*spec";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/compare/[...spec]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/actions/caches";
+          id: "/actions/caches";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/caches")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/issues/:number";
+          id: "/issues/:number";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/issues/[number]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/milestones/new";
+          id: "/milestones/new";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestones/new")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/pulse/:period?";
+          id: "/pulse/:period?";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/pulse/[[period]]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/actions/runners";
+          id: "/actions/runners";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runners")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/branches/:view?";
+          id: "/branches/:view?";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/branches/[[view]]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/discussions/new";
+          id: "/discussions/new";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/new")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/actions/runs/:id";
+          id: "/actions/runs/:id";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]")>;
+          $$route?: undefined;
+          children: readonly [
+            {
+              path: "/";
+              id: "/";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]/index")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/job/:jobId";
+              id: "/job/:jobId";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]/job/[jobId]")>;
+              $$route?: undefined;
+              children?: undefined;
+            },
+            {
+              path: "/attempts/:attempt";
+              id: "/attempts/:attempt";
+              page: true;
+              $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/runs/[id]/attempts/[attempt]")>;
+              $$route?: undefined;
+              children?: undefined;
+            }
+          ];
+        },
+        {
+          path: "/milestone/:number";
+          id: "/milestone/:number";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestone/[number]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/releases/tag/*tag";
+          id: "/releases/tag/*tag";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/tag/[...tag]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/releases/edit/*tag";
+          id: "/releases/edit/*tag";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/edit/[...tag]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/discussions/:number";
+          id: "/discussions/:number";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/[number]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/actions/workflows/:file";
+          id: "/actions/workflows/:file";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/actions/workflows/[file]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/milestones/:number/edit";
+          id: "/milestones/:number/edit";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/milestones/[number]/edit")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/discussions/categories/:slug";
+          id: "/discussions/categories/:slug";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/discussions/categories/[slug]")>;
+          $$route?: undefined;
+          children?: undefined;
         }
       ];
+    },
+    {
+      path: "/notifications";
+      id: "/notifications";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/notifications")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/topics/:topic";
+      id: "/topics/:topic";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/topics/[topic]")>;
+      $$route?: undefined;
+      children?: undefined;
     },
     {
       path: "/login/callback";
       id: "/login/callback";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/login/callback")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/organizations/:org/settings/*rest";
+      id: "/organizations/:org/settings/*rest";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/organizations/[org]/settings/[...rest]")>;
       $$route?: undefined;
       children?: undefined;
     }

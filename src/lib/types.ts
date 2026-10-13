@@ -208,3 +208,52 @@ export interface Organization {
   email?: string | null;
   html_url?: string;
 }
+
+/** GET /repos/{owner}/{repo}/pulls/{number} (REST pull request). */
+export interface PullRequestRef {
+  label: string;
+  ref: string;
+  sha: string;
+  user: SimpleUser;
+  repo: Repository | null;
+}
+
+export interface PullRequest {
+  id: number;
+  node_id: string;
+  number: number;
+  title: string;
+  body: string | null;
+  body_html?: string;
+  state: 'open' | 'closed';
+  draft?: boolean;
+  locked: boolean;
+  merged: boolean;
+  merged_at: string | null;
+  merged_by: SimpleUser | null;
+  mergeable: boolean | null;
+  mergeable_state: string;
+  merge_commit_sha: string | null;
+  user: SimpleUser;
+  labels: Label[];
+  assignees: SimpleUser[];
+  requested_reviewers: SimpleUser[];
+  requested_teams: { id: number; slug: string; name: string }[];
+  milestone: Milestone | null;
+  head: PullRequestRef;
+  base: PullRequestRef;
+  author_association: string;
+  comments: number;
+  review_comments: number;
+  commits: number;
+  additions: number;
+  deletions: number;
+  changed_files: number;
+  maintainer_can_modify: boolean;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  html_url: string;
+  diff_url: string;
+  patch_url: string;
+}

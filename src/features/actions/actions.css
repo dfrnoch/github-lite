@@ -1,0 +1,261 @@
+/* GitHub Actions views: job log panel (dark in both themes, like github.com) and ANSI colors. */
+
+.job-log {
+  --log-bg: #24292f;
+  --log-fg: #f0f6fc;
+  --log-fg-muted: #9198a1;
+  --log-hover: #32383f;
+  --log-border: #3d444d;
+  --log-highlight: rgba(210, 153, 34, 0.35);
+  background-color: var(--log-bg);
+  color: var(--log-fg);
+  border-radius: 6px;
+}
+html[data-color-mode='dark'] .job-log {
+  --log-bg: #0d1117;
+  --log-hover: #151b23;
+  border: 1px solid var(--borderColor-default);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-color-mode='light']) .job-log {
+    --log-bg: #0d1117;
+    --log-hover: #151b23;
+    border: 1px solid var(--borderColor-default);
+  }
+}
+
+.job-log-header {
+  border-bottom: 1px solid var(--log-border);
+}
+.job-log-search {
+  background-color: rgba(110, 118, 129, 0.2);
+  border: 1px solid transparent;
+  color: var(--log-fg);
+  border-radius: 6px;
+  padding: 4px 8px 4px 28px;
+  font-size: 14px;
+  width: 260px;
+}
+.job-log-search:focus {
+  border-color: var(--borderColor-accent-emphasis);
+  outline: none;
+}
+.job-log-search::placeholder {
+  color: var(--log-fg-muted);
+}
+.job-log .btn-octicon {
+  color: var(--log-fg-muted);
+}
+.job-log .btn-octicon:hover {
+  color: var(--log-fg);
+  background-color: var(--log-hover);
+}
+
+.job-step-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #d1d9e0;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.job-step-summary:hover,
+.job-step[open] > .job-step-summary {
+  background-color: var(--log-hover);
+  color: var(--log-fg);
+}
+.job-step-summary .octicon[class*='text-fg-success'],
+.job-step-summary .octicon[class*='text-fg-muted'] {
+  color: var(--log-fg-muted) !important;
+}
+.job-step-summary .octicon[class*='text-fg-danger'] {
+  color: #f85149 !important;
+}
+
+.job-log-lines {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 20px;
+  padding: 8px 0;
+  color: #f0f6fc;
+}
+.job-log-line {
+  display: flex;
+  padding-right: 16px;
+}
+.job-log-line:hover {
+  background-color: var(--log-hover);
+}
+.job-log-line.highlighted {
+  background-color: var(--log-highlight);
+}
+.job-log-line.selected {
+  background-color: rgba(56, 139, 253, 0.25);
+}
+.job-log-num {
+  flex-shrink: 0;
+  min-width: 56px;
+  padding-right: 16px;
+  text-align: right;
+  color: var(--log-fg-muted);
+  user-select: none;
+  text-decoration: none;
+}
+.job-log-num:hover {
+  color: var(--log-fg);
+  text-decoration: underline;
+}
+.job-log-time {
+  flex-shrink: 0;
+  padding-right: 12px;
+  color: var(--log-fg-muted);
+  user-select: none;
+}
+.job-log-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.job-log-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+.job-log-line.kind-group .job-log-text {
+  cursor: pointer;
+}
+.job-log-line.kind-error .job-log-text {
+  color: #f85149;
+}
+.job-log-line.kind-error {
+  background-color: rgba(248, 81, 73, 0.1);
+}
+.job-log-line.kind-warning .job-log-text {
+  color: #d29922;
+}
+.job-log-line.kind-warning {
+  background-color: rgba(187, 128, 9, 0.1);
+}
+.job-log-line.kind-notice .job-log-text {
+  color: #58a6ff;
+}
+.job-log-line.kind-debug .job-log-text {
+  color: #bc8cff;
+}
+.job-log-line.kind-command .job-log-text {
+  color: #79c0ff;
+}
+.job-log-text .log-prefix {
+  font-weight: 600;
+}
+.job-log mark {
+  background-color: #bb8009;
+  color: #fff;
+  border-radius: 2px;
+}
+
+/* 16-color ANSI palette, tuned for the dark log background. */
+.ansi-fg-0 { color: #6e7681; }
+.ansi-fg-1 { color: #ff7b72; }
+.ansi-fg-2 { color: #3fb950; }
+.ansi-fg-3 { color: #d29922; }
+.ansi-fg-4 { color: #58a6ff; }
+.ansi-fg-5 { color: #bc8cff; }
+.ansi-fg-6 { color: #39c5cf; }
+.ansi-fg-7 { color: #b1bac4; }
+.ansi-fg-8 { color: #8b949e; }
+.ansi-fg-9 { color: #ffa198; }
+.ansi-fg-10 { color: #56d364; }
+.ansi-fg-11 { color: #e3b341; }
+.ansi-fg-12 { color: #79c0ff; }
+.ansi-fg-13 { color: #d2a8ff; }
+.ansi-fg-14 { color: #56d4dd; }
+.ansi-fg-15 { color: #ffffff; }
+.ansi-bg-0 { background-color: #484f58; }
+.ansi-bg-1 { background-color: #b62324; }
+.ansi-bg-2 { background-color: #2ea043; }
+.ansi-bg-3 { background-color: #9e6a03; }
+.ansi-bg-4 { background-color: #1f6feb; }
+.ansi-bg-5 { background-color: #8957e5; }
+.ansi-bg-6 { background-color: #1b7c83; }
+.ansi-bg-7 { background-color: #6e7681; }
+.ansi-bg-8 { background-color: #6e7681; }
+.ansi-bg-9 { background-color: #da3633; }
+.ansi-bg-10 { background-color: #3fb950; }
+.ansi-bg-11 { background-color: #bb8009; }
+.ansi-bg-12 { background-color: #388bfd; }
+.ansi-bg-13 { background-color: #a371f7; }
+.ansi-bg-14 { background-color: #2b7489; }
+.ansi-bg-15 { background-color: #b1bac4; }
+.ansi-bold { font-weight: 600; }
+.ansi-dim { opacity: 0.7; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
+
+/* Workflow graph-lite: job cards on a dotted canvas. */
+.run-graph {
+  background-color: var(--bgColor-muted);
+  background-image: radial-gradient(var(--borderColor-muted) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.run-job-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 260px;
+  padding: 12px;
+  background-color: var(--bgColor-default);
+  border: 1px solid var(--borderColor-default);
+  border-radius: 6px;
+  box-shadow: var(--shadow-resting-small, 0 1px 0 rgba(31, 35, 40, 0.04));
+  color: var(--fgColor-default);
+  font-size: 14px;
+}
+.run-job-card:hover {
+  border-color: var(--borderColor-accent-emphasis);
+  text-decoration: none;
+}
+
+/* Run list rows: title column grows, the rest stays put. */
+.run-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px 160px 32px;
+  gap: 16px;
+  align-items: center;
+}
+@media (max-width: 1011px) {
+  .run-row {
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+  .run-row > .run-row-branch,
+  .run-row > .run-row-meta {
+    display: none;
+  }
+}
+
+.branch-name {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 6px;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--fgColor-accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  background-color: var(--bgColor-accent-muted);
+  border-radius: 6px;
+}
+a.branch-name:hover {
+  text-decoration: underline;
+}
+.job-step-summary .Counter {
+  background-color: rgba(110, 118, 129, 0.4);
+  color: var(--log-fg);
+}

@@ -141,6 +141,12 @@ export async function gh<T = any>(path: string, options: RequestOptions = {}): P
   return (options.text || !isJson ? await res.text() : await res.json()) as T;
 }
 
+/** Binary response (e.g. a private repo's image via `accept: 'application/vnd.github.raw'`). */
+export async function ghBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+  const res = await request(path, options);
+  return res.blob();
+}
+
 export interface PageInfo {
   page: number;
   /** Last page number when GitHub reports one (via the Link header). */

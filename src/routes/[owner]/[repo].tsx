@@ -1,4 +1,4 @@
-import { useLocation, useParams } from '@solidjs/router';
+import { type RouteDefinition, useLocation, useParams } from '@solidjs/router';
 import type { ParentProps } from 'solid-js';
 import { createMemo, Errored, Loading, Show } from 'solid-js';
 import { ErrorView, PageSpinner } from '../../components/ui';
@@ -54,6 +54,15 @@ function tabFor(section: string | undefined): Tab {
       return 'code';
   }
 }
+
+// Start the repo + tab counters as soon as navigation (or a link hover) begins,
+// so pages below don't wait on them before issuing their own requests.
+export const route = {
+  preload: ({ params }) => {
+    void getRepo(params.owner!, params.repo!);
+    void getRepoOverview(params.owner!, params.repo!);
+  },
+} satisfies RouteDefinition;
 
 /** Layout for every /:owner/:repo/* page: provides the repo and draws the tab bar. */
 export default function RepoLayout(props: ParentProps) {

@@ -14,6 +14,10 @@ export default function RefPicker(props: {
   current: string;
   hrefFor: (ref: string) => string;
   defaultBranch?: string;
+  /** Text before the ref name, e.g. "base:" on the compare page. */
+  prefix?: string;
+  /** Hide the Tags tab (compare / PR pickers work on branches too, but this keeps them short). */
+  branchesOnly?: boolean;
 }) {
   const [tab, setTab] = createSignal<'branches' | 'tags'>('branches');
   const [filter, setFilter] = createSignal('');
@@ -27,7 +31,9 @@ export default function RefPicker(props: {
       onOpen={() => input?.focus()}
       button={
         <>
-          <Octicon icon={gitBranchIcon} />
+          <Show when={!props.prefix} fallback={<span class="text-fg-muted">{props.prefix}</span>}>
+            <Octicon icon={gitBranchIcon} />
+          </Show>
           <span class="truncate font-semibold">{isSha() ? props.current.slice(0, 7) : props.current}</span>
           <Octicon icon={triangleDownIcon} />
         </>
@@ -44,7 +50,7 @@ export default function RefPicker(props: {
               value={filter()}
               onInput={(e) => setFilter(e.currentTarget.value)}
             />
-            <div class="flex gap-1 mt-2">
+            <div class={['flex gap-1 mt-2', { hidden: !!props.branchesOnly }]}>
               <button
                 type="button"
                 class={['btn btn-sm btn-invisible', { 'font-semibold!': tab() === 'branches' }]}

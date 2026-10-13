@@ -46,7 +46,7 @@ export default function StateIcon(props: { state: ItemState; size?: number; clas
     <Octicon
       icon={look(props.state).icon}
       size={props.size}
-      class={`${look(props.state).color} ${props.class ?? ''}`}
+      class={[look(props.state).color, props.class]}
       aria-label={look(props.state).label}
     />
   );

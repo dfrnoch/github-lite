@@ -1,14 +1,16 @@
-import { action, useAction, useLocation, useNavigate } from '@solidjs/router';
+import { action, query, useAction, useLocation, useNavigate } from '@solidjs/router';
+import { redirect } from '@solidjs/web';
 import { createEffect, createMemo, createSignal, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { CopyButton, Dialog, Markdown, PageSpinner, toastError } from '../../../components/ui';
 import { downloadIcon, pencilIcon, trashIcon } from '../../../icons/octicons';
 import { formatBytes } from '../../../lib/format';
-import { encodePath, gh, GitHubError } from '../../../lib/github';
+import { encodePath, gh } from '../../../lib/github';
 import { escapeLines, highlightLines } from '../../../lib/highlight';
 import type { Repository } from '../../../lib/types';
 import { getFile, getRawFile, getRenderedFile } from '../api';
 import Breadcrumbs from './Breadcrumbs';
+import { useFileTreeOpen } from './CodeLayout';
 import LatestCommit from './LatestCommit';
 import RefPicker from './RefPicker';
 
@@ -25,6 +27,19 @@ export const deleteFile = action(
   'delete-file',
 );
 
+/** github.com submodule URLs stay in-app (at the pinned commit); others link out. */
+function submoduleHref(url: string, sha: string) {
+  const m = url.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
+  return m ? `/${m[1]}/${m[2]}/tree/${sha}` : url;
+}
+
+/** File metadata; a folder redirects to its /tree/ page like github.com (READMEs link folders via /blob/). */
+const getBlobMeta = query(async (owner: string, repo: string, gitRef: string, path: string) => {
+  const file = await getFile(owner, repo, gitRef, path);
+  if (!file) throw redirect(`/${owner}/${repo}/tree/${encodePath(gitRef)}/${encodePath(path)}`);
+  return file;
+}, 'blob-meta');
+
 /** Parse "#L10" / "#L10-L20" into a line range. */
 function parseLineHash(hash: string): [number, number] | null {
   const m = hash.match(/^#L(\d+)(?:-L(\d+))?$/);
@@ -36,33 +51,41 @@ function parseLineHash(hash: string): [number, number] | null {
 
 /** A single file: header with actions, then code / rendered markdown / image. */
 export default function FileView(props: { repo: Repository; gitRef: string; path: string }) {
-  const owner = () => props.repo.owner.login;
-  const name = () => props.repo.name;
+  // Memos so a revalidated repo object (same values) doesn't refetch the file.
+  const owner = createMemo(() => props.repo.owner.login);
+  const name = createMemo(() => props.repo.name);
   const base = () => `/${props.repo.full_name}`;
   const location = useLocation();
   const navigate = useNavigate();
-  const meta = createMemo(() =>
-    getFile(owner(), name(), props.gitRef, props.path).then((f) => {
-      if (!f) throw new GitHubError(404, 'Not Found');
-      return f;
-    }),
-  );
+  const meta = createMemo(() => getBlobMeta(owner(), name(), props.gitRef, props.path));
   const isImage = () => IMAGE.test(props.path);
   const renderable = () => RENDERABLE.test(props.path);
   const [mode, setMode] = createSignal<'preview' | 'code' | 'blame'>(() => (renderable() ? 'preview' : 'code'));
   const canPush = () => !!props.repo.permissions?.push;
+  const inTree = useFileTreeOpen();
   const [deleting, setDeleting] = createSignal(false);
+  /** A symlink target is relative to the link's directory. */
+  const symlinkHref = (target: string) => {
+    const parts = props.path.split('/').slice(0, -1);
+    for (const seg of target.split('/')) {
+      if (seg === '..') parts.pop();
+      else if (seg && seg !== '.') parts.push(seg);
+    }
+    return `${base()}/blob/${encodePath(props.gitRef)}/${encodePath(parts.join('/'))}`;
+  };
 
   return (
     <>
       <div class="flex flex-wrap items-center gap-2 mb-4">
-        <RefPicker
-          owner={owner()}
-          repo={name()}
-          current={props.gitRef}
-          defaultBranch={props.repo.default_branch}
-          hrefFor={(ref) => `${base()}/blob/${encodePath(ref)}/${encodePath(props.path)}`}
-        />
+        <div class={{ 'lg:hidden': inTree() }}>
+          <RefPicker
+            owner={owner()}
+            repo={name()}
+            current={props.gitRef}
+            defaultBranch={props.repo.default_branch}
+            hrefFor={(ref) => `${base()}/blob/${encodePath(ref)}/${encodePath(props.path)}`}
+          />
+        </div>
         <div class="min-w-0 ml-2">
           <Breadcrumbs owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} isFile />
         </div>
@@ -117,13 +140,33 @@ export default function FileView(props: { repo: Repository; gitRef: string; path
         </div>
         <Loading fallback={<PageSpinner />}>
           <Switch>
+            <Match when={meta().type === 'symlink'}>
+              <div class="p-6 text-sm">
+                <span class="text-fg-muted">Symbolic link to </span>
+                <a class="font-mono" href={symlinkHref(meta().target ?? '')}>
+                  {meta().target}
+                </a>
+              </div>
+            </Match>
+            <Match when={meta().type === 'submodule'}>
+              <div class="p-6 text-sm">
+                <span class="text-fg-muted">Submodule </span>
+                <Show when={meta().submodule_git_url} fallback={<span class="font-mono">{props.path}</span>}>
+                  {(url) => (
+                    <a class="font-mono" href={submoduleHref(url(), meta().sha)}>
+                      {url()} @ {meta().sha.slice(0, 7)}
+                    </a>
+                  )}
+                </Show>
+              </div>
+            </Match>
             <Match when={isImage()}>
               <div class="p-6 flex justify-center bg-[length:20px_20px] bg-canvas-muted">
                 <img src={meta().download_url ?? ''} alt={props.path} class="max-w-full" />
               </div>
             </Match>
             <Match when={renderable() && mode() === 'preview'}>
-              <RenderedFile owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} />
+              <RenderedFile owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} private={props.repo.private} />
             </Match>
             <Match when={true}>
               <CodeView
@@ -169,11 +212,14 @@ function CopyRawButton(props: { owner: string; repo: string; gitRef: string; pat
   );
 }
 
-function RenderedFile(props: { owner: string; repo: string; gitRef: string; path: string }) {
+function RenderedFile(props: { owner: string; repo: string; gitRef: string; path: string; private: boolean }) {
   const html = createMemo(() => getRenderedFile(props.owner, props.repo, props.gitRef, props.path));
   return (
     <div class="p-6 md:p-8">
-      <Markdown html={html()} />
+      <Markdown
+        html={html()}
+        file={{ owner: props.owner, repo: props.repo, gitRef: props.gitRef, path: props.path, private: props.private }}
+      />
     </div>
   );
 }
@@ -226,7 +272,7 @@ function CodeView(props: {
         {raw().split('\n').length - (raw().endsWith('\n') ? 1 : 0)} lines ({raw().split('\n').filter((l) => l.trim()).length} loc)
       </div>
       <div class="overflow-auto py-2">
-        <table class="w-full border-collapse">
+        <table class="w-full border-collapse shiki">
           <tbody
             ref={(el) => (tbody = el)}
             // oxlint-disable-next-line solid/no-innerhtml -- escaped/highlighted source

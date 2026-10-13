@@ -1,55 +1,69 @@
-## Solid `with-unocss` template
+# GitHub Lite
 
-This is `basic` plus [UnoCSS](https://unocss.dev) — same routes, same demo, same tests; the pages are restyled with utility classes and `src/App.css` shrinks to the one thing utilities don't cover (the logo's keyframes). The diff against `basic` is the documentation of what UnoCSS changes.
+A lightweight, fast reimplementation of the github.com web UI on top of the
+public GitHub API. Swap `github.com` for this app's host in any URL and you
+land on the same page — same data, same look (GitHub's own Primer design
+tokens and Octicons), without the AI features and the bloat.
 
-**Deployment contract** (inherited from `basic`): zero server dependencies — `vite build` emits a purely static site; deploy `dist/client` anywhere. No server, no `start` script: Node hosts that run `npm start` after building (Firebase App Hosting, most buildpacks) need either the platform's static product or the SSR flip — see `basic`'s README.
+Built with SolidJS 2, Solid Router, UnoCSS and Vite. See
+[`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for what is done and what is left.
 
-## How UnoCSS fits this stack
+## Signing in
 
-- The `UnoCSS()` Vite plugin (registered in `vite.config.ts`) scans your source files for class names and generates exactly that CSS, served as the `virtual:uno.css` module — imported by `src/App.tsx` alongside `@unocss/reset/tailwind.css` for the element reset. Both flow into the prerendered document shell exactly like any app CSS; nothing about the turnkey setup changes.
-- The wind4 preset provides Tailwind-compatible utilities (see the restyled pages under `src/routes`); custom keyframes still live in plain CSS (`src/App.css`).
-- Configuration lives inline in `vite.config.ts` and can move to `uno.config.ts` as it grows (presets, shortcuts, custom rules).
-- If a class name doesn't apply, it usually wasn't seen by the scanner: class names must appear as complete strings in source (no runtime string-building).
+Two options, both giving the app a token that is stored only in your browser
+and sent only to `api.github.com`:
 
-Everything else — file-system routing, data loading, testing, the one-boolean `ssr: true` flip — is `basic`; see its README.
+1. **Personal access token** (works everywhere, including a purely static
+   deployment). The login page links to GitHub's "new classic token" form
+   with every scope the app can use pre-selected (`repo`, `workflow`,
+   `delete_repo`, `admin:org`, `admin:repo_hook`, `admin:public_key`,
+   `admin:gpg_key`, `user`, `notifications`, `project`, …). Fine-grained
+   tokens also work, limited to what you grant them.
+2. **Sign in with GitHub (OAuth App)**. GitHub's token endpoint has no CORS
+   and needs the client secret, so this needs the small server bundle:
+   create an OAuth App with callback URL `<origin>/login/callback`, then set
+   `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (see `.env.example`). The
+   button only appears when they are configured.
 
-## Usage
+Classic tokens and OAuth tokens can do everything the API allows: create,
+edit and delete repositories, manage settings, collaborators, branch
+protection, webhooks, releases, Actions, organizations, teams, and so on.
+Things the public API cannot do (creating organizations, wikis, billing)
+link out to github.com.
 
-Those templates dependencies are maintained via [pnpm](https://pnpm.io) via `pnpm up -Lri`.
-
-This is the reason you see a `pnpm-lock.yaml`. That being said, any package manager will work. This file can be safely be removed once you clone a template.
+## Development
 
 ```bash
-$ npm install # or pnpm install or yarn install
+pnpm install
+pnpm dev          # http://localhost:3000
+pnpm test         # vitest
+pnpm typecheck    # tsc
+pnpm lint         # oxlint
+node scripts/gen-octicons.mjs   # regenerate src/icons/octicons.ts after upgrading @primer/octicons
 ```
 
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
+## Building & deploying
 
-## Available Scripts
+```bash
+pnpm build
+```
 
-In the project directory, you can run:
+- `dist/client` is a static site (SPA with history fallback) — deploy it to
+  any static host if you only use personal access tokens.
+- For OAuth, run the bundled Node server, which serves `dist/client` and the
+  token-exchange endpoint: `GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… node dist/server/node.js`
+  (`PORT`/`HOST` configurable).
 
-### `npm run dev`
+## How it works
 
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
-
-The page will reload if you make edits.<br>
-
-### `npm run build`
-
-Builds the static production site to `dist/client`, routes code-split, CSS pruned to the classes actually used.
-
-### `npm run serve`
-
-Serves the production build locally.
-
-### `npm test`
-
-Runs the test suite.
-
-## Deployment
-
-Deploy the `dist/client` folder to any static host provider (netlify, surge, now, etc.)
-
-## This project was created with the [Solid CLI](https://github.com/solidjs-community/solid-cli)
+- `src/lib/github.ts` — REST + GraphQL client. GETs revalidate the browser's
+  HTTP cache with ETags, so unchanged data costs nothing against the rate
+  limit (shown in the footer).
+- Reads are router `query()`s, mutations router `action()`s; the router
+  refetches the page's data after every mutation.
+- Markdown (READMEs, issue bodies, comments, previews) is rendered by
+  GitHub's API, so it matches github.com exactly; links back to github.com
+  are rewritten to stay in the app.
+- Syntax highlighting uses Shiki with lazily loaded grammars.
+- Routes in `src/routes` mirror github.com's URL layout
+  (`/:owner/:repo/blob/:ref/:path`, `/:owner/:repo/pull/:n/files`, …).

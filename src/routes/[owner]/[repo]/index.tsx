@@ -2,12 +2,33 @@ import { Title } from '@solidjs/meta';
 import { createMemo, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { CopyButton } from '../../../components/ui';
-import { getLastCommit } from '../../../features/repo/api';
+import type { RouteDefinition } from '@solidjs/router';
+import { getCommunityFiles, getLastCommit, getReadme, getRepo, getRepoViewerState, getTree, getTreeCommits } from '../../../features/repo/api';
 import AboutSidebar from '../../../features/repo/components/AboutSidebar';
 import DirectoryView from '../../../features/repo/components/DirectoryView';
 import RepoTitle from '../../../features/repo/components/RepoTitle';
 import { useRepo } from '../../../features/repo/context';
 import { repoForkedIcon, repoTemplateIcon } from '../../../icons/octicons';
+
+// Everything on this page hangs off the default branch name, which only the
+// repo response knows: start all of it the moment the repo lands (at
+// navigation/hover time) instead of as each component renders.
+export const route = {
+  preload: ({ params }) => {
+    const { owner, repo } = params as { owner: string; repo: string };
+    void getRepoViewerState(owner, repo);
+    void getCommunityFiles(owner, repo);
+    void getRepo(owner, repo).then((r) => {
+      const ref = r.default_branch;
+      void getLastCommit(owner, repo, ref);
+      void getLastCommit(owner, repo, ref, ''); // the bar above the file list
+      void getReadme(owner, repo, ref, '');
+      void getTree(owner, repo, ref, '').then((entries) => {
+        if (entries) void getTreeCommits(owner, repo, ref, entries.map((e) => e.path));
+      });
+    });
+  },
+} satisfies RouteDefinition;
 
 /** Repository home: /:owner/:repo */
 export default function RepoHome() {

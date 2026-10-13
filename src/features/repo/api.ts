@@ -132,7 +132,7 @@ export interface TreeEntry {
 export const getTree = query(async (owner: string, repo: string, ref: string, path = '') => {
   const data = await gql<any>(
     `query($owner:String!,$name:String!,$expr:String!){repository(owner:$owner,name:$name){
-      object(expression:$expr){... on Tree{entries{name path type mode oid object{... on Blob{byteSize}}}}}
+      object(expression:$expr){... on Tree{entries{name path type mode oid submodule{gitUrl}}}}
     }}`,
     { owner, name: repo, expr: `${ref}:${path}` },
   );
@@ -147,7 +147,7 @@ export const getTree = query(async (owner: string, repo: string, ref: string, pa
         type: e.type,
         mode: e.mode,
         oid: e.oid,
-        size: e.object?.byteSize,
+        target: e.submodule?.gitUrl ?? undefined,
       }),
     )
     .sort((a, b) => order[a.type]! - order[b.type]! || a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
@@ -159,23 +159,30 @@ export const getTree = query(async (owner: string, repo: string, ref: string, pa
  * `history(first:1, path:…)` per entry.
  */
 export const getTreeCommits = query(async (owner: string, repo: string, ref: string, paths: string[]) => {
-  if (!paths.length) return {} as Record<string, LastCommit>;
-  const fields = paths
-    .slice(0, 200)
-    .map((p, i) => `e${i}:history(first:1,path:${JSON.stringify(p)}){nodes{oid messageHeadline committedDate}}`)
-    .join('\n');
-  const data = await gql<any>(
-    `query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){
-      object(expression:$ref){... on Commit{${fields}}}
-    }}`,
-    { owner, name: repo, ref },
+  type Entry = { oid: string; messageHeadline: string; committedDate: string };
+  const out: Record<string, Entry> = {};
+  const list = paths.slice(0, 300);
+  // Big directories time out as one query: ask in parallel chunks and keep whatever answers.
+  const chunks: string[][] = [];
+  for (let i = 0; i < list.length; i += 50) chunks.push(list.slice(i, i + 50));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      const fields = chunk
+        .map((p, i) => `e${i}:history(first:1,path:${JSON.stringify(p)}){nodes{oid messageHeadline committedDate}}`)
+        .join('\n');
+      const data = await gql<any>(
+        `query($owner:String!,$name:String!,$ref:String!){repository(owner:$owner,name:$name){
+          object(expression:$ref){... on Commit{${fields}}}
+        }}`,
+        { owner, name: repo, ref },
+      ).catch(() => null);
+      const obj = data?.repository?.object ?? {};
+      chunk.forEach((p, i) => {
+        const node = obj[`e${i}`]?.nodes?.[0];
+        if (node) out[p] = node;
+      });
+    }),
   );
-  const obj = data.repository.object ?? {};
-  const out: Record<string, { oid: string; messageHeadline: string; committedDate: string }> = {};
-  paths.slice(0, 200).forEach((p, i) => {
-    const node = obj[`e${i}`]?.nodes?.[0];
-    if (node) out[p] = node;
-  });
   return out;
 }, 'tree-commits');
 

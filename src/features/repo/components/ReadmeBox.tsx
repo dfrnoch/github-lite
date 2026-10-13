@@ -1,10 +1,11 @@
 import { Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Markdown } from '../../../components/ui';
+import type { RepoFileContext } from '../../../lib/markdown';
 import { bookIcon, pencilIcon } from '../../../icons/octicons';
 
 /** The README panel under the file list. */
-export default function ReadmeBox(props: { html: string; editHref?: string; title?: string }) {
+export default function ReadmeBox(props: { html: string; editHref?: string; title?: string; file?: RepoFileContext }) {
   return (
     <div class="Box mt-4" id="readme">
       <div class="flex items-center gap-2 px-4 py-2 border-b border-line-muted sticky top-0 bg-canvas rounded-t-md z-1">
@@ -20,7 +21,7 @@ export default function ReadmeBox(props: { html: string; editHref?: string; titl
         </Show>
       </div>
       <div class="p-6 md:p-8">
-        <Markdown html={props.html} />
+        <Markdown html={props.html} file={props.file} />
       </div>
     </div>
   );

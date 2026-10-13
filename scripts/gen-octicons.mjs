@@ -16,12 +16,16 @@ export interface OcticonData {
   readonly sizes: { readonly [height: number]: { readonly width: number; readonly d: readonly string[] } };
 }
 `;
+// `fooIcon` carries the 16px drawing (or 24px when that is the only one);
+// `fooIcon24` the 24px drawing — separate exports keep the bundle to what is used.
 for (const name of Object.keys(data).sort()) {
-  const sizes = {};
-  for (const [h, v] of Object.entries(data[name].heights)) {
-    sizes[h] = { width: v.width, d: paths(v.path) };
+  const heights = data[name].heights;
+  const entry = (h) => ({ [h]: { width: heights[h].width, d: paths(heights[h].path) } });
+  const base = heights[16] ? entry(16) : entry(Object.keys(heights)[0]);
+  out += `export const ${camel(name)}Icon: OcticonData = ${JSON.stringify({ sizes: base })};\n`;
+  if (heights[16] && heights[24]) {
+    out += `export const ${camel(name)}Icon24: OcticonData = ${JSON.stringify({ sizes: entry(24) })};\n`;
   }
-  out += `export const ${camel(name)}Icon: OcticonData = ${JSON.stringify({ sizes })};\n`;
 }
 writeFileSync(new URL('../src/icons/octicons.ts', import.meta.url), out);
 console.log(`wrote ${Object.keys(data).length} icons`);

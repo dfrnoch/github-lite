@@ -1190,6 +1190,10 @@ html[data-color-mode='dark'] .shiki span {
   font-size: 14px !important;
   background-color: transparent !important;
 }
+/* The tailwind reset makes <img> block-level; READMEs rely on inline badges. */
+.markdown-body img {
+  display: inline;
+}
 .container-xl {
   max-width: 1280px;
   margin-right: auto;
@@ -1375,4 +1379,26 @@ dialog.Drawer::backdrop {
 .markdown-body :is(h1, h2, h3, h4, h5, h6):hover .anchor,
 .markdown-body .anchor:focus {
   opacity: 1;
+}
+
+/* The element reset strips list markers; restore them inside rendered markdown. */
+.markdown-body ul {
+  list-style: disc;
+}
+.markdown-body ol {
+  list-style: decimal;
+}
+.markdown-body ul ul,
+.markdown-body ol ul {
+  list-style: circle;
+}
+.markdown-body ul ul ul {
+  list-style: square;
+}
+.markdown-body ol ol {
+  list-style: lower-roman;
+}
+.markdown-body ul.contains-task-list,
+.markdown-body .task-list-item {
+  list-style: none;
 }

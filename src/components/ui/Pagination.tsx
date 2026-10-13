@@ -42,10 +42,11 @@ export default function Pagination(props: { pageInfo: PageInfo; href: (page: num
               {(p) =>
                 p == null ? (
                   <span class="disabled">…</span>
-                ) : p === page() ? (
-                  <em aria-current="page">{p}</em>
                 ) : (
-                  <a href={props.href(p)}>{p}</a>
+                  // Read page() inside JSX (the For callback body is not a tracking scope).
+                  <Show when={p !== page()} fallback={<em aria-current="page">{p}</em>}>
+                    <a href={props.href(p)}>{p}</a>
+                  </Show>
                 )
               }
             </For>

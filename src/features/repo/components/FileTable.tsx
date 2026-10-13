@@ -8,6 +8,12 @@ import { CommitMessage } from './LatestCommit';
 
 const SYMLINK_MODE = 0o120000;
 
+/** Submodules on github.com open in-app at the pinned commit; other hosts link out. */
+function submoduleHref(e: TreeEntry) {
+  const m = e.target?.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
+  return m ? `/${m[1]}/${m[2]}/tree/${e.oid}` : (e.target ?? undefined);
+}
+
 /** github.com's file table: icon, name, last commit message, last commit date. */
 export default function FileTable(props: {
   owner: string;
@@ -60,9 +66,9 @@ export default function FileTable(props: {
                   <Show
                     when={entry.type !== 'commit'}
                     fallback={
-                      <span class="truncate">
-                        {entry.name} @ <span class="font-mono text-fg-muted">{entry.oid.slice(0, 7)}</span>
-                      </span>
+                      <a class="link-plain truncate" href={submoduleHref(entry)} title={entry.target ?? entry.name}>
+                        {entry.name} @ <span class="font-mono text-fg-accent">{entry.oid.slice(0, 7)}</span>
+                      </a>
                     }
                   >
                     <a class="link-plain truncate" href={hrefFor(entry)} title={entry.name}>
