@@ -153,3 +153,76 @@ export const followFromHovercard = action(async (login: string, follow: boolean)
   forget(login);
   await gh(`/user/following/${encodeURIComponent(login)}`, { method: follow ? 'PUT' : 'DELETE' });
 }, 'hovercard-follow');
+
+export interface IssueHovercardData {
+  kind: 'issue' | 'pull';
+  repo: string;
+  ownerAvatar: string;
+  number: number;
+  title: string;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  stateReason: string | null;
+  draft: boolean;
+  createdAt: string;
+  /** Plain-text body, for a short excerpt. */
+  body: string;
+  author: { login: string; avatarUrl: string } | null;
+  labels: { name: string; color: string }[];
+  comments: number;
+  viewerDidAuthor: boolean;
+  /** Pull requests only. */
+  baseRef?: string;
+  headRef?: string;
+  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+}
+
+async function fetchIssueHovercard(owner: string, repo: string, number: number): Promise<IssueHovercardData | null> {
+  const common = `number title createdAt bodyText viewerDidAuthor author{login avatarUrl}
+    labels(first:6){nodes{name color}} comments{totalCount}`;
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
+      nameWithOwner owner{avatarUrl}
+      issueOrPullRequest(number:$number){__typename
+        ... on Issue{${common} state stateReason}
+        ... on PullRequest{${common} state isDraft baseRefName headRefName reviewDecision}
+      }
+    }}`,
+    { owner, name: repo, number },
+  ).catch(() => null);
+  const r = data?.repository;
+  const i = r?.issueOrPullRequest;
+  if (!i) return null;
+  const pull = i.__typename === 'PullRequest';
+  return {
+    kind: pull ? 'pull' : 'issue',
+    repo: r.nameWithOwner,
+    ownerAvatar: r.owner.avatarUrl,
+    number: i.number,
+    title: i.title,
+    state: i.state,
+    stateReason: i.stateReason ?? null,
+    draft: !!i.isDraft,
+    createdAt: i.createdAt,
+    body: (i.bodyText ?? '').trim(),
+    author: i.author,
+    labels: i.labels?.nodes ?? [],
+    comments: i.comments?.totalCount ?? 0,
+    viewerDidAuthor: !!i.viewerDidAuthor,
+    baseRef: i.baseRefName,
+    headRef: i.headRefName,
+    reviewDecision: i.reviewDecision ?? null,
+  };
+}
+
+const issueCache = new Map<string, { at: number; value: Promise<IssueHovercardData | null> }>();
+
+/** Everything an issue / pull request hovercard shows. */
+export const getIssueHovercard = query((owner: string, repo: string, number: number): Promise<IssueHovercardData | null> => {
+  const key = `${owner}/${repo}#${number}`.toLowerCase();
+  const hit = issueCache.get(key);
+  if (hit && Date.now() - hit.at < TTL) return hit.value;
+  const value = fetchIssueHovercard(owner, repo, number);
+  issueCache.set(key, { at: Date.now(), value });
+  value.then((v) => v ?? issueCache.delete(key)).catch(() => issueCache.delete(key));
+  return value;
+}, 'issue-hovercard');

@@ -1,8 +1,15 @@
 import { useLocation } from '@solidjs/router';
-import { createSignal, onSettled, Show } from 'solid-js';
+import { createSignal, Match, onSettled, Switch } from 'solid-js';
 import { RESERVED } from '../layout/headerContext';
 import Popover from '../ui/Popover';
-import { getHovercard, type HovercardData, type HovercardSubject } from './api';
+import {
+  getHovercard,
+  getIssueHovercard,
+  type HovercardData,
+  type HovercardSubject,
+  type IssueHovercardData,
+} from './api';
+import IssueHovercard from './IssueHovercard';
 import UserHovercard from './UserHovercard';
 
 const SHOW_DELAY = 500;
@@ -31,33 +38,56 @@ const NOT_LOGINS = new Set([
 const EXCLUDED = '[data-no-hovercard], .AppHeader, .Drawer, dialog, .btn, .UnderlineNav, .SelectMenu';
 
 const LOGIN = /^\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/?$/;
+/** /owner/repo/issues/123 or /owner/repo/pull/123 (optionally /files, /commits…). */
+const ISSUE = /^\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)(?:\/[^/]*)?\/?$/;
+
+type Target = { kind: 'user'; login: string } | { kind: 'issue'; owner: string; repo: string; number: number };
+const keyOf = (t: Target) => (t.kind === 'user' ? `@${t.login}` : `${t.owner}/${t.repo}#${t.number}`).toLowerCase();
 
 /** The hovercard target an event started in, if any. */
 function targetOf(node: EventTarget | null): HTMLElement | null {
-  const el = (node as Element | null)?.closest?.('[data-hovercard-user], a[href]') as HTMLElement | null;
+  const el = (node as Element | null)?.closest?.(
+    '[data-hovercard-user], [data-hovercard-issue], a[href]',
+  ) as HTMLElement | null;
   if (!el || el.closest(EXCLUDED)) return null;
-  return loginOf(el) ? el : null;
+  return infoOf(el) ? el : null;
 }
 
-/** Login of a target: its `data-hovercard-user`, or a single-segment profile link (`/login`). */
-function loginOf(el: HTMLElement): string | null {
-  const explicit = el.getAttribute('data-hovercard-user');
-  if (explicit != null) return explicit || null;
+/** An in-app or github.com URL for a link, or null. */
+function urlOf(el: HTMLElement): URL | null {
   const href = el.getAttribute('href');
   if (!href || href.startsWith('#')) return null;
-  let url: URL;
   try {
-    url = new URL(href, location.href);
+    const url = new URL(href, location.href);
+    return url.origin === location.origin || url.hostname === 'github.com' ? url : null;
   } catch {
     return null;
   }
-  if (url.origin !== location.origin && url.hostname !== 'github.com') return null;
+}
+
+/**
+ * What a target shows: a user (its `data-hovercard-user`, or a single-segment
+ * profile link `/login`) or an issue / pull request (`data-hovercard-issue=
+ * "owner/repo#123"`, or a link to one — #123 references in comments, commit
+ * messages and timelines).
+ */
+function infoOf(el: HTMLElement): Target | null {
+  const user = el.getAttribute('data-hovercard-user');
+  if (user != null) return user ? { kind: 'user', login: user } : null;
+  const issue = el.getAttribute('data-hovercard-issue')?.match(/^([^/]+)\/([^#]+)#(\d+)$/);
+  if (issue) return { kind: 'issue', owner: issue[1]!, repo: issue[2]!, number: Number(issue[3]) };
+  const url = urlOf(el);
+  if (!url) return null;
+  const ref = url.pathname.match(ISSUE);
+  if (ref && !RESERVED.has(ref[1]!.toLowerCase()) && !NOT_LOGINS.has(ref[1]!.toLowerCase())) {
+    return { kind: 'issue', owner: decodeURIComponent(ref[1]!), repo: decodeURIComponent(ref[2]!), number: Number(ref[3]) };
+  }
   if (url.search || url.hash) return null;
   const m = url.pathname.match(LOGIN);
   if (!m) return null;
   const login = m[1]!;
   if (RESERVED.has(login.toLowerCase()) || NOT_LOGINS.has(login.toLowerCase())) return null;
-  return login;
+  return { kind: 'user', login };
 }
 
 /** The repo / issue / PR the current page is about (tailors the hovercard's context lines). */
@@ -70,17 +100,22 @@ function subjectOf(pathname: string): HovercardSubject | undefined {
   return { owner, repo, kind: 'repository' };
 }
 
+type Card =
+  | { kind: 'user'; anchor: HTMLElement; data: HovercardData }
+  | { kind: 'issue'; anchor: HTMLElement; data: IssueHovercardData };
+
 /**
- * github.com's user / organization hovercards, app-wide. Mounted once; finds
- * targets by event delegation on the document — profile links (`/login`) and
- * any element with `data-hovercard-user="login"` (e.g. non-link avatars).
+ * github.com's hovercards, app-wide: users / organizations and issues / pull
+ * requests. Mounted once; finds targets by event delegation on the document —
+ * profile links, issue/PR links (e.g. #123 references), and elements with
+ * `data-hovercard-user` / `data-hovercard-issue` (e.g. non-link avatars).
  * Shows after a short hover (data is prefetched as soon as the hover starts),
  * stays while the pointer moves into the card, hides shortly after leaving
  * both, and on Escape / click / navigation.
  */
 export default function HovercardHost() {
   const loc = useLocation();
-  const [card, setCard] = createSignal<{ anchor: HTMLElement; data: HovercardData } | null>(null);
+  const [card, setCard] = createSignal<Card | null>(null);
   let pending: HTMLElement | null = null;
   /** Last pointer position over a target — to re-find it if the page re-rendered it meanwhile. */
   let lastX = 0;
@@ -114,18 +149,23 @@ export default function HovercardHost() {
       if (pending === el) return;
       clearTimeout(showTimer);
       pending = el;
-      const login = loginOf(el)!;
+      const target = infoOf(el)!;
       // Start fetching right away so the card can show with data when the delay ends.
-      const data = getHovercard(login, subjectOf(loc.pathname)).catch(() => null);
+      const data: Promise<Card['data'] | null> = (
+        target.kind === 'user'
+          ? getHovercard(target.login, subjectOf(loc.pathname))
+          : getIssueHovercard(target.owner, target.repo, target.number)
+      ).catch(() => null);
       showTimer = setTimeout(() => {
         void data.then((d) => {
           if (pending !== el) return;
           pending = null;
           // A revalidation may have swapped the element out from under the pointer.
           const anchor = el.isConnected ? el : targetOf(document.elementFromPoint(lastX, lastY));
-          if (!d || !anchor || loginOf(anchor) !== login) return;
+          const now = anchor && infoOf(anchor);
+          if (!d || !anchor || !now || keyOf(now) !== keyOf(target)) return;
           cancelHide();
-          setCard({ anchor, data: d });
+          setCard({ kind: target.kind, anchor, data: d } as Card);
         });
       }, SHOW_DELAY);
     };
@@ -165,9 +205,16 @@ export default function HovercardHost() {
       onPointerEnter={cancelHide}
       onPointerLeave={scheduleHide}
       class="w-[340px] max-w-[calc(100vw-16px)]"
-      aria-label="User card"
+      aria-label={card()?.kind === 'issue' ? 'Issue card' : 'User card'}
     >
-      <Show when={card()}>{(c) => <UserHovercard data={c().data} />}</Show>
+      <Switch>
+        <Match when={card()?.kind === 'issue' && (card() as Extract<Card, { kind: 'issue' }>)}>
+          {(c) => <IssueHovercard data={c().data} />}
+        </Match>
+        <Match when={card()?.kind === 'user' && (card() as Extract<Card, { kind: 'user' }>)}>
+          {(c) => <UserHovercard data={c().data} />}
+        </Match>
+      </Switch>
     </Popover>
   );
 }
