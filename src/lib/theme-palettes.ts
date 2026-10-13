@@ -196,6 +196,17 @@ export const PALETTES: Palette[] = [
     syntax: { keyword: '#fede5d', string: '#ff8b39', constant: '#f97e72', entity: '#36f9f6', tag: '#72f1b8', variable: '#ff7edb', comment: '#848bbd' },
   },
   {
+    // Modern true black (OLED): pure black canvas, hairline borders, vivid accents.
+    id: 'midnight',
+    name: 'Midnight',
+    family: 'dark',
+    colors: {
+      bg: '#000000', inset: '#000000', surface: '#0a0a0a', fg: '#ededed', muted: '#a1a1a1', border: '#262626',
+      red: '#ff6166', orange: '#ff990a', yellow: '#ffd60a', green: '#3dd68c', cyan: '#2fd3d3', blue: '#52a8ff', purple: '#bf7af0', pink: '#f75f8f',
+    },
+    syntax: { keyword: '#f75f8f', string: '#62c073', constant: '#52a8ff', entity: '#bf7af0', tag: '#3dd68c', variable: '#ff990a', comment: '#6e6e6e' },
+  },
+  {
     id: 'catppuccin_latte',
     name: 'Catppuccin Latte',
     family: 'light',

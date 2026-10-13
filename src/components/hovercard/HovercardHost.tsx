@@ -50,7 +50,16 @@ function targetOf(node: EventTarget | null): HTMLElement | null {
     '[data-hovercard-user], [data-hovercard-issue], a[href]',
   ) as HTMLElement | null;
   if (!el || el.closest(EXCLUDED)) return null;
-  return infoOf(el) ? el : null;
+  const info = infoOf(el);
+  if (!info) return null;
+  if (info.kind === 'issue') {
+    // Issue / PR lists already show what the card would; and a link to the
+    // page you're on (its files, conflicts, commits) isn't worth a card.
+    if (el.closest('[data-no-issue-hovercard]')) return null;
+    const here = location.pathname.match(ISSUE);
+    if (here && here[1]!.toLowerCase() === info.owner.toLowerCase() && here[2]!.toLowerCase() === info.repo.toLowerCase() && Number(here[3]) === info.number) return null;
+  }
+  return el;
 }
 
 /** An in-app or github.com URL for a link, or null. */

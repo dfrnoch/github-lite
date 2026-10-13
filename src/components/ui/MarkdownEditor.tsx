@@ -139,7 +139,7 @@ export default function MarkdownEditor(props: {
   return (
     <div class="rounded-md border border-line">
       <div class="flex items-center justify-between gap-2 border-b border-line bg-canvas-muted px-2 pt-2 rounded-t-md">
-        <div class="flex -mb-px">
+        <div class="flex -mb-px shrink-0 self-end">
           <button
             type="button"
             class={[
@@ -162,7 +162,7 @@ export default function MarkdownEditor(props: {
           </button>
         </div>
         <Show when={tab() === 'write'}>
-          <div class="hidden md:flex items-center pb-1">
+          <div class="hidden md:flex flex-wrap items-center justify-end min-w-0 pb-1">
             <For each={FORMATS}>{(f) => (
               <button
                 type="button"

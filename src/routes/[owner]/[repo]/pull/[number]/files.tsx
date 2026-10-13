@@ -229,7 +229,7 @@ function ReviewMenu(props: {
     <Dropdown
       class="btn btn-sm btn-primary"
       align="right"
-      menuClass="w-[min(560px,calc(100vw-32px))] p-3"
+      menuClass="w-[min(560px,calc(100vw-32px))] max-w-none! max-h-[calc(100vh-120px)]! p-3"
       button={
         <>
           {props.pendingCount ? 'Finish your review' : 'Review changes'}

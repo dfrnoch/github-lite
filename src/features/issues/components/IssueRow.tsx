@@ -85,7 +85,7 @@ export default function IssueRow(props: IssueRowProps) {
   );
 
   return (
-    <div class={['Box-row Box-row--hover flex items-start gap-3 py-2! px-4!', { 'rgh-dim-bot': feature('dim-bots') && isBot(props.item.author) }]}>
+    <div data-no-issue-hovercard="" class={['Box-row Box-row--hover flex items-start gap-3 py-2! px-4!', { 'rgh-dim-bot': feature('dim-bots') && isBot(props.item.author) }]}>
       <StateIcon
         class="mt-1 shrink-0"
         state={itemState({ isPull: isPull(), state: props.item.state, stateReason: props.item.stateReason, draft: props.item.isDraft })}

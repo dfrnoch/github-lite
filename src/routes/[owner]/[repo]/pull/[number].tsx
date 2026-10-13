@@ -27,7 +27,10 @@ export default function PullLayout(props: ParentProps) {
   const ctx = useRepo();
   const params = useParams<{ number: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const number = () => Number(params.number);
+  // Like github.com, diffs (Files changed, a single commit) use the full window width.
+  const wide = () => /\/pull\/\d+\/(files|commits\/[^/]+)\/?$/.test(location.pathname);
   const pullOrNull = createMemo(() => getPull(ctx.owner(), ctx.name(), number()));
   // Started together with the pull request (not after it) so they don't waterfall.
   const checks = createMemo(() => getPullChecksCount(ctx.owner(), ctx.name(), number()));
@@ -50,7 +53,7 @@ export default function PullLayout(props: ParentProps) {
 
   return (
     <PullContext value={value}>
-      <div class="container-xl px-4 md:px-6 lg:px-8 py-6">
+      <div class={wide() ? 'px-4 lg:px-8 py-4' : 'container-xl px-4 md:px-6 lg:px-8 py-6'}>
         <Show when={pullOrNull()}>
           {(pull) => (
             <>
