@@ -13,11 +13,13 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@primer/octicons": "^19.40.0",
     "@solidjs/diagnostics": "^2.0.0-rc.14",
     "@solidjs/start-devtools": "^1.0.0-next.5",
     "@solidjs/testing-library": "^1.0.0-beta.3",
     "@solidjs/vite-plugin": "^3.0.0-next.49",
     "@testing-library/jest-dom": "^7.0.1",
+    "@types/node": "^26.6.5",
     "@unocss/preset-wind4": "^66.11.0",
     "@unocss/reset": "^66.11.0",
     "eslint-plugin-solid": "~0.18.1",
@@ -30,9 +32,12 @@
     "vitest": "^5.0.4"
   },
   "dependencies": {
+    "@primer/primitives": "^11.10.0",
     "@solidjs/meta": "^1.0.0-next.2",
     "@solidjs/router": "^2.0.0-next.38",
     "@solidjs/web": "^2.0.0-rc.14",
+    "github-markdown-css": "^5.9.0",
+    "shiki": "^4.5.0",
     "solid-js": "^2.0.0-rc.14"
   }
 }

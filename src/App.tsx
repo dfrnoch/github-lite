@@ -1,35 +1,48 @@
 import { Title } from '@solidjs/meta';
-import { Loading } from 'solid-js';
+import { useLocation } from '@solidjs/router';
+import { Errored, Loading, Show } from 'solid-js';
 import '@unocss/reset/tailwind.css';
+import '@primer/primitives/dist/css/functional/themes/light.css';
+import '@primer/primitives/dist/css/functional/themes/dark.css';
+import 'github-markdown-css/github-markdown.css';
+import './styles/primer.css';
 import 'virtual:uno.css';
-import { paths, Router } from './router';
-import './App.css';
+import AppHeader from './components/layout/AppHeader';
+import Footer from './components/layout/Footer';
+import { ErrorView, PageSpinner, Toasts } from './components/ui';
+import { isSignedIn } from './lib/auth';
+import LoginPage from './routes/login/index';
+import { Router } from './router';
 
 export default function App() {
   return (
     <Router>
-      {(props) => (
-        <>
-          <Title>Solid App</Title>
-          <nav class="bg-slate-800 p-4">
-            <a
-              class="mx-0.5 inline-block rounded-lg px-3 py-1.5 font-semibold text-sky-300 no-underline transition-colors hover:bg-white/10 hover:text-sky-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-600"
-              href={paths()}
+      {(props) => {
+        const location = useLocation();
+        const isAuthRoute = () => location.pathname.startsWith('/login');
+        return (
+          <>
+            <Title>GitHub</Title>
+            <Show
+              when={isSignedIn() || isAuthRoute()}
+              // Signed out: show the login form in place, at the requested URL —
+              // signing in then simply renders the page that was asked for.
+              fallback={<LoginPage />}
             >
-              Home
-            </a>
-            <a
-              class="mx-0.5 inline-block rounded-lg px-3 py-1.5 font-semibold text-sky-300 no-underline transition-colors hover:bg-white/10 hover:text-sky-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-600"
-              href={paths.users()}
-            >
-              Users
-            </a>
-          </nav>
-          <Loading fallback={<main class="px-4 py-12">Loading…</main>}>
-            {props.children}
-          </Loading>
-        </>
-      )}
+              <Show when={!isAuthRoute()}>
+                <AppHeader />
+              </Show>
+              <main class="min-h-[calc(100vh-200px)]">
+                <Errored fallback={(err, reset) => <ErrorView error={err()} reset={reset} />}>
+                  <Loading fallback={<PageSpinner />}>{props.children}</Loading>
+                </Errored>
+              </main>
+              <Footer />
+            </Show>
+            <Toasts />
+          </>
+        );
+      }}
     </Router>
   );
 }

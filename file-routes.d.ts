@@ -38,7 +38,7 @@ declare module "virtual:file-routes" {
       path: "/*404";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[...404]")>;
-      $$route: FileRouteEagerRef<typeof import("./src/routes/[...404]")>;
+      $$route?: undefined;
     },
     {
       path: "/";
@@ -47,21 +47,39 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
-      path: "/users";
+      path: "/login/";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/users")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/login/index")>;
       $$route?: undefined;
     },
     {
-      path: "/users/:id";
+      path: "/login/callback";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/users/[id]")>;
-      $$route: FileRouteEagerRef<typeof import("./src/routes/users/[id]")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/login/callback")>;
+      $$route?: undefined;
     },
     {
-      path: "/users/";
+      path: "/:owner/:repo/";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/users/index")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/tree/*path";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/tree/[...path]")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/:owner/:repo/blob/*path";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/blob/[...path]")>;
       $$route?: undefined;
     }
   ];
@@ -82,33 +100,57 @@ declare module "virtual:file-routes" {
       id: "/*404";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[...404]")>;
-      $$route: FileRouteEagerRef<typeof import("./src/routes/[...404]")>;
+      $$route?: undefined;
       children?: undefined;
     },
     {
-      path: "/users";
-      id: "/users";
+      path: "/login/";
+      id: "/login/";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/users")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/login/index")>;
+      $$route?: undefined;
+      children?: undefined;
+    },
+    {
+      path: "/:owner/:repo";
+      id: "/:owner/:repo";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
       $$route?: undefined;
       children: readonly [
         {
           path: "/";
           id: "/";
           page: true;
-          $component: FileRouteLazyRef<typeof import("./src/routes/users/index")>;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/index")>;
           $$route?: undefined;
           children?: undefined;
         },
         {
-          path: "/:id";
-          id: "/:id";
+          path: "/blob/*path";
+          id: "/blob/*path";
           page: true;
-          $component: FileRouteLazyRef<typeof import("./src/routes/users/[id]")>;
-          $$route: FileRouteEagerRef<typeof import("./src/routes/users/[id]")>;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/blob/[...path]")>;
+          $$route?: undefined;
+          children?: undefined;
+        },
+        {
+          path: "/tree/*path";
+          id: "/tree/*path";
+          page: true;
+          $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/tree/[...path]")>;
+          $$route?: undefined;
           children?: undefined;
         }
       ];
+    },
+    {
+      path: "/login/callback";
+      id: "/login/callback";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/login/callback")>;
+      $$route?: undefined;
+      children?: undefined;
     }
   ];
 }

@@ -1,22 +1,22 @@
 import type { ParentProps } from 'solid-js';
 import { HydrationScript } from '@solidjs/web';
 
-// The document shell (the index.html replacement), picked up by the
-// src/Document.* convention; it must render the full <html> and ships no
-// client JS. <HydrationScript /> is stripped from the prerendered shell in
-// client mode and activates under `ssr: true`. Delete this file to fall
-// back to the plugin's built-in shell.
+// Applies the saved color mode before first paint (Primer's token sheets key
+// off <html data-color-mode>), so dark-mode users never see a light flash.
+const themeScript = `try{var m=localStorage.getItem('gh-lite:color-mode');if(m)document.documentElement.dataset.colorMode=m}catch(e){}`;
+
 export default function Document(props: ParentProps) {
   return (
-    <html lang="en">
+    <html lang="en" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-        <title>Solid App</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <title>GitHub</title>
+        <script innerHTML={themeScript} />
         <HydrationScript />
       </head>
-      <body class="text-center font-sans">{props.children}</body>
+      <body>{props.children}</body>
     </html>
   );
 }

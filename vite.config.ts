@@ -1,35 +1,42 @@
-import presetWind4 from '@unocss/preset-wind4';
 import { fileRoutes } from 'filesystem-routing/vite';
 import UnoCSS from 'unocss/vite';
+import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import solid from '@solidjs/vite-plugin';
 
-export default defineConfig({
-  // Turnkey client mode: no index.html and no mount file — the plugin generates
-  // the entries around src/App.tsx (wrapped in src/Document.tsx) and `vite build`
-  // prerenders the shell into a purely static dist/client.
-  plugins: [
-    // `extensions` makes @solidjs/vite-plugin also compile the `?pick=` route
-    // modules the fileRoutes plugin emits (their ids end in a query string).
-    solid({ start: true, extensions: ['.jsx', '.tsx'], diagnostics: true }), // add `ssr: true` for streaming SSR
-    fileRoutes({ types: true }),
-    // Generated CSS is served as the virtual:uno.css module (imported by
-    // src/App.tsx); the wind4 preset is Tailwind-compatible utilities.
-    UnoCSS({ presets: [presetWind4()] }),
-  ],
-  server: {
-    port: 3000,
-  },
-  test: {
-    environment: 'jsdom',
-    globals: false,
-    setupFiles: ['./vitest-setup.ts'],
-    // if you have few tests, try commenting this
-    // out to improve performance:
-    isolate: false,
-  },
-  build: {
-    target: 'esnext',
-    assetsInlineLimit: 0,
-  },
+export default defineConfig(({ mode }) => {
+  // Expose GITHUB_* from .env to server functions in development (OAuth).
+  Object.assign(process.env, loadEnv(mode, process.cwd(), 'GITHUB_'));
+
+  return {
+    // Client start mode: the app renders in the browser onto a prerendered
+    // shell. `serverFunctions` keeps a tiny server bundle around for the one
+    // thing a browser cannot do on its own — the OAuth code→token exchange,
+    // which needs the client secret (see src/lib/oauth.ts). Without the OAuth
+    // env vars the app still works purely client-side with a token, and
+    // dist/client can be deployed to any static host.
+    plugins: [
+      solid({
+        start: { node: true },
+        serverFunctions: true,
+        extensions: ['.jsx', '.tsx'],
+        diagnostics: true,
+      }),
+      fileRoutes({ types: true }),
+      UnoCSS(), // config in uno.config.ts
+    ],
+    server: {
+      port: 3000,
+    },
+    test: {
+      environment: 'jsdom',
+      globals: false,
+      setupFiles: ['./vitest-setup.ts'],
+      isolate: false,
+    },
+    build: {
+      target: 'esnext',
+      assetsInlineLimit: 0,
+    },
+  };
 });
