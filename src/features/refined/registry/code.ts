@@ -55,4 +55,5 @@ export const codeFeatures: FeatureDef[] = [
   { id: "tab-size", section: "Fixes for GitHub shortcomings", description: "Reduces the default tab indent width from 8 to 4 characters in code views where GitHub doesn't follow the user's preferences.", status: 'todo' },
   { id: "sticky-file-header", section: "Fixes for GitHub shortcomings", description: "Makes the file header sticky when scrolling through code diffs.", status: 'todo' },
   { id: "sticky-csv-header", section: "Fixes for GitHub shortcomings", description: "Makes the first column of CSV/TSV file previews sticky while scrolling horizontally.", status: 'todo' },
+  { id: "one-click-pr-or-gist", section: "Editing pull requests", description: "Lets you create draft PRs and public gists in one click.", status: 'todo' },
 ];

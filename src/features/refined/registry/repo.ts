@@ -30,6 +30,5 @@ export const repoFeatures: FeatureDef[] = [
   { id: "confirm-release", section: "Tags and releases", description: "Adds a confirmation dialog when publishing a release, preventing accidental submissions.", status: 'todo' },
   { id: "link-to-changelog-file", section: "Tags and releases", description: "Adds a button to view the changelog file from the releases page.", status: 'todo' },
   { id: "clean-repo-sidebar", section: "Fixes for GitHub shortcomings", description: "Removes unnecessary or redundant information from the repository sidebar.", status: 'todo' },
-  { id: "reload-failed-proxied-images", section: "Fixes for GitHub shortcomings", description: "Retries downloading images that failed downloading due to GitHub limited proxying.", status: 'todo' },
-  { id: "mark-private-repos", section: "Fixes for GitHub shortcomings", description: "Highlights private repositories in the repository list with a distinct color.", status: 'todo' },
+  { id: "bugs-tab", section: "Conversations", description: "Adds a \"Bugs\" tab to repos, if there are any open issues with the \"bug\" label (depends on `extensible-nav` feature).", status: 'todo' },
 ];

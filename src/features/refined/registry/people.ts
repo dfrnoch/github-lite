@@ -19,4 +19,5 @@ export const peopleFeatures: FeatureDef[] = [
   { id: "useful-not-found-page", section: "Global", description: "Adds possible related pages and alternatives on 404 pages.", status: 'todo' },
   { id: "selection-in-new-tab", section: "Global", description: "Adds a keyboard shortcut to open selection in new tab when navigating via j and k: shift o.", status: 'todo' },
   { id: "improve-shortcut-help", section: "Global", description: "Shows all of Refined GitHub\u2019s new keyboard shortcuts in the help modal (? hotkey).", status: 'done', hotkeys: ["?"] },
+  { id: "mark-private-repos", section: "Fixes for GitHub shortcomings", description: "Highlights private repositories in the repository list with a distinct color.", status: 'todo' },
 ];
