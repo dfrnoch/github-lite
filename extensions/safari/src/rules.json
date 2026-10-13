@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "priority": 2,
+    "action": { "type": "allow" },
+    "condition": {
+      "regexFilter": "^https://(www\\.)?github\\.com/(login|logout|session|sessions|signup|join|password_reset|auth|sso|oauth|account|settings/(tokens|personal-access-tokens|security|apps|developers|connections|billing|installations|copilot)|organizations/new|marketplace|sponsors|features|pricing|enterprise|codespaces|copilot|github-copilot|apps|user-attachments|site|security|readme|customer-stories|team|about|contact|.well-known)(/|\\?|#|$)",
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 2,
+    "action": { "type": "allow" },
+    "condition": {
+      "regexFilter": "^https://(www\\.)?github\\.com/[^/]+/[^/]+/(raw|archive|releases/download|zipball|tarball|upload|wiki|attestations|pull/[0-9]+/conflicts|security/code-scanning)(/|\\?|#|$)",
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 2,
+    "action": { "type": "allow" },
+    "condition": {
+      "regexFilter": "^https://(www\\.)?github\\.com/[^?#]*\\.(diff|patch)([?#]|$)",
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 10,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": { "regexSubstitution": "https://gh.frnoch.dev/\\2" }
+    },
+    "condition": {
+      "regexFilter": "^https://(www\\.)?github\\.com/?(.*)$",
+      "excludedInitiatorDomains": ["gh.frnoch.dev"],
+      "resourceTypes": ["main_frame"]
+    }
+  }
+]

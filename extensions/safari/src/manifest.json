@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub Lite Redirect",
+  "version": "1.0.0",
+  "description": "Opens github.com pages in GitHub Lite (gh.frnoch.dev) instead.",
+  "permissions": ["declarativeNetRequest"],
+  "host_permissions": ["*://github.com/*", "*://www.github.com/*"],
+  "declarative_net_request": {
+    "rule_resources": [{ "id": "redirect", "enabled": true, "path": "rules.json" }]
+  },
+  "icons": { "48": "icon-48.png", "96": "icon-96.png", "128": "icon-128.png", "256": "icon-256.png" }
+}

@@ -67,6 +67,15 @@ search proxy).
   as a secret on the Worker (Settings → Variables and secrets), with the OAuth
   App callback URL `https://<your-domain>/login/callback`.
 
+## Safari redirect extension
+
+`extensions/safari` contains a tiny Safari extension that sends github.com
+pages to GitHub Lite (`gh.frnoch.dev`) using a declarative redirect rule (no
+scripts, no access to page content). Sign-in, token settings, downloads, raw
+files and the conflict editor stay on github.com, and links opened from GitHub
+Lite itself are not redirected. Build and install with
+`extensions/safari/build.sh`, then enable it in Safari → Settings → Extensions.
+
 ## How it works
 
 - `src/lib/github.ts` — REST + GraphQL client. GETs revalidate the browser's
