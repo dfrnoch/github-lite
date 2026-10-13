@@ -1,9 +1,9 @@
 import { Title } from '@solidjs/meta';
 import { useNavigate, useSearchParams } from '@solidjs/router';
-import { Loading, Show } from 'solid-js';
+import { createSignal, Loading, Show } from 'solid-js';
 import Octicon from '../components/Octicon';
-import { PageSpinner } from '../components/ui';
-import { searchIcon } from '../icons/octicons';
+import { PageSpinner, QUERY_KEYS, QueryInput } from '../components/ui';
+import { searchIcon, xCircleFillIcon } from '../icons/octicons';
 import SearchResults from '../features/search/components/SearchResults';
 import SearchSidebar from '../features/search/components/SearchSidebar';
 import { normalizeType, param, searchHref } from '../features/search/href';
@@ -37,29 +37,43 @@ export default function SearchPage() {
 
 function SearchInput(props: { q: string; type: ReturnType<typeof normalizeType>; large?: boolean }) {
   const navigate = useNavigate();
+  const [value, setValue] = createSignal(() => props.q);
+  let input: HTMLInputElement | undefined;
   return (
     <form
       role="search"
       class="flex gap-2 mb-4"
       onSubmit={(e) => {
         e.preventDefault();
-        const value = (new FormData(e.currentTarget).get('q') as string).trim();
-        if (value) navigate(searchHref({ q: value, type: props.type }));
+        const q = value().trim();
+        if (q) navigate(searchHref({ q, type: props.type }));
       }}
     >
-      <label class="relative flex-1">
-        <span class="sr-only">Search GitHub</span>
-        <Octicon icon={searchIcon} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted" />
-        <input
-          name="q"
-          type="search"
-          class={['form-control w-full pl-8!', { 'text-base! py-2!': props.large }]}
-          value={props.q}
-          placeholder="Search GitHub"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </label>
+      <QueryInput
+        class={['form-control flex-1 pl-8!', { 'pr-8!': !!value(), 'text-base! py-2!': props.large }]}
+        name="q"
+        label="Search GitHub"
+        placeholder="Search GitHub"
+        value={value()}
+        onInput={setValue}
+        inputRef={(el) => (input = el)}
+        suggestions={QUERY_KEYS}
+      >
+        <Octicon icon={searchIcon} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none" />
+        <Show when={value()}>
+          <button
+            type="button"
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg-accent flex bg-transparent border-0 p-0 cursor-pointer"
+            aria-label="Clear"
+            onClick={() => {
+              setValue('');
+              input?.focus();
+            }}
+          >
+            <Octicon icon={xCircleFillIcon} />
+          </button>
+        </Show>
+      </QueryInput>
       <button type="submit" class="btn">
         Search
       </button>

@@ -1,10 +1,14 @@
 import { useAction } from '@solidjs/router';
-import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import { getViewer } from '../../user/api';
 import Octicon from '../../../components/Octicon';
 import { Avatar, MarkdownEditor, toastError } from '../../../components/ui';
 import { checkIcon, chevronDownIcon, chevronRightIcon, fileIcon } from '../../../icons/octicons';
 import LineNumberLink from '../../code/components/LineNumberLink';
+import { tabSizeStyle } from '../../code/refined';
+import { highlightDiff } from '../../diff/highlight';
+import { escapeHtml, type DiffLine } from '../../diff/parse';
+import { feature } from '../../refined';
 import Comment from '../../issues/components/Comment';
 import type { ReviewThread as Thread } from '../../issues/types';
 import { replyToThread, setThreadResolved } from '../api';
@@ -35,40 +39,67 @@ export function parseHunk(hunk: string): HunkLine[] {
   return out;
 }
 
-/** The few diff lines a review comment points at (GitHub shows the last 4). */
+/**
+ * The few diff lines a review comment points at — github.com's compact
+ * snippet table: 12px monospace, two narrow line-number columns, `+`/`-`
+ * marker, syntax colors, only the last 4 lines of the hunk.
+ */
 export function DiffHunk(props: { hunk: string; lines?: number; path?: string; filesHref?: string }) {
+  const all = createMemo(() => parseHunk(props.hunk));
   const rows = createMemo(() => {
-    const all = parseHunk(props.hunk);
-    const body = all.filter((l) => l.kind !== 'hunk');
+    const lines = all();
+    const body = lines.filter((l) => l.kind !== 'hunk');
     const shown = body.slice(-(props.lines ?? 4));
-    const header = all[0]?.kind === 'hunk' && body.length <= (props.lines ?? 4) ? [all[0]] : [];
+    const header = lines[0]?.kind === 'hunk' && body.length <= (props.lines ?? 4) ? [lines[0]] : [];
     return [...header, ...shown];
   });
+  // Syntax colors for the whole hunk (so multi-line tokens carry over); plain text until ready.
+  const [html, setHtml] = createSignal<{ lines: HunkLine[]; html: string[] } | null>(null);
+  createEffect(
+    () => ({ lines: all(), path: props.path }),
+    ({ lines, path }) => {
+      if (!path || !lines.length) return;
+      const diffLines = lines.map((l) => ({ type: l.kind, text: l.text, hunkIndex: 0 }) as DiffLine);
+      void highlightDiff(diffLines, path).then((out) => {
+        if (out) setHtml({ lines, html: out });
+      });
+    },
+  );
+  const htmlOf = (l: HunkLine) => {
+    const h = html();
+    const i = h && h.lines === all() ? all().indexOf(l) : -1;
+    return i >= 0 ? h!.html[i]! : escapeHtml(l.text);
+  };
+  const numClass = (l: HunkLine) => ['blob-num', { 'blob-num-addition': l.kind === 'add', 'blob-num-deletion': l.kind === 'del', 'blob-num-hunk': l.kind === 'hunk' }];
+
   return (
-    <div class="overflow-x-auto">
-      <table class="diff-table w-full text-xs">
+    <div class={['review-hunk overflow-x-auto', { 'rgh-hide-diff-signs': feature('hide-diff-signs') }]} style={tabSizeStyle()}>
+      <table class="diff-table table-auto! min-w-full w-max">
         <tbody>
           <For each={rows()}>
             {(l) => (
               <tr>
-                <td class={['blob-num', { 'blob-num-addition': l.kind === 'add', 'blob-num-deletion': l.kind === 'del', 'blob-num-hunk': l.kind === 'hunk' }]}>
+                <td class={numClass(l)}>
                   <LineNumberLink n={l.old} side="L" path={props.path} filesHref={props.filesHref} />
                 </td>
-                <td class={['blob-num', { 'blob-num-addition': l.kind === 'add', 'blob-num-deletion': l.kind === 'del', 'blob-num-hunk': l.kind === 'hunk' }]}>
+                <td class={numClass(l)}>
                   <LineNumberLink n={l.new} side="R" path={props.path} filesHref={props.filesHref} />
                 </td>
                 <td
                   class={[
-                    'blob-code blob-code-inner whitespace-pre font-mono',
+                    'blob-code',
                     {
                       'blob-code-addition': l.kind === 'add',
                       'blob-code-deletion': l.kind === 'del',
-                      'blob-code-hunk text-fg-muted': l.kind === 'hunk',
+                      'blob-code-hunk': l.kind === 'hunk',
                     },
                   ]}
                 >
-                  {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '- ' : l.kind === 'ctx' ? '  ' : ''}
-                  {l.text}
+                  <Show when={l.kind !== 'hunk'} fallback={l.text}>
+                    <span class="blob-code-marker" data-code-marker={l.kind === 'add' ? '+' : l.kind === 'del' ? '-' : ' '} />
+                    {/* oxlint-disable-next-line solid/no-innerhtml -- escaped / highlighted source */}
+                    <span class="blob-code-inner shiki" innerHTML={htmlOf(l)} />
+                  </Show>
                 </td>
               </tr>
             )}

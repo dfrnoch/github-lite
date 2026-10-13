@@ -89,7 +89,7 @@ export function RepoHeaderInfo(props: { owner: string; repo: string }) {
             <Show when={info().ci}>
               {(ci) => (
                 <span class="inline-flex px-1" title="CI status of latest commit">
-                  <CommitStatusIcon state={ci().state} href={`${base()}/commit/${ci().oid}`} />
+                  <CommitStatusIcon state={ci().state} href={`${base()}/commit/${ci().oid}`} owner={props.owner} repo={props.repo} sha={ci().oid} />
                 </span>
               )}
             </Show>

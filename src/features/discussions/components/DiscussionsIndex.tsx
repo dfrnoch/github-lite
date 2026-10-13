@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from '@solidjs/router';
 import { createMemo, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Blankslate, Dropdown, IssueLabel, PageSpinner, RelativeTime } from '../../../components/ui';
+import { Blankslate, Dropdown, IssueLabel, PageSpinner, QueryInput, RelativeTime } from '../../../components/ui';
 import {
   checkCircleFillIcon,
   checkCircleIcon,
@@ -29,6 +29,13 @@ import {
 import { UpvoteButton } from './Reactions';
 
 const DEFAULT_QUERY = 'is:open';
+const DISCUSSION_QUALIFIERS = ['is', 'category', 'label', 'author', 'sort', 'answered', 'locked'];
+const DISCUSSION_VALUES = {
+  is: ['open', 'closed', 'answered', 'unanswered', 'locked', 'unlocked'],
+  sort: ['latest', 'created', 'top'],
+  answered: ['true', 'false'],
+  locked: ['true', 'false'],
+};
 
 /** /discussions and /discussions/categories/:slug — categories sidebar + list. */
 export default function DiscussionsIndex(props: { categorySlug: string }) {
@@ -75,13 +82,21 @@ export default function DiscussionsIndex(props: { categorySlug: string }) {
             navigate(`${location.pathname}?discussions_q=${encodeURIComponent(value.trim())}`);
           }}
         >
-          <Octicon icon={searchIcon} class="absolute left-2 top-2 text-fg-muted" />
-          <input name="q" class="form-control w-full pl-8! pr-8!" aria-label="Search all discussions" value={q()} />
-          <Show when={q()}>
-            <a class="absolute right-2 top-1.5 text-fg-muted" href={`${location.pathname}?discussions_q=`} aria-label="Clear filters">
-              <Octicon icon={xIcon} />
-            </a>
-          </Show>
+          <QueryInput
+            name="q"
+            class="form-control pl-8! pr-8!"
+            label="Search all discussions"
+            value={q()}
+            suggestions={DISCUSSION_QUALIFIERS}
+            values={DISCUSSION_VALUES}
+          >
+            <Octicon icon={searchIcon} class="absolute left-2 top-2 text-fg-muted pointer-events-none" />
+            <Show when={q()}>
+              <a class="absolute right-2 top-1.5 text-fg-muted" href={`${location.pathname}?discussions_q=`} aria-label="Clear filters">
+                <Octicon icon={xIcon} />
+              </a>
+            </Show>
+          </QueryInput>
         </form>
         <Dropdown
           align="right"

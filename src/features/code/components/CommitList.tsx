@@ -1,7 +1,8 @@
 import { createMemo, createSignal, For, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, CopyButton, RelativeTime } from '../../../components/ui';
-import { checkIcon, codeIcon, dotFillIcon, ellipsisIcon, gitCommitIcon, gitMergeIcon, tagIcon, xIcon } from '../../../icons/octicons';
+import ChecksStatus, { RollupGlyph } from '../../../components/checks/ChecksStatus';
+import { Avatar, CopyButton, RelativeTime, VerifiedBadge } from '../../../components/ui';
+import { codeIcon, ellipsisIcon, gitCommitIcon, gitMergeIcon, tagIcon } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
 import { feature } from '../../refined';
 import type { ChecksSummary, HistoryCommit } from '../api';
@@ -57,31 +58,31 @@ export function CommitTitle(props: { message: string; base: string; href: string
   );
 }
 
-/** "✓ 3 / 3" check summary. */
-export function ChecksBadge(props: { checks: ChecksSummary | null; href?: string }) {
+/**
+ * "✓ 3 / 3" check summary. With `owner`/`repo`/`sha` it is a button opening
+ * the checks popover (github.com's commit rows); otherwise a link to `href`.
+ */
+export function ChecksBadge(props: { checks: ChecksSummary | null; href?: string; owner?: string; repo?: string; sha?: string }) {
   return (
     <Show when={props.checks}>
       {(c) => (
-        <a
-          class="inline-flex items-center gap-1 text-xs text-fg-muted link-muted"
-          href={props.href}
-          title={`${c().passed} / ${c().total} checks OK`}
+        <Show
+          when={props.owner && props.repo && props.sha}
+          fallback={
+            <a
+              class="inline-flex items-center gap-1 text-xs text-fg-muted link-muted"
+              href={props.href}
+              title={`${c().passed} / ${c().total} checks OK`}
+            >
+              <RollupGlyph state={c().state} />
+              <Show when={c().total}>
+                {c().passed} / {c().total}
+              </Show>
+            </a>
+          }
         >
-          <Switch>
-            <Match when={c().state === 'SUCCESS'}>
-              <Octicon icon={checkIcon} class="text-fg-success" />
-            </Match>
-            <Match when={c().state === 'FAILURE' || c().state === 'ERROR'}>
-              <Octicon icon={xIcon} class="text-fg-danger" />
-            </Match>
-            <Match when={true}>
-              <Octicon icon={dotFillIcon} class="text-fg-attention" />
-            </Match>
-          </Switch>
-          <Show when={c().total}>
-            {c().passed} / {c().total}
-          </Show>
-        </a>
+          <ChecksStatus owner={props.owner!} repo={props.repo!} sha={props.sha} state={c().state ?? 'PENDING'} passed={c().passed} total={c().total} />
+        </Show>
       )}
     </Show>
   );
@@ -109,6 +110,7 @@ export function CommitAuthors(props: {
         <a
           class={['link-plain', { 'font-semibold': !!props.strong }]}
           href={props.authorHref ? props.authorHref(u().login) : `/${u().login}`}
+          data-hovercard-user={u().login}
           title={props.authorHref ? `View all commits by ${u().login}` : `View ${u().login}'s profile`}
         >
           {u().login}
@@ -119,7 +121,7 @@ export function CommitAuthors(props: {
   return (
     <span class="inline-flex items-center gap-1.5 flex-wrap min-w-0">
       <span class="AvatarStack shrink-0">
-        <For each={authors().slice(0, 3)}>{(a) => <Avatar src={a.avatarUrl} size={props.size ?? 16} login={a.user?.login} />}</For>
+        <For each={authors().slice(0, 3)}>{(a) => <Avatar src={a.avatarUrl} size={props.size ?? 16} login={a.user?.login} hovercard />}</For>
       </span>
       <Switch>
         <Match when={props.commit.authorCount > 2}>
@@ -140,17 +142,6 @@ export function CommitAuthors(props: {
   );
 }
 
-export function VerifiedBadge() {
-  return (
-    <span
-      class="Label Label--success"
-      title="This commit was signed with a verified signature."
-    >
-      Verified
-    </span>
-  );
-}
-
 export interface CommitListOptions {
   base: string;
   browsePath?: string;
@@ -166,6 +157,8 @@ export interface CommitListOptions {
 export function CommitRow(props: CommitListOptions & { commit: HistoryCommit }) {
   const [open, setOpen] = createSignal(false);
   const href = () => (props.commitHref ? props.commitHref(props.commit.oid) : `${props.base}/commit/${props.commit.oid}`);
+  const owner = () => props.base.split('/')[1];
+  const repo = () => props.base.split('/')[2];
   const isMerge = () => feature('mark-merge-commits-in-list') && props.commit.parentCount > 1;
   const tags = () => (feature('tags-on-commits-list') ? (props.tags?.[props.commit.oid] ?? []) : []);
   /** easy-toggle-commit-messages: a click anywhere on the row (but not on a control or while selecting) toggles the body. */
@@ -206,7 +199,7 @@ export function CommitRow(props: CommitListOptions & { commit: HistoryCommit }) 
           <CommitAuthors commit={props.commit} authorHref={props.authorHref} />
           <Show when={props.commit.checks}>
             <span>·</span>
-            <ChecksBadge checks={props.commit.checks} href={href()} />
+            <ChecksBadge checks={props.commit.checks} href={href()} owner={owner()} repo={repo()} sha={props.commit.oid} />
           </Show>
           <Loading>
           <Show when={tags().length}>
@@ -228,9 +221,7 @@ export function CommitRow(props: CommitListOptions & { commit: HistoryCommit }) 
         </Show>
       </div>
       <div class="flex items-center gap-2 shrink-0 pt-1">
-        <Show when={props.commit.verified}>
-          <VerifiedBadge />
-        </Show>
+        <VerifiedBadge signature={props.commit.signature} />
         <a class="font-mono text-xs link-muted text-fg-muted px-1" href={href()} title="View commit details">
           {props.commit.abbreviatedOid}
         </a>

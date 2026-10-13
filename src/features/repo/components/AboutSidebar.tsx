@@ -1,7 +1,7 @@
 import { action, useAction } from '@solidjs/router';
 import { createMemo, createSignal, Errored, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Dialog, RelativeTime, toastError } from '../../../components/ui';
+import { Avatar, Dialog, RelativeTime, toastError } from '../../../components/ui';
 import {
   bookIcon,
   codeOfConductIcon,
@@ -22,7 +22,8 @@ import { gh } from '../../../lib/github';
 import { languageColor } from '../../../lib/languages';
 import type { Repository } from '../../../lib/types';
 import { feature } from '../../refined';
-import { getCommunityFiles, getFirstCommit, getRepoOverview } from '../api';
+import { tagHref } from '../../releases/versions';
+import { getCommunityFiles, getFirstCommit, getRepoContributors, getRepoOverview, type RepoContributors, type SidebarRelease } from '../api';
 
 export const updateRepoAbout = action(
   async (owner: string, repo: string, about: { description: string; homepage: string; topics: string[] }) => {
@@ -43,7 +44,9 @@ export default function AboutSidebar(props: { repo: Repository }) {
   const overview = createMemo(() => getRepoOverview(owner(), name()));
   const community = createMemo(() => getCommunityFiles(owner(), name()));
   const [editing, setEditing] = createSignal(false);
+  const contributors = createMemo(() => getRepoContributors(owner(), name()));
   const clean = () => feature('clean-repo-sidebar');
+  const shownReleases = () => (overview().releases.latest ? 1 : 0) + (overview().releases.prerelease ? 1 : 0);
 
   const Link = (p: { icon: typeof bookIcon; href: string; children: any }) => (
     <a class="link-muted flex items-center gap-2 mt-2" href={p.href}>
@@ -163,37 +166,51 @@ export default function AboutSidebar(props: { repo: Repository }) {
             </Show>
           </h2>
           <Show
-            when={overview().releases.latest}
+            when={overview().releases.latest || overview().releases.prerelease}
             fallback={
-              <p class="text-fg-muted">
-                No releases published
-                <Show when={props.repo.permissions?.push}>
-                  <br />
-                  <a href={`${base()}/releases/new`}>Create a new release</a>
-                </Show>
-              </p>
+              <Show
+                when={overview().tags}
+                fallback={
+                  <p class="text-fg-muted">
+                    No releases published
+                    <Show when={props.repo.permissions?.push}>
+                      <br />
+                      <a href={`${base()}/releases/new`}>Create a new release</a>
+                    </Show>
+                  </p>
+                }
+              >
+                <a class="link-muted flex items-center gap-2" href={`${base()}/tags`}>
+                  <Octicon icon={tagIcon} />
+                  <span>
+                    <strong class="text-fg">{formatNumber(overview().tags)}</strong> {overview().tags === 1 ? 'tag' : 'tags'}
+                  </span>
+                </a>
+              </Show>
             }
           >
-            {(rel) => (
-              <a class="flex gap-2 link-plain" href={`${base()}/releases/tag/${encodeURIComponent(rel().tagName)}`}>
-                <Octicon icon={tagIcon} class="text-fg-success mt-0.5" />
-                <span>
-                  <span class="font-semibold">{rel().name || rel().tagName}</span>{' '}
-                  <span class="Label Label--success">Latest</span>
-                  <span class="block text-xs text-fg-muted">
-                    <RelativeTime datetime={rel().publishedAt} />
-                  </span>
-                </span>
-              </a>
-            )}
+            <div class="flex flex-col gap-3">
+              <Show when={overview().releases.latest}>
+                {(rel) => <SidebarReleaseLink base={base()} release={rel()} kind="latest" />}
+              </Show>
+              <Show when={overview().releases.prerelease}>
+                {(rel) => <SidebarReleaseLink base={base()} release={rel()} kind="prerelease" />}
+              </Show>
+            </div>
           </Show>
-          <Show when={overview().releases.totalCount > 1 && !clean()}>
+          <Show when={overview().releases.totalCount > shownReleases() && !clean()}>
             <a class="block mt-3 text-xs" href={`${base()}/releases`}>
-              + {formatNumber(overview().releases.totalCount - 1)} releases
+              + {formatNumber(overview().releases.totalCount - shownReleases())} releases
             </a>
           </Show>
         </section>
         </Show>
+
+        <Errored fallback={null}>
+          <Loading fallback={null}>
+            <Show when={contributors()}>{(c) => <ContributorsSection data={c()} base={base()} />}</Show>
+          </Loading>
+        </Errored>
 
         <Show when={overview().languages.items.length}>
           <section class="py-6">
@@ -346,5 +363,54 @@ function RepoAge(props: { owner: string; repo: string }) {
         </>
       )}
     </Show>
+  );
+}
+
+/** A release in the sidebar: tag icon, name, "Latest" / "Pre-release" label, date. */
+function SidebarReleaseLink(props: { base: string; release: SidebarRelease; kind: 'latest' | 'prerelease' }) {
+  return (
+    <a class="flex gap-2 link-plain" href={tagHref(props.base, props.release.tagName)}>
+      <Octicon icon={tagIcon} class={['mt-0.5 shrink-0', props.kind === 'latest' ? 'text-fg-success' : 'text-fg-attention']} />
+      <span class="min-w-0">
+        <span class="font-semibold break-words">{props.release.name || props.release.tagName}</span>{' '}
+        <Show when={props.kind === 'latest'} fallback={<span class="Label Label--attention">Pre-release</span>}>
+          <span class="Label Label--success">Latest</span>
+        </Show>
+        <span class="block text-xs text-fg-muted">
+          <RelativeTime datetime={props.release.publishedAt} />
+        </span>
+      </span>
+    </a>
+  );
+}
+
+/** "Contributors N": the top 14 avatars and "+ N contributors". */
+function ContributorsSection(props: { data: RepoContributors; base: string }) {
+  const href = (u: { login: string; type: string }) => (u.type === 'Bot' ? `/apps/${u.login.replace(/\[bot\]$/, '')}` : `/${u.login}`);
+  return (
+    <section class="py-6 border-b border-line-muted">
+      <h2 class="text-base font-semibold mb-3">
+        <a class="link-plain" href={`${props.base}/graphs/contributors`}>
+          Contributors
+        </a>{' '}
+        <span class="Counter">{formatNumber(props.data.total)}</span>
+      </h2>
+      <ul class="flex flex-wrap">
+        <For each={props.data.top}>
+          {(u) => (
+            <li class="mr-2 mb-2">
+              <a href={href(u)} title={u.login} aria-label={u.login} data-hovercard-user={u.type === 'Bot' ? undefined : u.login} class="block">
+                <Avatar src={u.avatar_url} login={u.login} size={32} />
+              </a>
+            </li>
+          )}
+        </For>
+      </ul>
+      <Show when={props.data.total > props.data.top.length}>
+        <a class="block mt-1 text-xs" href={`${props.base}/graphs/contributors`}>
+          + {formatNumber(props.data.total - props.data.top.length)} contributors
+        </a>
+      </Show>
+    </section>
   );
 }

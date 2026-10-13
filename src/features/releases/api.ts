@@ -1,7 +1,8 @@
 import { action, query } from '@solidjs/router';
+import { getToken } from '../../lib/auth';
 import { encodePath, gh, GitHubError, ghPage, gql } from '../../lib/github';
 import type { Reactions, SimpleUser } from '../../lib/types';
-import type { TagCommit } from './versions';
+import { previousTag, type TagCommit } from './versions';
 
 export interface ReleaseAsset {
   id: number;
@@ -30,6 +31,8 @@ export interface Release {
   author: SimpleUser;
   assets: ReleaseAsset[];
   html_url: string;
+  /** Published with immutable assets/tag (GitHub "Immutable" releases). */
+  immutable?: boolean;
   upload_url: string;
   tarball_url: string | null;
   zipball_url: string | null;
@@ -40,21 +43,111 @@ export interface Release {
 
 const HTML = 'application/vnd.github.full+json';
 
-/** One page of releases (10 per page, like github.com), with rendered notes. */
-export const getReleases = query(
-  (owner: string, repo: string, page: number) =>
-    ghPage<Release>(`/repos/${owner}/${repo}/releases`, { page, perPage: 10, accept: HTML }),
-  'releases',
+/** What the REST release payload lacks: the tag's commit (short SHA, signature). */
+export interface ReleaseCommit {
+  oid: string;
+  abbreviatedOid: string;
+  /** Signature verified (null when unsigned). */
+  verified: boolean | null;
+}
+
+/** Tag commits of releases by tag name — one GraphQL call with an alias per tag. */
+async function fetchReleaseCommits(owner: string, repo: string, tags: string[]): Promise<Record<string, ReleaseCommit>> {
+  if (!tags.length) return {};
+  const fields = tags
+    .map((t, i) => `r${i}:release(tagName:${JSON.stringify(t)}){tagCommit{oid abbreviatedOid signature{isValid}}}`)
+    .join(' ');
+  const data = await gql<any>(`query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${fields}}}`, { owner, name: repo });
+  const out: Record<string, ReleaseCommit> = {};
+  tags.forEach((t, i) => {
+    const c = data.repository?.[`r${i}`]?.tagCommit;
+    if (c) out[t] = { oid: c.oid, abbreviatedOid: c.abbreviatedOid, verified: c.signature ? !!c.signature.isValid : null };
+  });
+  return out;
+}
+
+/**
+ * One page of releases (10 per page, like github.com), with rendered notes
+ * and (joined into the same flight) each release's tag commit.
+ */
+export const getReleases = query(async (owner: string, repo: string, page: number) => {
+  const res = await ghPage<Release>(`/repos/${owner}/${repo}/releases`, { page, perPage: 10, accept: HTML });
+  const commits = await fetchReleaseCommits(
+    owner,
+    repo,
+    res.items.filter((r) => !r.draft).map((r) => r.tag_name),
+  ).catch(() => ({}) as Record<string, ReleaseCommit>);
+  return { ...res, commits };
+}, 'releases');
+
+/** Tag commit of one release (single release page; starts alongside the release itself). */
+export const getReleaseCommit = query(
+  async (owner: string, repo: string, tag: string): Promise<ReleaseCommit | null> =>
+    (await fetchReleaseCommits(owner, repo, [tag]).catch(() => ({}) as Record<string, ReleaseCommit>))[tag] ?? null,
+  'release-commit',
 );
 
-/** Id of the release marked "Latest" (null when there is none). */
-export const getLatestReleaseId = query(async (owner: string, repo: string) => {
+/** "N commits to <branch> since this release" (compare tag...branch; null when it can't be compared). */
+export const getCommitsSinceRelease = query(async (owner: string, repo: string, tag: string, branch: string) => {
   try {
-    return (await gh<Release>(`/repos/${owner}/${repo}/releases/latest`)).id;
+    const cmp = await gh<{ ahead_by: number }>(`/repos/${owner}/${repo}/compare/${encodePath(tag)}...${encodePath(branch)}`, {
+      query: { per_page: 1 },
+    });
+    return cmp.ahead_by;
   } catch (e) {
-    if (e instanceof GitHubError && e.status === 404) return null;
+    if (e instanceof GitHubError && (e.status === 404 || e.status === 422)) return null;
     throw e;
   }
+}, 'commits-since-release');
+
+export interface ReleaseListEntry {
+  name: string | null;
+  tagName: string;
+  isDraft: boolean;
+  isPrerelease: boolean;
+  isLatest: boolean;
+  /** Draft releases are addressed by their untagged-… URL. */
+  url: string;
+}
+
+/** Is `entry` the release addressed by `tag` (drafts by their untagged-… URL)? */
+export const isReleaseFor = (entry: ReleaseListEntry, tag: string) =>
+  entry.tagName === tag || entry.url.endsWith(`/tag/${encodeURIComponent(tag)}`) || entry.url.endsWith(`/tag/${tag}`);
+
+/** Releases newest first, names only, in pages of 100 until `done` (at most 1000). */
+async function fetchReleaseList(owner: string, repo: string, done: (list: ReleaseListEntry[]) => boolean) {
+  const out: ReleaseListEntry[] = [];
+  let after: string | null = null;
+  for (let i = 0; i < 10; i++) {
+    const data: any = await gql<any>(
+      `query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){releases(first:100,after:$after,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{hasNextPage endCursor} nodes{name tagName isDraft isPrerelease isLatest url}}}}`,
+      { owner, name: repo, after },
+    );
+    const conn = data.repository.releases;
+    out.push(...conn.nodes);
+    if (!conn.pageInfo.hasNextPage || done(out)) break;
+    after = conn.pageInfo.endCursor;
+  }
+  return out;
+}
+
+/**
+ * Release names for the release list column and tag suggestions: the newest
+ * 100, or — with `until` — as many pages as it takes to reach that release.
+ */
+export const getReleaseList = query(
+  (owner: string, repo: string, until?: string): Promise<ReleaseListEntry[]> =>
+    fetchReleaseList(owner, repo, (list) => !until || list.some((r) => isReleaseFor(r, until))),
+  'release-list',
+);
+
+/** Id of the release marked "Latest" (null when there is none; GraphQL, so no 404 when there isn't one). */
+export const getLatestReleaseId = query(async (owner: string, repo: string): Promise<number | null> => {
+  const data = await gql<any>(`query($owner:String!,$name:String!){repository(owner:$owner,name:$name){latestRelease{databaseId}}}`, {
+    owner,
+    name: repo,
+  });
+  return data.repository.latestRelease?.databaseId ?? null;
 }, 'latest-release-id');
 
 /**
@@ -208,14 +301,24 @@ export const getTagCommits = query(async (owner: string, repo: string, max: numb
   return out;
 }, 'rgh-tag-commits');
 
-/** releases-dropdown: tag names of the newest 100 releases. */
-export const getReleaseTagNames = query(async (owner: string, repo: string): Promise<string[]> => {
-  const data = await gql<any>(
-    `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){releases(first:100,orderBy:{field:CREATED_AT,direction:DESC}){nodes{tagName}}}}`,
-    { owner, name: repo },
-  );
-  return data.repository.releases.nodes.map((n: any) => n.tagName as string);
-}, 'rgh-release-tag-names');
+/**
+ * tag-changes-link: the tag before `tag`. The newest 100 tags cover most
+ * pages; older releases look further back (up to 1000 tags) — in one flight.
+ */
+export const getPreviousTag = query(async (owner: string, repo: string, tag: string): Promise<string | null> => {
+  // `recent` usually comes from the cache, so read the token (a dependency of every request) before awaiting.
+  getToken();
+  const recent = await getTagCommits(owner, repo, 100);
+  const prev = previousTag(tag, recent);
+  if (prev || recent.length < 100) return prev ?? null;
+  return previousTag(tag, await getTagCommits(owner, repo, 1000)) ?? null;
+}, 'rgh-previous-tag');
+
+/** releases-dropdown: tag names of the newest 100 releases (shares the release list request). */
+export const getReleaseTagNames = query(
+  async (owner: string, repo: string): Promise<string[]> => (await getReleaseList(owner, repo)).map((n) => n.tagName),
+  'rgh-release-tag-names',
+);
 
 const CHANGELOG = /^(?:changelog|news|changes|history|release|whatsnew)(?:\.(?:mdx?|mkdn?|mdwn|mdown|markdown|litcoffee|txt|rst))?$/i;
 
@@ -232,3 +335,20 @@ export const getChangelogFile = query(async (owner: string, repo: string): Promi
 /** convert-release-to-draft: PATCH draft:true (the release URL then becomes an untagged draft URL). */
 export const convertReleaseToDraft = (owner: string, repo: string, id: number) =>
   gh<Release>(`/repos/${owner}/${repo}/releases/${id}`, { method: 'PATCH', body: { draft: true } });
+
+/**
+ * "Find a release": releases whose name or tag contains `q` (the API has no
+ * release search, so this scans up to 1000 release names), first 10 matches
+ * as full releases. Same shape as a `getReleases` page.
+ */
+export const searchReleases = query(async (owner: string, repo: string, q: string) => {
+  const needle = q.trim().toLowerCase();
+  const list = await fetchReleaseList(owner, repo, () => false);
+  const hits = list.filter((r) => !r.isDraft && `${r.name ?? ''}\n${r.tagName}`.toLowerCase().includes(needle)).slice(0, 10);
+  const tags = hits.map((h) => h.tagName);
+  const [items, commits] = await Promise.all([
+    Promise.all(tags.map((t) => gh<Release>(`/repos/${owner}/${repo}/releases/tags/${encodePath(t)}`, { accept: HTML }))),
+    fetchReleaseCommits(owner, repo, tags).catch(() => ({}) as Record<string, ReleaseCommit>),
+  ]);
+  return { items, commits, total: hits.length, pageInfo: { page: 1, lastPage: 1, hasNext: false, hasPrev: false } };
+}, 'release-search');

@@ -1,26 +1,43 @@
-import { Match, Switch } from 'solid-js';
-import Octicon from '../../../components/Octicon';
-import { checkIcon, dotFillIcon, xIcon } from '../../../icons/octicons';
+import { Show } from 'solid-js';
+import ChecksStatus, { RollupGlyph } from '../../../components/checks/ChecksStatus';
+import { rollupLook } from '../../../components/checks/api';
 
-/** ✓ / ✗ / ● for a commit's combined check state (statusCheckRollup.state). */
-export default function CommitStatusIcon(props: { state: string | null | undefined; href?: string }) {
+/**
+ * ✓ / ✗ / ● for a commit's combined check state (statusCheckRollup.state).
+ * Given `owner`/`repo` and a `sha` (or PR `pull` number) it opens the checks
+ * popover on click, like github.com; otherwise it links to `href`.
+ */
+export default function CommitStatusIcon(props: {
+  state: string | null | undefined;
+  href?: string;
+  owner?: string;
+  repo?: string;
+  sha?: string;
+  pull?: number;
+  /** "passed / total" after the icon. */
+  passed?: number;
+  total?: number;
+}) {
   return (
-    <Switch>
-      <Match when={props.state === 'SUCCESS'}>
-        <a href={props.href} title="All checks have passed" class="text-fg-success inline-flex">
-          <Octicon icon={checkIcon} />
-        </a>
-      </Match>
-      <Match when={props.state === 'FAILURE' || props.state === 'ERROR'}>
-        <a href={props.href} title="Some checks were not successful" class="text-fg-danger inline-flex">
-          <Octicon icon={xIcon} />
-        </a>
-      </Match>
-      <Match when={props.state === 'PENDING' || props.state === 'EXPECTED'}>
-        <a href={props.href} title="Some checks haven't completed yet" class="text-fg-attention inline-flex">
-          <Octicon icon={dotFillIcon} />
-        </a>
-      </Match>
-    </Switch>
+    <Show
+      when={props.owner && props.repo && (props.sha || props.pull)}
+      fallback={
+        <Show when={props.state}>
+          <a href={props.href} title={rollupLook(props.state).title} class="inline-flex">
+            <RollupGlyph state={props.state} />
+          </a>
+        </Show>
+      }
+    >
+      <ChecksStatus
+        owner={props.owner!}
+        repo={props.repo!}
+        sha={props.sha}
+        pull={props.pull}
+        state={props.state}
+        passed={props.passed}
+        total={props.total}
+      />
+    </Show>
   );
 }

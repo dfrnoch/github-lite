@@ -1,5 +1,15 @@
-/** GitHub avatar. `square` for organizations/bots (GitHub draws those with rounded corners). */
-export default function Avatar(props: { src?: string | null; login?: string; size?: number; square?: boolean; class?: string }) {
+/**
+ * GitHub avatar. `square` for organizations/bots (GitHub draws those with rounded corners).
+ * `hovercard` (with `login`) shows the user hovercard on hover — for avatars that aren't links.
+ */
+export default function Avatar(props: {
+  src?: string | null;
+  login?: string;
+  size?: number;
+  square?: boolean;
+  class?: string;
+  hovercard?: boolean;
+}) {
   const size = () => props.size ?? 20;
   const src = () => {
     const url = props.src ?? (props.login ? `https://github.com/${props.login}.png` : '');
@@ -16,6 +26,7 @@ export default function Avatar(props: { src?: string | null; login?: string; siz
       height={size()}
       alt={props.login ? `@${props.login}` : ''}
       loading="lazy"
+      data-hovercard-user={props.hovercard && props.login ? props.login : undefined}
     />
   );
 }

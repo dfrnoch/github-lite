@@ -159,7 +159,7 @@ export const repoFeatures: FeatureDef[] = [
     section: 'Tags and releases',
     description: 'Adds a tags dropdown/search on release pages.',
     status: 'done',
-    note: 'A “Find a release” box suggesting the newest 100 release tags; picking one opens it. `prerelease:false` hides pre-releases on the current page (GitHub’s release search isn’t in the API).',
+    note: 'The native “Find a release” box suggests the newest 100 release tags; picking one (or submitting an exact tag) opens it. `prerelease:false` hides pre-releases on the current page.',
   },
   {
     id: 'create-release-shortcut',

@@ -32,7 +32,7 @@ import { signOut } from '../../lib/auth';
 import { useHotkey } from '../../lib/hotkeys';
 import { colorMode, setColorMode } from '../../lib/theme';
 import Octicon from '../Octicon';
-import { Avatar, Dropdown } from '../ui';
+import { Avatar, Dropdown, QUERY_KEYS, QueryInput } from '../ui';
 import Drawer from './Drawer';
 import { headerContext } from './headerContext';
 
@@ -306,6 +306,7 @@ function TopRepos() {
 function SearchBox(props: { repo?: string }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [value, setValue] = createSignal('');
   let input!: HTMLInputElement;
 
   const focus = () => input.focus();
@@ -318,7 +319,7 @@ function SearchBox(props: { repo?: string }) {
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
-        const q = input.value.trim();
+        const q = value().trim();
         if (!q) return;
         const type = location.pathname.includes('/pull') ? 'pullrequests' : location.pathname.includes('/issues') ? 'issues' : '';
         navigate(`/search?q=${encodeURIComponent(q)}${type && props.repo ? `&type=${type}` : ''}`);
@@ -326,16 +327,19 @@ function SearchBox(props: { repo?: string }) {
       }}
     >
       <Octicon icon={searchIcon} />
-      <input
-        ref={input}
-        type="text"
+      <QueryInput
+        class="flex-1 min-w-0"
+        inputRef={(el) => (input = el)}
         placeholder="Type / to search"
-        aria-label="Search GitHub"
+        label="Search GitHub"
+        value={value()}
+        onInput={setValue}
+        suggestions={QUERY_KEYS}
         onFocus={() => {
-          if (props.repo && !input.value) input.value = `repo:${props.repo} `;
+          if (props.repo && !value()) setValue(`repo:${props.repo} `);
         }}
         onBlur={() => {
-          if (props.repo && input.value.trim() === `repo:${props.repo}`) input.value = '';
+          if (props.repo && value().trim() === `repo:${props.repo}`) setValue('');
         }}
       />
       <kbd>/</kbd>

@@ -155,7 +155,7 @@ export interface Commit {
     committer: GitUser;
     message: string;
     comment_count: number;
-    verification?: { verified: boolean; reason: string };
+    verification?: { verified: boolean; reason: string; signature?: string | null; payload?: string | null; verified_at?: string | null };
   };
   author: SimpleUser | null;
   committer: SimpleUser | null;

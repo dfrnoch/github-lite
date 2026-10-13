@@ -344,7 +344,7 @@ declare module "virtual:file-routes" {
       path: "/:owner/:repo/releases/";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/index")>;
-      $$route?: undefined;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]/releases/index")>;
     },
     {
       path: "/:owner/:repo/releases/new";
@@ -356,7 +356,7 @@ declare module "virtual:file-routes" {
       path: "/:owner/:repo/releases/tag/*tag";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/tag/[...tag]")>;
-      $$route?: undefined;
+      $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]/releases/tag/[...tag]")>;
     },
     {
       path: "/:owner/:repo/security";
@@ -1557,7 +1557,7 @@ declare module "virtual:file-routes" {
           id: "/releases/";
           page: true;
           $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/index")>;
-          $$route?: undefined;
+          $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]/releases/index")>;
           children?: undefined;
         },
         {
@@ -1807,7 +1807,7 @@ declare module "virtual:file-routes" {
           id: "/releases/tag/*tag";
           page: true;
           $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/releases/tag/[...tag]")>;
-          $$route?: undefined;
+          $$route: FileRouteEagerRef<typeof import("./src/routes/[owner]/[repo]/releases/tag/[...tag]")>;
           children?: undefined;
         },
         {

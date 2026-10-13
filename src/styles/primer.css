@@ -473,6 +473,79 @@ textarea.form-control {
   min-height: 100px;
   resize: vertical;
 }
+/* QueryInput: transparent-text input over a highlighted mirror of the query. */
+.QueryInput {
+  position: relative;
+  cursor: text;
+}
+.QueryInput.form-control {
+  display: flex;
+  align-items: center;
+}
+.QueryInput.form-control:focus-within {
+  border-color: var(--borderColor-accent-emphasis);
+  outline: 2px solid var(--borderColor-accent-emphasis);
+  outline-offset: -1px;
+}
+.QueryInput-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.QueryInput .QueryInput-field > input {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: transparent;
+  caret-color: var(--fgColor-default);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+.QueryInput .QueryInput-field > input::placeholder {
+  color: var(--fgColor-muted);
+}
+.QueryInput-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre;
+  color: var(--fgColor-default);
+  pointer-events: none;
+}
+.QueryInput-mirror > span {
+  display: inline-block;
+}
+.QueryInput-value {
+  color: var(--fgColor-accent);
+  background-color: var(--bgColor-accent-muted);
+  border-radius: 3px;
+}
+.QueryInput-user {
+  color: var(--fgColor-done);
+  background-color: var(--bgColor-done-muted);
+  border-radius: 3px;
+}
+.QueryInput-keyword {
+  color: var(--fgColor-done);
+}
+.QueryInput-menu {
+  top: calc(100% + 4px);
+  left: 0;
+  cursor: default;
+}
+.QueryInput-menu .QueryInput-active {
+  background-color: var(--bgColor-neutral-muted);
+}
 .form-select {
   appearance: none;
   padding-right: 24px;
@@ -1085,6 +1158,7 @@ dialog.Dialog::backdrop {
 .diff-table {
   width: 100%;
   border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
 }
 .diff-table .blob-num {
@@ -1112,6 +1186,12 @@ dialog.Dialog::backdrop {
 }
 .blob-num-hunk {
   background-color: var(--diffBlob-hunkNum-bgColor-rest, var(--bgColor-accent-muted));
+}
+/* Review-comment snippet (conversation threads): GitHub's compact number columns. */
+.review-hunk .blob-num {
+  width: 50px;
+  min-width: 50px;
+  padding: 0 10px;
 }
 .blob-code-inner .x {
   border-radius: 2px;
@@ -1189,6 +1269,10 @@ html[data-color-mode='dark'] .shiki span {
 .markdown-body {
   font-size: 14px !important;
   background-color: transparent !important;
+}
+/* Release notes render at github.com's 16px. */
+.markdown-body.release-notes {
+  font-size: 16px !important;
 }
 /* The tailwind reset makes <img> block-level; READMEs rely on inline badges. */
 .markdown-body img {
@@ -1883,4 +1967,77 @@ code.rgh-backticks {
 }
 .markdown-body details summary .anchor {
   display: none;
+}
+
+/* ---------- Popover (anchored overlay: hovercards, checks, verification) ---------- */
+.Popover-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  color: var(--fgColor-default);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  background-color: var(--overlay-bgColor);
+  border: 1px solid var(--overlay-borderColor, var(--borderColor-default));
+  border-radius: 12px;
+  box-shadow: var(--shadow-floating-small);
+  outline: none;
+  animation: popover-in 120ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.Popover-panel[data-side='bottom'] {
+  transform-origin: var(--caret-x, 24px) top;
+}
+.Popover-panel[data-side='top'] {
+  transform-origin: var(--caret-x, 24px) bottom;
+}
+.Popover-panel--caret::before,
+.Popover-panel--caret::after {
+  content: '';
+  position: absolute;
+  left: var(--caret-x, 24px);
+  border: 8px solid transparent;
+  margin-left: -8px;
+  pointer-events: none;
+}
+.Popover-panel--caret::after {
+  border-width: 7px;
+  margin-left: -7px;
+}
+.Popover-panel--caret[data-side='bottom']::before {
+  bottom: 100%;
+  border-bottom-color: var(--borderColor-default);
+}
+.Popover-panel--caret[data-side='bottom']::after {
+  bottom: 100%;
+  border-bottom-color: var(--overlay-bgColor);
+}
+.Popover-panel--caret[data-side='top']::before {
+  top: 100%;
+  border-top-color: var(--borderColor-default);
+}
+.Popover-panel--caret[data-side='top']::after {
+  top: 100%;
+  border-top-color: var(--overlay-bgColor);
+}
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .Popover-panel {
+    animation: none;
+  }
+}
+.Hovercard-emoji g-emoji,
+.Hovercard-emoji .g-emoji {
+  font-size: 14px;
+  font-style: normal;
 }

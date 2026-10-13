@@ -1,14 +1,14 @@
 import type { JSX } from '@solidjs/web';
 import { For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { CopyButton } from '../../../components/ui';
+import { CopyButton, VerifiedBadge } from '../../../components/ui';
 import { gitBranchIcon, gitPullRequestIcon } from '../../../icons/octicons';
 import { formatNumber, pluralize } from '../../../lib/format';
 import { encodePath } from '../../../lib/github';
 import DiffView, { Diffstat } from '../../diff/DiffView';
 import { feature } from '../../refined';
 import { fetchRaw, type CommitDetails as CommitData } from '../api';
-import { ChecksBadge, CommitAuthors, VerifiedBadge } from './CommitList';
+import { ChecksBadge, CommitAuthors } from './CommitList';
 
 /**
  * A commit's message box, metadata and diff — the body of /commit/:sha and of
@@ -44,11 +44,9 @@ export default function CommitDetails(props: {
         <CommitAuthors commit={info()} size={20} strong />
         <Show when={info().checks}>
           <span>·</span>
-          <ChecksBadge checks={info().checks} />
+          <ChecksBadge checks={info().checks} owner={props.owner} repo={props.repo} sha={sha()} />
         </Show>
-        <Show when={info().verified}>
-          <VerifiedBadge />
-        </Show>
+        <VerifiedBadge signature={info().signature} />
       </div>
 
       <div class="Box mb-6">

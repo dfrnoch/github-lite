@@ -9,6 +9,7 @@ import './styles/primer.css';
 import 'virtual:uno.css';
 import AppHeader from './components/layout/AppHeader';
 import Footer from './components/layout/Footer';
+import HovercardHost from './components/hovercard/HovercardHost';
 import NavigationProgress from './components/layout/NavigationProgress';
 import GlobalHotkeys from './components/layout/GlobalHotkeys';
 import ShortcutsDialog from './components/layout/ShortcutsDialog';
@@ -44,6 +45,7 @@ export default function App() {
               <Footer />
               <ShortcutsDialog />
               <GlobalHotkeys />
+              <HovercardHost />
             </Show>
             <Toasts />
           </>

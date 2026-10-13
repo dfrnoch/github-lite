@@ -1,5 +1,6 @@
 import { action, query } from '@solidjs/router';
-import { encodePath, gh, GitHubError, gql } from '../../lib/github';
+import { encodePath, gh, GitHubError, ghPage, gql } from '../../lib/github';
+import { type CommitSignature, SIGNATURE_FIELDS, signatureFromGql } from '../../lib/signature';
 import type { ContentItem, Repository } from '../../lib/types';
 import { getLatestVersionTag } from '../releases/versions';
 
@@ -31,17 +32,41 @@ export const setRepoSubscription = action(async (owner: string, repo: string, mo
     });
 }, 'repo-subscription');
 
+export interface SidebarRelease {
+  name: string | null;
+  tagName: string;
+  publishedAt: string;
+}
+
 export interface RepoOverview {
   openIssues: number;
   openPulls: number;
   branches: number;
   tags: number;
-  releases: { totalCount: number; latest: { name: string | null; tagName: string; publishedAt: string } | null };
+  releases: {
+    totalCount: number;
+    /** The release marked "Latest" (the newest stable one). */
+    latest: SidebarRelease | null;
+    /** The newest published pre-release when it is newer than `latest` (or there is no latest). */
+    prerelease: SidebarRelease | null;
+  };
   languages: { totalSize: number; items: { name: string; color: string | null; size: number }[] };
   contributors?: number;
   hasDiscussions: boolean;
   hasProjects: boolean;
   hasWiki: boolean;
+}
+
+/** The newest published pre-release, if it is newer than the latest (stable) release. */
+function newerPrerelease(
+  latest: SidebarRelease | null,
+  recent: (SidebarRelease & { isPrerelease: boolean; isDraft: boolean })[],
+): SidebarRelease | null {
+  const pre = recent
+    .filter((r) => r.isPrerelease && !r.isDraft && r.publishedAt)
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
+  if (!pre || (latest && pre.publishedAt <= latest.publishedAt)) return null;
+  return { name: pre.name, tagName: pre.tagName, publishedAt: pre.publishedAt };
 }
 
 /** Counts and sidebar data for the repo home + tab counters (one GraphQL call). */
@@ -54,6 +79,7 @@ export const getRepoOverview = query(async (owner: string, repo: string): Promis
       tags:refs(refPrefix:"refs/tags/"){totalCount}
       releases{totalCount}
       latestRelease{name tagName publishedAt}
+      recentReleases:releases(first:10,orderBy:{field:CREATED_AT,direction:DESC}){nodes{name tagName isPrerelease isLatest isDraft publishedAt}}
       languages(first:12,orderBy:{field:SIZE,direction:DESC}){totalSize edges{size node{name color}}}
       hasDiscussionsEnabled hasProjectsEnabled hasWikiEnabled
     }}`,
@@ -65,7 +91,7 @@ export const getRepoOverview = query(async (owner: string, repo: string): Promis
     openPulls: r.pullRequests.totalCount,
     branches: r.branches.totalCount,
     tags: r.tags.totalCount,
-    releases: { totalCount: r.releases.totalCount, latest: r.latestRelease },
+    releases: { totalCount: r.releases.totalCount, latest: r.latestRelease, prerelease: newerPrerelease(r.latestRelease, r.recentReleases.nodes) },
     languages: {
       totalSize: r.languages.totalSize,
       items: r.languages.edges.map((e: any) => ({ name: e.node.name, color: e.node.color, size: e.size })),
@@ -76,6 +102,36 @@ export const getRepoOverview = query(async (owner: string, repo: string): Promis
   };
 }, 'repo-overview');
 
+export interface RepoContributors {
+  /** All contributors, anonymous ones included (the count github.com shows). */
+  total: number;
+  /** The first ones by contributions (users only). */
+  top: { login: string; avatar_url: string; type: string }[];
+}
+
+/**
+ * Sidebar "Contributors": the count from the Link header of a one-per-page
+ * request, and the top 14 avatars. Null when GitHub won't list them (huge
+ * repositories answer 403, empty ones 204).
+ */
+export const getRepoContributors = query(async (owner: string, repo: string): Promise<RepoContributors | null> => {
+  const path = `/repos/${owner}/${repo}/contributors`;
+  try {
+    const [count, top] = await Promise.all([
+      ghPage<{ login?: string }>(path, { perPage: 1, query: { anon: 1 } }),
+      ghPage<{ login: string; avatar_url: string; type: string }>(path, { perPage: 14 }),
+    ]);
+    const total = count.pageInfo.lastPage ?? count.items.length;
+    if (!total) return null;
+    return { total, top: top.items };
+  } catch (e) {
+    if (e instanceof GitHubError && (e.status === 403 || e.status === 404)) return null;
+    // 204 No Content (empty repository) has no JSON body.
+    if (e instanceof SyntaxError) return null;
+    throw e;
+  }
+}, 'repo-contributors');
+
 export interface LastCommit {
   oid: string;
   abbreviatedOid: string;
@@ -84,13 +140,15 @@ export interface LastCommit {
   committedDate: string;
   authors: { name: string | null; avatarUrl: string; user: { login: string } | null }[];
   status: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
+  signature: CommitSignature | null;
   historyCount: number;
   associatedPullNumber?: number;
 }
 
 const COMMIT_FIELDS = `oid abbreviatedOid messageHeadline message committedDate
   authors(first:3){nodes{name avatarUrl user{login}}}
-  statusCheckRollup{state}`;
+  statusCheckRollup{state}
+  ${SIGNATURE_FIELDS}`;
 
 const toLastCommit = (c: any, historyCount = 0): LastCommit => ({
   oid: c.oid,
@@ -100,6 +158,7 @@ const toLastCommit = (c: any, historyCount = 0): LastCommit => ({
   committedDate: c.committedDate,
   authors: c.authors.nodes,
   status: c.statusCheckRollup?.state ?? null,
+  signature: signatureFromGql(c.signature),
   historyCount,
 });
 

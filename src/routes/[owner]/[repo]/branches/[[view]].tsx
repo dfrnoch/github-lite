@@ -323,14 +323,20 @@ function BranchTableRow(props: {
       <Cell class="hidden md:table-cell whitespace-nowrap">
         <span class="inline-flex items-center gap-2 text-fg-muted text-xs">
           <Show when={props.branch.author.avatarUrl}>
-            <Avatar src={props.branch.author.avatarUrl} size={16} login={props.branch.author.login ?? undefined} />
+            <Avatar src={props.branch.author.avatarUrl} size={16} login={props.branch.author.login ?? undefined} hovercard />
           </Show>
           <RelativeTime datetime={props.branch.committedDate} relative />
         </span>
       </Cell>
       <Cell class="hidden lg:table-cell">
         <Loading>
-          <ChecksBadge checks={props.extra?.checks ?? null} href={`${ctx.base()}/commit/${props.branch.oid}`} />
+          <ChecksBadge
+            checks={props.extra?.checks ?? null}
+            href={`${ctx.base()}/commit/${props.branch.oid}`}
+            owner={ctx.owner()}
+            repo={ctx.name()}
+            sha={props.branch.oid}
+          />
         </Loading>
       </Cell>
       <Cell class="hidden md:table-cell text-xs text-fg-muted text-center whitespace-nowrap">

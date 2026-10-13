@@ -479,7 +479,7 @@ function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string
               <span class="relative z-1 bg-canvas text-fg-muted flex">
                 <Octicon icon={gitCommitIcon} />
               </span>
-              <Avatar src={n.commit?.authors?.nodes[0]?.avatarUrl} size={16} />
+              <Avatar src={n.commit?.authors?.nodes[0]?.avatarUrl} size={16} login={n.commit?.authors?.nodes[0]?.user?.login} hovercard />
               <a
                 class="link-muted truncate min-w-0 flex-1"
                 href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}
@@ -487,7 +487,7 @@ function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string
               >
                 <RichText text={n.commit?.messageHeadline} links={false} />
               </a>
-              <CommitStatusIcon state={n.commit?.statusCheckRollup?.state} />
+              <CommitStatusIcon state={n.commit?.statusCheckRollup?.state} owner={props.owner} repo={props.repo} sha={n.commit?.oid} />
               <a class="link-muted font-mono text-xs" href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}>
                 {n.commit?.abbreviatedOid}
               </a>

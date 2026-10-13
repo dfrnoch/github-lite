@@ -2,7 +2,7 @@ import { useLocation, useNavigate, useSearchParams } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
 import { createEffect, createMemo, createSignal, For, isPending, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, Blankslate, itemState, Pagination, RelativeTime, Spinner, StateIcon } from '../../../components/ui';
+import { Avatar, Blankslate, ISSUE_QUALIFIERS, itemState, Pagination, QueryInput, RelativeTime, Spinner, StateIcon } from '../../../components/ui';
 import {
   checkIcon,
   commentIcon,
@@ -146,13 +146,13 @@ export default function IssueList(props: IssueListProps) {
           go(input());
         }}
       >
-        <div class="relative flex-1">
-          <input
-            class="form-control w-full pr-8! rounded-r-none! text-sm"
-            aria-label={props.kind === 'pr' ? 'Search pull requests' : 'Search issues'}
-            value={input()}
-            onInput={(e) => setInput(e.currentTarget.value)}
-          />
+        <QueryInput
+          class="form-control flex-1 pr-8! rounded-r-none! text-sm"
+          label={props.kind === 'pr' ? 'Search pull requests' : 'Search issues'}
+          value={input()}
+          onInput={setInput}
+          suggestions={ISSUE_QUALIFIERS}
+        >
           <Show when={params.q != null && q() !== props.defaultQuery}>
             <a
               class="absolute right-2 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg-accent flex"
@@ -162,7 +162,7 @@ export default function IssueList(props: IssueListProps) {
               <Octicon icon={xCircleFillIcon} />
             </a>
           </Show>
-        </div>
+        </QueryInput>
         <button type="submit" class="btn rounded-l-none! border-l-0! px-3!" aria-label="Search">
           <Octicon icon={searchIcon} />
         </button>

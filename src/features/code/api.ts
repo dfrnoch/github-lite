@@ -1,5 +1,6 @@
 import { action, query } from '@solidjs/router';
 import { encodePath, gh, GitHubError, gql, toBase64 } from '../../lib/github';
+import { type CommitSignature, SIGNATURE_FIELDS, signatureFromGql, signatureFromRest } from '../../lib/signature';
 import type { Commit, DiffFile } from '../../lib/types';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,8 @@ export interface HistoryCommit {
   committer: { name: string | null; avatarUrl: string; user: { login: string } | null } | null;
   verified: boolean;
   signatureState: string | null;
+  /** Signature details for the Verified / Unverified badge (null when unsigned). */
+  signature: CommitSignature | null;
   checks: ChecksSummary | null;
   /** Number of parents (2+ = merge commit). */
   parentCount: number;
@@ -40,7 +43,7 @@ export interface HistoryPage {
 export const COMMIT_NODE_FIELDS = `oid abbreviatedOid message committedDate authoredDate
   authors(first:3){totalCount nodes{name email avatarUrl user{login}}}
   committer{name avatarUrl user{login}}
-  signature{isValid state}
+  ${SIGNATURE_FIELDS}
   parentCount:parents{totalCount}
   statusCheckRollup{state contexts(first:1){checkRunCount checkRunCountsByState{state count} statusContextCount statusContextCountsByState{state count}}}`;
 
@@ -71,6 +74,7 @@ export function toHistoryCommit(c: any): HistoryCommit {
     committer: c.committer ?? null,
     verified: !!c.signature?.isValid,
     signatureState: c.signature?.state ?? null,
+    signature: signatureFromGql(c.signature),
     checks: c.statusCheckRollup
       ? { state: c.statusCheckRollup.state, passed, total: (ctx?.checkRunCount ?? 0) + (ctx?.statusContextCount ?? 0) }
       : null,
@@ -277,6 +281,7 @@ export function restToHistoryCommit(c: Commit): HistoryCommit {
     committer: { name: c.commit.committer.name, avatarUrl: c.committer?.avatar_url ?? '', user: c.committer ? { login: c.committer.login } : null },
     verified: !!c.commit.verification?.verified,
     signatureState: null,
+    signature: signatureFromRest(c.commit.verification, c.committer),
     checks: null,
     parentCount: c.parents?.length ?? 1,
   };

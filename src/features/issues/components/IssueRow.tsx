@@ -148,7 +148,14 @@ export default function IssueRow(props: IssueRowProps) {
           <Show when={checks()}>
             {(c) => (
               <span class="inline-flex items-center gap-1">
-                · <CommitStatusIcon state={c().state} href={`${path()}/checks`} />
+                ·{' '}
+                <CommitStatusIcon
+                  state={c().state}
+                  href={`${path()}/checks`}
+                  owner={props.item.repository.nameWithOwner.split('/')[0]}
+                  repo={props.item.repository.nameWithOwner.split('/')[1]}
+                  pull={props.item.number}
+                />
                 <a class="link-muted" href={`${path()}/checks`}>
                   {c().text}
                 </a>

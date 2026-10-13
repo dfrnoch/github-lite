@@ -1,13 +1,27 @@
 import { useAction } from '@solidjs/router';
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import type { JSX } from '@solidjs/web';
+import { createMemo, createSignal, For, Loading, onSettled, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, Markdown, RelativeTime } from '../../../components/ui';
-import { codeIcon, downloadIcon, fileZipIcon, gitBranchIcon, packageIcon, pencilIcon, tagIcon, trashIcon } from '../../../icons/octicons';
+import {
+  checkCircleIcon,
+  codeIcon,
+  downloadIcon,
+  fileZipIcon,
+  gitBranchIcon,
+  gitCommitIcon,
+  lockIcon,
+  packageIcon,
+  pencilIcon,
+  tagIcon,
+  trashIcon,
+} from '../../../icons/octicons';
 import { compactNumber, formatBytes, formatNumber, pluralize } from '../../../lib/format';
 import { feature } from '../../refined';
 import { ConfirmDialog } from '../../repo-settings/components/ui';
-import type { Release } from '../api';
+import type { Release, ReleaseCommit } from '../api';
 import { removeRelease } from '../api';
+import CompareTagMenu from './CompareTagMenu';
 import { TagChangesLink } from './RefinedReleases';
 
 /**
@@ -58,9 +72,9 @@ export function ReleaseBadges(props: { release: Release; latest: boolean }) {
 }
 
 /**
- * One release as github.com draws it: title + badges, author/tag line,
- * rendered notes, collapsible assets (with sizes and download counts) and
- * read-only reactions.
+ * One release as github.com draws it: title + badges with Compare / edit /
+ * delete on the right, the meta row (author, tag, commit), rendered notes,
+ * then collapsible assets (sizes and download counts) and reactions.
  */
 export default function ReleaseCard(props: {
   release: Release;
@@ -69,6 +83,16 @@ export default function ReleaseCard(props: {
   repo: string;
   latest: boolean;
   canEdit: boolean;
+  /** The tag's commit (short SHA + signature check); omitted while unknown. */
+  commit?: ReleaseCommit | null;
+  /** tag-changes-link's previous tag when the page already looks it up (else the link fetches it). */
+  previousTag?: string | null;
+  /** Extra meta entries after the author (e.g. "N commits to main since this release"). */
+  extraMeta?: JSX.Element;
+  /** Extra header buttons before edit / delete (e.g. convert-release-to-draft). */
+  actions?: JSX.Element;
+  /** Cut long notes short with a "Read more" link (list page). */
+  clampNotes?: boolean;
   /** Expanded assets list (single release page). */
   expandAssets?: boolean;
   /** Custom delete (single page navigates away); defaults to the list action. */
@@ -80,63 +104,111 @@ export default function ReleaseCard(props: {
   const archive = (ext: 'zip' | 'tar.gz') => `https://github.com/${props.owner}/${props.repo}/archive/refs/tags/${r().tag_name}.${ext}`;
   const reactions = () => REACTIONS.filter(([k]) => (r().reactions as any)?.[k] > 0);
   const heat = createMemo(() => heatIndex(r().assets.map((a) => a.download_count)));
+  const isBot = () => r().author.type === 'Bot';
+  const authorName = () => (isBot() ? r().author.login.replace(/\[bot\]$/, '') : r().author.login);
 
   return (
     <div class="Box">
-      <div class="Box-body p-4! md:p-6!">
-        <div class="flex flex-wrap items-start gap-2 mb-2">
-          <h2 class="text-2xl md:text-[32px] font-semibold leading-tight break-all mr-1">
-            <a class="link-plain" href={tagHref(props.base, r().tag_name)}>
-              {r().name || r().tag_name}
-            </a>
-          </h2>
-          <div class="flex gap-1 mt-1.5">
-            <ReleaseBadges release={r()} latest={props.latest} />
+      <div class="Box-body p-4!">
+        <div class="flex flex-col md:flex-row gap-x-2">
+          <div class="flex-1 min-w-0 mb-3 break-words">
+            <span class="text-2xl md:text-[32px] leading-[1.5] font-semibold mr-3">
+              <a class="link-plain" href={tagHref(props.base, r().tag_name)}>
+                {r().name || r().tag_name}
+              </a>
+            </span>
+            <span class="inline-flex gap-1 align-text-bottom relative -top-1.5">
+              <ReleaseBadges release={r()} latest={props.latest} />
+            </span>
           </div>
-          <div class="flex-1" />
-          <Show when={props.canEdit}>
-            <div class="flex gap-1">
-              <a class="btn-octicon" href={`${props.base}/releases/edit/${r().tag_name}`} aria-label="Edit release" title="Edit">
+          <div class="flex items-start gap-1 mb-3 shrink-0">
+            <Show when={!r().draft}>
+              <CompareTagMenu owner={props.owner} repo={props.repo} tag={r().tag_name} />
+            </Show>
+            {props.actions}
+            <Show when={props.canEdit}>
+              <a class="btn-octicon w-7! h-7!" href={`${props.base}/releases/edit/${r().tag_name}`} aria-label="Edit release" title="Edit">
                 <Octicon icon={pencilIcon} />
               </a>
-              <button type="button" class="btn-octicon btn-octicon-danger" aria-label="Delete release" title="Delete" onClick={() => setDeleting(true)}>
+              <button
+                type="button"
+                class="btn-octicon w-7! h-7! text-fg-danger! hover:bg-danger-muted!"
+                aria-label="Delete release"
+                title="Delete"
+                onClick={() => setDeleting(true)}
+              >
                 <Octicon icon={trashIcon} />
               </button>
-            </div>
-          </Show>
-        </div>
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-fg-muted pb-4 mb-4 border-b border-line-muted">
-          <span class="flex items-center gap-1">
-            <Avatar src={r().author.avatar_url} size={20} />
-            <a class="font-semibold link-plain" href={`/${r().author.login}`}>
-              {r().author.login}
-            </a>
-            <Show when={r().published_at} fallback={<span>drafted this</span>}>
-              released this <RelativeTime datetime={r().published_at} />
             </Show>
-          </span>
-          <a class="flex items-center gap-1 link-muted" href={`${props.base}/tree/${r().tag_name}`} title={`Browse the code at ${r().tag_name}`}>
-            {/* visit-tag: this link opens the code, so say so. */}
-            <Octicon icon={feature('visit-tag') ? codeIcon : tagIcon} />
-            <span class="truncate max-w-[220px]">{r().tag_name}</span>
-          </a>
-          <Show when={!r().draft}>
-            <TagChangesLink owner={props.owner} repo={props.repo} tag={r().tag_name} />
-          </Show>
-          <Show when={r().draft || r().target_commitish !== r().tag_name}>
-            <span class="flex items-center gap-1">
-              <Octicon icon={gitBranchIcon} />
-              <span class="truncate max-w-[180px]">{r().target_commitish}</span>
-            </span>
-          </Show>
+          </div>
         </div>
-        <Show when={r().body_html} fallback={<p class="text-fg-muted italic text-sm">No release notes.</p>}>
-          <Markdown html={r().body_html} />
+        <div class="mb-3 md:pb-4 md:border-b border-line-muted">
+          <div class="flex flex-wrap items-end text-sm text-fg-muted">
+            <div class="mr-4 mb-2 flex items-center gap-1 min-w-0">
+              <Avatar src={r().author.avatar_url} login={r().author.login} size={20} square={isBot()} />
+              <a
+                class="font-semibold text-fg-muted! hover:text-fg-accent! ml-0.5"
+                href={isBot() ? `/apps/${authorName()}` : `/${r().author.login}`}
+                data-hovercard-user={isBot() ? undefined : r().author.login}
+              >
+                {authorName()}
+              </a>
+              <Show when={r().published_at} fallback={<span>drafted this</span>}>
+                <span>
+                  released this <RelativeTime datetime={r().published_at} />
+                </span>
+              </Show>
+            </div>
+            {props.extraMeta}
+            <Show when={r().immutable}>
+              <div class="mr-4 mb-2 flex items-center gap-1" title="This release is immutable: its tag and assets can't be changed">
+                <Octicon icon={lockIcon} /> Immutable
+              </div>
+            </Show>
+            <div class="mr-4 mb-2">
+              <a class="flex items-center gap-1 link-muted" href={`${props.base}/tree/${r().tag_name}`} title={r().tag_name}>
+                {/* visit-tag: this link opens the code, so say so. */}
+                <Octicon icon={feature('visit-tag') ? codeIcon : tagIcon} />
+                <span class="ml-1 truncate max-w-[125px]">{r().tag_name}</span>
+              </a>
+            </div>
+            <Loading fallback={null}>
+              <Show when={!r().draft && props.commit}>
+                {(c) => (
+                  <div class="mr-4 mb-2 flex items-center gap-1">
+                    <a class="flex items-center gap-1 link-muted" href={`${props.base}/commit/${c().oid}`} title={c().oid}>
+                      <Octicon icon={gitCommitIcon} /> <code class="text-sm ml-1">{c().abbreviatedOid}</code>
+                    </a>
+                    <Show when={c().verified}>
+                      <span class="text-fg-success inline-flex ml-1" title="This commit was signed with a verified signature">
+                        <Octicon icon={checkCircleIcon} />
+                      </span>
+                    </Show>
+                  </div>
+                )}
+              </Show>
+            </Loading>
+            <Show when={!r().draft}>
+              <TagChangesLink owner={props.owner} repo={props.repo} tag={r().tag_name} previous={props.previousTag} class="mr-4 mb-2" />
+            </Show>
+            <Show when={r().draft}>
+              <div class="mr-4 mb-2 flex items-center gap-1">
+                <Octicon icon={gitBranchIcon} />
+                <span class="truncate max-w-[180px]">{r().target_commitish}</span>
+              </div>
+            </Show>
+          </div>
+        </div>
+        <Show when={r().body_html} fallback={<p class="text-fg-muted italic">No release notes.</p>}>
+          <Show when={props.clampNotes} fallback={<Markdown html={r().body_html} class="release-notes my-4" />}>
+            <ClampedNotes html={r().body_html} href={tagHref(props.base, r().tag_name)} />
+          </Show>
         </Show>
-
-        <details class="mt-6" open={props.expandAssets || r().assets.length > 0}>
+      </div>
+      <div class="px-4 py-4 border-t border-line-muted">
+        <details open={props.expandAssets || r().assets.length > 0}>
           <summary class="cursor-pointer select-none mb-2">
-            <span class="text-xl font-semibold">Assets</span>{' '}
+            <span class="text-xl font-semibold ml-1">Assets</span>{' '}
             <span class="Counter">{r().assets.length + (r().draft ? 0 : 2)}</span>
           </summary>
           <div class="Box">
@@ -218,5 +290,26 @@ export default function ReleaseCard(props: {
         <p>This will delete the information for the release <strong>{r().name || r().tag_name}</strong>. The tag is kept.</p>
       </ConfirmDialog>
     </div>
+  );
+}
+
+/** Long release notes on the list page stop at a fixed height with "Read more" (github.com truncates them too). */
+function ClampedNotes(props: { html: string | undefined; href: string }) {
+  let el!: HTMLDivElement;
+  const [clamped, setClamped] = createSignal(false);
+  onSettled(() => {
+    setClamped(el.scrollHeight > el.clientHeight + 1);
+  });
+  return (
+    <>
+      <div ref={el} class="max-h-[2000px] overflow-hidden">
+        <Markdown html={props.html} class="release-notes my-4" />
+      </div>
+      <Show when={clamped()}>
+        <a class="inline-block mt-2" href={props.href}>
+          Read more
+        </a>
+      </Show>
+    </>
   );
 }

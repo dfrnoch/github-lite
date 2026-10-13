@@ -3,7 +3,9 @@ import { useAction, useSearchParams } from '@solidjs/router';
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Blankslate, Dropdown, RelativeTime, toast } from '../../../components/ui';
-import { deleteTag, getTags } from '../../../features/releases/api';
+import { feature } from '../../../features/refined';
+import { deleteTag, getTagCommits, getTags } from '../../../features/releases/api';
+import { previousTag } from '../../../features/releases/versions';
 import { tagHref } from '../../../features/releases/components/ReleaseCard';
 import ReleasesSubnav from '../../../features/releases/components/ReleasesSubnav';
 import { TagChangesLink, useCreateReleaseHotkey } from '../../../features/releases/components/RefinedReleases';
@@ -19,12 +21,23 @@ export default function TagsPage() {
   const remove = useAction(deleteTag);
   const [deleting, setDeleting] = createSignal<string | null>(null);
   const canEdit = () => !!ctx.repo().permissions?.push;
+  // tag-changes-link: one tag list for every row, started alongside the page (older pages look further back).
+  const tagList = createMemo(() =>
+    feature('tag-changes-link') ? getTagCommits(ctx.owner(), ctx.name(), search.after || search.before ? 1000 : 100) : null,
+  );
+  /** The tag before `tag` (undefined: not in the list we have — the link looks further itself). */
+  const previousFor = (tag: string) => {
+    const list = tagList();
+    if (!list) return null;
+    return previousTag(tag, list) ?? (list.length >= 100 && list.length < 1000 ? undefined : null);
+  };
   useCreateReleaseHotkey();
   const archive = (tag: string, ext: string) => `https://github.com/${ctx.fullName()}/archive/refs/tags/${tag}.${ext}`;
 
   return (
     <div class="container-xl px-4 md:px-6 lg:px-8 py-6">
       <Title>{`Tags · ${ctx.fullName()}`}</Title>
+      <div class="lg:w-11/12 mx-auto">
       <ReleasesSubnav base={ctx.base()} active="tags" />
       <div class="Box">
         <div class="Box-header flex items-center gap-2 font-semibold">
@@ -84,7 +97,7 @@ export default function TagsPage() {
                     <Octicon icon={fileIcon} /> Notes
                   </a>
                 </Show>
-                <TagChangesLink owner={ctx.owner()} repo={ctx.name()} tag={t.name} />
+                <TagChangesLink owner={ctx.owner()} repo={ctx.name()} tag={t.name} previous={previousFor(t.name)} />
               </div>
             </div>
           )}
@@ -100,6 +113,7 @@ export default function TagsPage() {
           </Show>
         </nav>
       </Show>
+      </div>
       <ConfirmDialog
         open={deleting() != null}
         onClose={() => setDeleting(null)}

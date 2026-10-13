@@ -1,5 +1,5 @@
 import { useNavigate } from '@solidjs/router';
-import { createMemo, createUniqueId, Errored, For, Loading, Show } from 'solid-js';
+import { createMemo, Errored, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Dropdown } from '../../../components/ui';
 import { diffIcon, eyeIcon, linkExternalIcon, rssIcon, triangleDownIcon } from '../../../icons/octicons';
@@ -8,9 +8,7 @@ import { useHotkey } from '../../../lib/hotkeys';
 import { feature } from '../../refined';
 import { getRepoViewerState } from '../../repo/api';
 import { useRepo } from '../../repo/context';
-import { getChangelogFile, getReleaseTagNames, getTagCommits } from '../api';
-import { previousTag, tagHref } from '../versions';
-
+import { getChangelogFile, getPreviousTag } from '../api';
 
 /** Refined GitHub widgets of the releases / tags pages. */
 
@@ -105,72 +103,19 @@ export function SubscribeReleases() {
   );
 }
 
-/** releases-dropdown: "Find a release" with every release tag as a suggestion; picking one opens it. */
-export function FindRelease(props: { prereleasesHidden: boolean; onFilter: (q: string | undefined) => void }) {
-  const ctx = useRepo();
-  const navigate = useNavigate();
-  const tags = createMemo(() => getReleaseTagNames(ctx.owner(), ctx.name()));
-  const listId = createUniqueId();
-  return (
-    <Show when={feature('releases-dropdown')}>
-      <form
-        class="w-full md:w-[260px]"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const value = String(new FormData(e.currentTarget).get('q') ?? '').trim();
-          if (value === 'prerelease:false') return props.onFilter(value);
-          if (value) navigate(tagHref(ctx.base(), value));
-        }}
-      >
-        <input
-          name="q"
-          class="form-control w-full"
-          type="search"
-          placeholder="Find a release"
-          aria-label="Find a release"
-          list={listId}
-          autocomplete="off"
-          value={props.prereleasesHidden ? 'prerelease:false' : ''}
-          onInput={(e) => {
-            // Picking a datalist suggestion fires `input` without an inputType.
-            if ('inputType' in e && (e as InputEvent).inputType) return;
-            const value = e.currentTarget.value;
-            if (value === 'prerelease:false') return props.onFilter(value);
-            let known: string[] = [];
-            try {
-              known = tags();
-            } catch {
-              // Suggestions not loaded yet.
-            }
-            if (known.includes(value)) navigate(tagHref(ctx.base(), value));
-          }}
-          onChange={(e) => {
-            if (!e.currentTarget.value && props.prereleasesHidden) props.onFilter(undefined);
-          }}
-        />
-        <Errored fallback={null}>
-          <Loading>
-            <datalist id={listId}>
-              <option value="prerelease:false">Hide pre-releases</option>
-              <For each={tags()}>{(t) => <option value={t} />}</For>
-            </datalist>
-          </Loading>
-        </Errored>
-      </form>
-    </Show>
-  );
-}
-
 /** tag-changes-link: "Commits" — the compare view from the previous tag to this one. */
-export function TagChangesLink(props: { owner: string; repo: string; tag: string; class?: string }) {
-  // The newest 100 tags cover most pages; older releases look further back (up to 1000 tags).
-  const recent = createMemo(() => getTagCommits(props.owner, props.repo, 100));
-  const older = createMemo(() =>
-    !previousTag(props.tag, recent()) && recent().length >= 100 ? getTagCommits(props.owner, props.repo, 1000) : null,
-  );
+export function TagChangesLink(props: {
+  owner: string;
+  repo: string;
+  tag: string;
+  /** The previous tag when the page already looks it up. */
+  previous?: string | null;
+  class?: string;
+}) {
   const prev = createMemo(() => {
-    const list = older();
-    return previousTag(props.tag, list ?? recent());
+    if (!feature('tag-changes-link')) return null;
+    const known = props.previous;
+    return known !== undefined ? known : getPreviousTag(props.owner, props.repo, props.tag);
   });
   return (
     <Show when={feature('tag-changes-link')}>

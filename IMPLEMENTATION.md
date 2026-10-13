@@ -18,6 +18,10 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [x] App header (context breadcrumbs, search with `/` shortcut, create menu, issues/PRs/notifications, user drawer, nav drawer)
 - [x] UI kit: Avatar, Dropdown, Dialog, Toast, Pagination, Markdown (GitHub-rendered HTML), MarkdownEditor (write/preview/toolbar), RelativeTime, IssueLabel, Blankslate, CopyButton, ErrorView
 - [x] github.com links inside rendered markdown are rewritten to stay in-app
+- [x] User / organization hovercards app-wide (`src/components/hovercard/`): delegated on profile links + `data-hovercard-user`, status, pronouns, bio, location, `GET /users/:login/hovercard` context lines for the current repo / issue / PR, Follow button
+- [x] Shared `Popover` primitive (`src/components/ui/Popover.tsx`): anchored, caret, flip + viewport clamp, outside-click / Escape
+- [x] Checks popover on every commit status icon (`src/components/checks/ChecksStatus.tsx`): commit lists, commit page, latest-commit bar, branches, PR list rows, PR timeline commits, repo-header CI icon
+- [~] Commit signature badge `VerifiedBadge` with details popover (GPG key ID / SSH fingerprint, signer, failure reason) — "Partially verified" and vigilant-mode "Unverified" for unsigned commits aren't exposed by the API
 - [ ] Route `preload`s for the heavy pages (removes the request waterfalls the Solid diagnostics report)
 - [~] Keyboard shortcuts beyond `/` (`t` file finder done on code pages; `g i`, `g p`, … todo)
 - [ ] Respect forced light/dark theme inside `.markdown-body` (github-markdown-css follows the OS)
@@ -25,7 +29,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 ## Repository — code (`/:owner/:repo`)
 
 - [x] Repo layout + tab bar with counters (Code, Issues, PRs, Discussions, Actions, Projects, Security, Insights, Settings)
-- [x] Repo home: title, Watch (all/participating/ignore), Fork, Star, branch picker, branch/tag counts, latest commit bar, file table with per-file last commit, README, About sidebar (edit description/website/topics), releases, languages, clone/ZIP menu, empty-repo quick setup
+- [x] Repo home: title, Watch (all/participating/ignore), Fork, Star, branch picker, branch/tag counts, latest commit bar, file table with per-file last commit, README, About sidebar (edit description/website/topics), releases (latest + newer pre-release, or tag count), contributors (count + top 14 avatars), languages, clone/ZIP menu, empty-repo quick setup
 - [x] Tree view `/tree/:ref/:path*` (branch names with slashes resolved like github.com)
 - [x] Blob view `/blob/:ref/:path*`: syntax highlighting (lazy Shiki), line numbers, `#L10-L20` selection, markdown preview, images, binary detection, raw/copy/download, delete file
 - [x] File tree side panel on tree/blob/blame pages (lazy directories, current path expanded, collapse remembered)
@@ -80,8 +84,8 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [x] Deploy keys `/settings/keys` (+ `/new`, fingerprints, delete)
 - [x] Actions secrets & variables `/settings/secrets/actions`, `/settings/variables/actions` (+ `/new`, `/:name`; secrets sealed in-browser with tweetnacl + blakejs `crypto_box_seal`, lazy-loaded)
 - [x] Pages settings `/settings/pages` (enable, branch/folder or Actions source, custom domain, enforce HTTPS, unpublish)
-- [x] Releases `/releases`, `/releases/tag/:tag`, `/releases/new` (`?tag=`), `/releases/edit/:tag` (tag picker/create on target, generate notes, binaries upload/delete, pre-release/latest, draft), delete; Tags `/tags` (verified, zip/tar, notes, delete tag)
-- [ ] Release search ("Find a release") — not in the REST API
+- [x] Releases `/releases` (sticky "Release list" column with scroll spy + anchors, stacked cards, long notes clamped), `/releases/tag/:tag` (release list column paged around the release, Compare ▾ tag menu, commit SHA + signature, Immutable, commits since release), `/releases/new` (`?tag=`), `/releases/edit/:tag` (tag picker/create on target, generate notes, binaries upload/delete, pre-release/latest, draft), delete; Tags `/tags` (verified, zip/tar, notes, delete tag)
+- [x] Release search ("Find a release", `?q=`) — not in the API: matches name/tag over up to 1000 release names (GraphQL), first 10 matches
 - [x] Stargazers, watchers (user cards, cursor pagination; GitHub hides stargazer lists of repos you don't admin), forks (sort, pagination)
 - [x] Insights: contributors (period/metric, area chart + per-contributor charts, 202 retry), commit activity, code frequency, traffic (push access), pulse (`/pulse/:period`), activity (`/activity` with filters); hand-rolled SVG charts with hover tooltips
 - [x] Security tab: overview, security policy (repo or owner `.github` SECURITY.md), advisories list + detail, Dependabot alerts (graceful when the token lacks access)

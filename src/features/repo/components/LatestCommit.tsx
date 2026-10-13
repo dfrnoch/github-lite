@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, RelativeTime } from '../../../components/ui';
+import { Avatar, RelativeTime, VerifiedBadge } from '../../../components/ui';
 import { ellipsisIcon, historyIcon, versionsIcon } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
 import { encodePath } from '../../../lib/github';
@@ -48,7 +48,7 @@ export default function LatestCommit(props: {
       {(c) => (
         <div class="Box-header flex items-center gap-2 py-3! text-sm flex-wrap">
           <span class="AvatarStack">
-            <For each={c().authors.slice(0, 2)}>{(a) => <Avatar src={a.avatarUrl} size={24} />}</For>
+            <For each={c().authors.slice(0, 2)}>{(a) => <Avatar src={a.avatarUrl} size={24} login={a.user?.login} hovercard />}</For>
           </span>
           <span class="font-semibold">
             <For each={c().authors.slice(0, 2)}>
@@ -77,7 +77,8 @@ export default function LatestCommit(props: {
               <Octicon icon={ellipsisIcon} />
             </button>
           </Show>
-          <CommitStatusIcon state={c().status} href={`${base()}/commit/${c().oid}`} />
+          <CommitStatusIcon state={c().status} href={`${base()}/commit/${c().oid}`} owner={props.owner} repo={props.repo} sha={c().oid} />
+          <VerifiedBadge signature={c().signature} />
           <span class="text-fg-muted text-xs whitespace-nowrap">
             <a class="link-muted font-mono" href={`${base()}/commit/${c().oid}`}>
               {c().abbreviatedOid}
