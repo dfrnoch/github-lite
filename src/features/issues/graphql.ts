@@ -50,7 +50,7 @@ export const ISSUE_TIMELINE_ITEM = `__typename
 
 /** Extra timeline item fields for pull requests. */
 export const PULL_TIMELINE_ITEM = `${ISSUE_TIMELINE_ITEM}
-  ... on PullRequestCommit{commit{oid abbreviatedOid messageHeadline committedDate url statusCheckRollup{state} authors(first:2){nodes{name avatarUrl user{login}}}}}
+  ... on PullRequestCommit{commit{oid abbreviatedOid messageHeadline messageBody committedDate url statusCheckRollup{state} authors(first:2){nodes{name avatarUrl user{login}}}}}
   ... on PullRequestReview{${COMMENT} databaseId url state submittedAt viewerCanUpdate viewerCanDelete isMinimized minimizedReason}
   ... on HeadRefForcePushedEvent{${EV} beforeCommit{oid abbreviatedOid} afterCommit{oid abbreviatedOid} ref{name}}
   ... on BaseRefForcePushedEvent{${EV} beforeCommit{oid abbreviatedOid} afterCommit{oid abbreviatedOid} ref{name}}

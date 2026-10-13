@@ -1,8 +1,10 @@
 import { createEffect, createMemo, onSettled, untrack } from 'solid-js';
 import { commitAt } from '../../features/issues/refined';
+import { enrichDiagrams } from '../../lib/diagrams';
 import { encodePath, gh, ghBlob } from '../../lib/github';
 import { escapeLines, highlightLines } from '../../lib/highlight';
 import { type RepoFileContext, resolveRepoUrls, rewriteHtmlLinks } from '../../lib/markdown';
+import { systemDark, themeSettings } from '../../lib/theme';
 
 /** Context for comment bodies (Refined GitHub reading features). */
 export interface MarkdownComment {
@@ -32,6 +34,15 @@ export default function Markdown(props: { html: string | null | undefined; class
     out = mentionAvatars(out);
     return rewriteHtmlLinks(out);
   });
+
+  // Mermaid diagrams (and other blocks github.com enriches with its own JS):
+  // render them here, again whenever the theme changes.
+  createEffect(
+    () => [html(), themeSettings(), systemDark()] as const,
+    () => {
+      void enrichDiagrams(el);
+    },
+  );
 
   // Private repos: relative images can't be loaded by URL, so fetch them
   // through the API (with the token) and show them as blob URLs.

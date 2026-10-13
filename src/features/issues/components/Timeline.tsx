@@ -10,6 +10,7 @@ import {
   eyeIcon,
   fileDiffIcon,
   gitBranchIcon,
+  ellipsisIcon,
   gitCommitIcon,
   gitMergeIcon,
   gitPullRequestClosedIcon,
@@ -475,33 +476,53 @@ function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string
         </div>
       </div>
       <div class="ml-[-8px] mt-1">
-        <For each={props.nodes}>
-          {(n) => (
-            <div
-              class={[
-                'flex items-center gap-2 py-1 pl-0 text-sm',
-                { 'rgh-dim-bot': feature('dim-bots') && isBotLogin(n.commit?.authors?.nodes[0]?.user?.login ?? n.commit?.authors?.nodes[0]?.name) },
-              ]}
-            >
-              <span class="relative z-1 bg-canvas text-fg-muted flex">
-                <Octicon icon={gitCommitIcon} />
-              </span>
-              <AvatarStack avatars={commitAvatars(n)} size={16} />
-              <a
-                class="link-muted truncate min-w-0 flex-1"
-                href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}
-                title={n.commit?.messageHeadline}
-              >
-                <RichText text={n.commit?.messageHeadline} links={false} />
-              </a>
-              <CommitStatusIcon state={n.commit?.statusCheckRollup?.state} owner={props.owner} repo={props.repo} sha={n.commit?.oid} />
-              <a class="link-muted font-mono text-xs" href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}>
-                {n.commit?.abbreviatedOid}
-              </a>
-            </div>
-          )}
-        </For>
+        <For each={props.nodes}>{(n) => <TimelineCommit node={n} owner={props.owner} repo={props.repo} />}</For>
       </div>
+    </div>
+  );
+}
+
+/** One pushed commit in a PR timeline; the "…" button shows its description, like github.com. */
+function TimelineCommit(props: { node: TimelineNode; owner: string; repo: string }) {
+  const [open, setOpen] = createSignal(false);
+  const commit = () => props.node.commit;
+  const href = () => `/${props.owner}/${props.repo}/commit/${commit()?.oid}`;
+  return (
+    <div
+      class={{
+        'rgh-dim-bot':
+          feature('dim-bots') && isBotLogin(commit()?.authors?.nodes[0]?.user?.login ?? commit()?.authors?.nodes[0]?.name),
+      }}
+    >
+      <div class="flex items-center gap-2 py-1 pl-0 text-sm">
+        <span class="relative z-1 bg-canvas text-fg-muted flex">
+          <Octicon icon={gitCommitIcon} />
+        </span>
+        <AvatarStack avatars={commitAvatars(props.node)} size={16} />
+        <span class="flex items-center gap-1 min-w-0 flex-1">
+          <a class="link-muted truncate min-w-0" href={href()} title={commit()?.messageHeadline}>
+            <RichText text={commit()?.messageHeadline} links={false} />
+          </a>
+          <Show when={commit()?.messageBody?.trim()}>
+            <button
+              type="button"
+              class="btn btn-sm h-4! px-1! py-0! leading-none shrink-0"
+              aria-label="Show description for this commit"
+              aria-expanded={open() ? 'true' : 'false'}
+              onClick={() => setOpen(!open())}
+            >
+              <Octicon icon={ellipsisIcon} size={12} />
+            </button>
+          </Show>
+        </span>
+        <CommitStatusIcon state={commit()?.statusCheckRollup?.state} owner={props.owner} repo={props.repo} sha={commit()?.oid} />
+        <a class="link-muted font-mono text-xs" href={href()}>
+          {commit()?.abbreviatedOid}
+        </a>
+      </div>
+      <Show when={open()}>
+        <pre class="ml-14 mb-2 text-xs text-fg-muted whitespace-pre-wrap break-words font-mono">{commit()?.messageBody?.trim()}</pre>
+      </Show>
     </div>
   );
 }

@@ -75,6 +75,7 @@ export interface TimelineNode extends Partial<Omit<GqlComment, 'id'>> {
     oid: string;
     abbreviatedOid: string;
     messageHeadline?: string;
+    messageBody?: string;
     committedDate?: string;
     url?: string;
     statusCheckRollup?: { state: string } | null;

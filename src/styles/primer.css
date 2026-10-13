@@ -2435,3 +2435,31 @@ code.rgh-backticks {
   font-size: 12px;
   line-height: 20px;
 }
+
+/* GitHub's "render-needs-enrichment" blocks (Mermaid etc., see src/lib/diagrams.ts). */
+.markdown-body .js-render-enrichment-loader {
+  display: none;
+}
+.markdown-body .render-needs-enrichment.is-rendered .render-plaintext-hidden {
+  display: none;
+}
+.markdown-body .render-diagram {
+  margin-bottom: 16px;
+  padding: 16px;
+  overflow: auto;
+  text-align: center;
+  background-color: var(--bgColor-default);
+  border: 1px solid var(--borderColor-muted);
+  border-radius: 6px;
+}
+.markdown-body .render-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.markdown-body .render-needs-enrichment.is-error::after {
+  content: 'Unable to render diagram: ' attr(data-error);
+  display: block;
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: var(--fgColor-danger);
+}
