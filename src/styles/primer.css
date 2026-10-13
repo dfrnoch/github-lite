@@ -1863,3 +1863,24 @@ code.rgh-backticks {
     width: 90%;
   }
 }
+
+/* <details><summary> with a heading inside: keep the disclosure arrow on the heading's line. */
+.markdown-body details summary {
+  display: list-item;
+  cursor: pointer;
+}
+.markdown-body details summary > .markdown-heading,
+.markdown-body details summary > :is(h1, h2, h3, h4, h5, h6, p) {
+  display: inline-block;
+  vertical-align: middle;
+}
+.markdown-body details summary > .markdown-heading > :is(h1, h2, h3, h4, h5, h6),
+.markdown-body details summary > :is(h1, h2, h3, h4, h5, h6) {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.markdown-body details summary .anchor {
+  display: none;
+}
