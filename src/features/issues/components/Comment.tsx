@@ -3,7 +3,6 @@ import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, Dialog, Dropdown, Markdown, MarkdownEditor, RelativeTime, toast, toastError } from '../../../components/ui';
 import { eyeClosedIcon, foldIcon, kebabHorizontalIcon, mentionIcon, pencilIcon, unfoldIcon } from '../../../icons/octicons';
-import { feature } from '../../refined';
 import { deleteComment, editComment, type CommentRef, type MinimizeReason, setCommentMinimized } from '../api';
 import { commitAt, UserName } from '../refined';
 import type { GqlComment } from '../types';
@@ -17,7 +16,7 @@ const ASSOCIATION: Record<string, string> = {
   FIRST_TIME_CONTRIBUTOR: 'First-time contributor',
   FIRST_TIMER: 'First-time contributor',
 };
-/** Labels linkify-user-labels turns into links to the author's commits. */
+/** Labels that link to the author's commits in the repository. */
 const COMMITTER_LABELS = new Set(['MEMBER', 'COLLABORATOR', 'CONTRIBUTOR']);
 
 const HIDE_REASONS: { value: MinimizeReason; label: string }[] = [
@@ -39,7 +38,7 @@ export const quoteText = (body: string) =>
     .map((l) => `> ${l}`)
     .join('\n') + '\n\n';
 
-/** First words of a comment as plain text (preview-hidden-comments). */
+/** First words of a comment as plain text (shown on hidden comments). */
 const preview = (body: string) =>
   body
     .replace(/<!--[\s\S]*?-->/g, '')
@@ -74,8 +73,6 @@ export default function Comment(props: CommentProps) {
   const [editing, setEditing] = createSignal(false);
   const [confirmDelete, setConfirmDelete] = createSignal(false);
   const [showMinimized, setShowMinimized] = createSignal(false);
-  const [hideDialog, setHideDialog] = createSignal(false);
-  const [hideReason, setHideReason] = createSignal<MinimizeReason>('OFF_TOPIC');
   const reactions = useReactions({
     get subjectId() {
       return props.comment.id;
@@ -95,7 +92,6 @@ export default function Comment(props: CommentProps) {
   const hide = async (reason: MinimizeReason | null) => {
     try {
       await minimize(props.comment.id, reason);
-      setHideDialog(false);
     } catch (e) {
       toastError(e);
     }
@@ -114,7 +110,7 @@ export default function Comment(props: CommentProps) {
     const label = ASSOCIATION[props.comment.authorAssociation];
     if (!label) return null;
     const href =
-      feature('linkify-user-labels') && COMMITTER_LABELS.has(props.comment.authorAssociation) && props.comment.author
+      COMMITTER_LABELS.has(props.comment.authorAssociation) && props.comment.author
         ? `/${props.repo}/commits?author=${encodeURIComponent(props.comment.author.login)}`
         : undefined;
     return { label, href };
@@ -139,7 +135,7 @@ export default function Comment(props: CommentProps) {
             <span> · edited</span>
           </Show>
         </span>
-        <Show when={feature('quick-mention') && props.onQuote && props.comment.author && !props.comment.viewerDidAuthor}>
+        <Show when={props.onQuote && props.comment.author && !props.comment.viewerDidAuthor}>
           <button
             type="button"
             class="rgh-quick-mention btn-octicon w-6 h-6 ml-1 align-middle opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -163,7 +159,7 @@ export default function Comment(props: CommentProps) {
           </Show>
         )}
       </Show>
-      <Show when={feature('quick-comment-edit') && canEdit() && !editing()}>
+      <Show when={canEdit() && !editing()}>
         <button type="button" class="btn-octicon" title="Edit comment" aria-label="Edit comment" onClick={() => setEditing(true)}>
           <Octicon icon={pencilIcon} />
         </button>
@@ -201,19 +197,17 @@ export default function Comment(props: CommentProps) {
                 Quote reply
               </button>
             </Show>
-            <Show when={feature('comments-time-machine-links')}>
-              <button
-                type="button"
-                class="SelectMenu-item"
-                title="Browse the repository like it appeared on this day"
-                onClick={() => {
-                  close();
-                  void browseAtTime();
-                }}
-              >
-                View repo at this time
-              </button>
-            </Show>
+            <button
+              type="button"
+              class="SelectMenu-item"
+              title="Browse the repository like it appeared on this day"
+              onClick={() => {
+                close();
+                void browseAtTime();
+              }}
+            >
+              View repo at this time
+            </button>
             <Show when={canEdit() || canDelete() || props.comment.viewerCanMinimize}>
               <hr class="SelectMenu-divider" />
             </Show>
@@ -233,21 +227,7 @@ export default function Comment(props: CommentProps) {
               <Show
                 when={props.comment.isMinimized}
                 fallback={
-                  <Show
-                    when={feature('quick-comment-hiding')}
-                    fallback={
-                      <button
-                        type="button"
-                        class="SelectMenu-item"
-                        onClick={() => {
-                          close();
-                          setHideDialog(true);
-                        }}
-                      >
-                        Hide
-                      </button>
-                    }
-                  >
+                  <>
                     <div class="px-4 pt-1 pb-0.5 text-xs text-fg-muted">Hide as…</div>
                     <For each={HIDE_REASONS}>
                       {(r) => (
@@ -263,7 +243,7 @@ export default function Comment(props: CommentProps) {
                         </button>
                       )}
                     </For>
-                  </Show>
+                  </>
                 }
               >
                 <button
@@ -297,7 +277,6 @@ export default function Comment(props: CommentProps) {
   );
 
   const minimizedReason = () => (props.comment.minimizedReason ?? 'hidden').toLowerCase().replace(/_/g, ' ');
-  const easyToggle = () => feature('easy-toggle-hidden-comments');
 
   const box = () => (
     <div
@@ -314,15 +293,15 @@ export default function Comment(props: CommentProps) {
         when={!props.comment.isMinimized || showMinimized()}
         fallback={
           <div
-            class={['rgh-minimized-comment flex items-center gap-2 px-4 py-2 text-sm text-fg-muted bg-canvas-muted rounded-md', { 'cursor-pointer': easyToggle() }]}
+            class="rgh-minimized-comment flex items-center gap-2 px-4 py-2 text-sm text-fg-muted bg-canvas-muted rounded-md cursor-pointer"
             onClick={(e) => {
-              if (easyToggle() && !(e.target as HTMLElement).closest('button, a')) setShowMinimized(true);
+              if (!(e.target as HTMLElement).closest('button, a')) setShowMinimized(true);
             }}
           >
             <Octicon icon={eyeClosedIcon} class="shrink-0" />
             <span class="flex-1 min-w-0 truncate">
               This comment was marked as {minimizedReason()}.
-              <Show when={feature('preview-hidden-comments') && preview(props.comment.body)}>
+              <Show when={preview(props.comment.body)}>
                 {(text) => (
                   <span class="rgh-hidden-comment-preview ml-2 italic" title={text()}>
                     <span class="font-semibold not-italic">{author()}:</span> {text()}
@@ -338,9 +317,9 @@ export default function Comment(props: CommentProps) {
       >
         <Show when={props.comment.isMinimized}>
           <div
-            class={['flex items-center gap-2 px-4 py-1.5 text-xs text-fg-muted bg-canvas-muted border-b border-line', { 'cursor-pointer': easyToggle() }]}
+            class="flex items-center gap-2 px-4 py-1.5 text-xs text-fg-muted bg-canvas-muted border-b border-line cursor-pointer"
             onClick={(e) => {
-              if (easyToggle() && !(e.target as HTMLElement).closest('button, a')) setShowMinimized(false);
+              if (!(e.target as HTMLElement).closest('button, a')) setShowMinimized(false);
             }}
           >
             <span class="flex-1">This comment was marked as {minimizedReason()}.</span>
@@ -370,9 +349,7 @@ export default function Comment(props: CommentProps) {
             commentRef={props.commentRef}
             repo={props.repo}
             onDone={() => setEditing(false)}
-            onDelete={
-              feature('quick-review-comment-deletion') && props.commentRef.kind === 'review_comment' && canDelete() ? () => setConfirmDelete(true) : undefined
-            }
+            onDelete={props.commentRef.kind === 'review_comment' && canDelete() ? () => setConfirmDelete(true) : undefined}
           />
         </Show>
       </Show>
@@ -409,27 +386,6 @@ export default function Comment(props: CommentProps) {
             }}
           >
             Delete
-          </button>
-        </div>
-      </Dialog>
-      <Dialog open={hideDialog()} onClose={() => setHideDialog(false)} title="Hide comment" width="400px">
-        <label class="form-label" for={`hide-reason-${props.comment.id}`}>
-          Choose a reason for hiding this comment
-        </label>
-        <select
-          id={`hide-reason-${props.comment.id}`}
-          class="form-select w-full"
-          value={hideReason()}
-          onChange={(e) => setHideReason(e.currentTarget.value as MinimizeReason)}
-        >
-          <For each={HIDE_REASONS}>{(r) => <option value={r.value}>{r.label}</option>}</For>
-        </select>
-        <div class="flex justify-end gap-2 mt-4">
-          <button type="button" class="btn" onClick={() => setHideDialog(false)}>
-            Cancel
-          </button>
-          <button type="button" class="btn btn-primary" onClick={() => void hide(hideReason())}>
-            Hide comment
           </button>
         </div>
       </Dialog>

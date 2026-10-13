@@ -14,7 +14,6 @@ import {
 } from '../../../icons/octicons';
 import { shortSha } from '../../../lib/format';
 import { renderMarkdown, toAppUrl } from '../../../lib/markdown';
-import { feature } from '../../refined';
 import { useRepo } from '../../repo/context';
 import { getAnnotations, getCommitChecks, getPullHead } from '../api';
 import { duration, type RunState, runState, stateVerb } from '../status';
@@ -220,10 +219,10 @@ function CheckDetails(props: { check: CheckRun; pull: string }) {
     const text = [props.check.output?.summary, props.check.output?.text].filter(Boolean).join('\n\n');
     return text ? renderSummary(text, ctx.fullName()) : '';
   });
-  // action-pr-link: in-app run/job links remember the PR they were opened from.
+  // In-app run/job links remember the PR they were opened from.
   const href = () => {
     const h = detailsHref(props.check);
-    if (!h || !feature('action-pr-link') || !h.startsWith('/') || !h.includes('/actions/runs/')) return h;
+    if (!h || !h.startsWith('/') || !h.includes('/actions/runs/')) return h;
     return `${h}${h.includes('?') ? '&' : '?'}pr=${props.pull}`;
   };
   const isActions = () => props.check.app?.slug === 'github-actions';

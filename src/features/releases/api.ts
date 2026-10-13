@@ -280,7 +280,7 @@ export const checkTagExists = query(async (owner: string, repo: string, tag: str
 
 /* ------------------------------------------------ Refined GitHub (releases) */
 
-/** tag-changes-link: the newest `max` tags (in pages of 100) with their commits, newest first. */
+/** The newest `max` tags (in pages of 100) with their commits, newest first. */
 export const getTagCommits = query(async (owner: string, repo: string, max: number): Promise<TagCommit[]> => {
   const out: TagCommit[] = [];
   let after: string | null = null;
@@ -302,7 +302,7 @@ export const getTagCommits = query(async (owner: string, repo: string, max: numb
 }, 'rgh-tag-commits');
 
 /**
- * tag-changes-link: the tag before `tag`. The newest 100 tags cover most
+ * The tag before `tag`. The newest 100 tags cover most
  * pages; older releases look further back (up to 1000 tags) — in one flight.
  */
 export const getPreviousTag = query(async (owner: string, repo: string, tag: string): Promise<string | null> => {
@@ -314,7 +314,7 @@ export const getPreviousTag = query(async (owner: string, repo: string, tag: str
   return previousTag(tag, await getTagCommits(owner, repo, 1000)) ?? null;
 }, 'rgh-previous-tag');
 
-/** releases-dropdown: tag names of the newest 100 releases (shares the release list request). */
+/** Tag names of the newest 100 releases (shares the release list request). */
 export const getReleaseTagNames = query(
   async (owner: string, repo: string): Promise<string[]> => (await getReleaseList(owner, repo)).map((n) => n.tagName),
   'rgh-release-tag-names',
@@ -322,7 +322,7 @@ export const getReleaseTagNames = query(
 
 const CHANGELOG = /^(?:changelog|news|changes|history|release|whatsnew)(?:\.(?:mdx?|mkdn?|mdwn|mdown|markdown|litcoffee|txt|rst))?$/i;
 
-/** link-to-changelog-file: name of a changelog file at the repo root (default branch), or null. */
+/** Name of a changelog file at the repo root (default branch), or null. */
 export const getChangelogFile = query(async (owner: string, repo: string): Promise<string | null> => {
   const data = await gql<any>(
     `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){object(expression:"HEAD:"){... on Tree{entries{name type}}}}}`,
@@ -332,7 +332,7 @@ export const getChangelogFile = query(async (owner: string, repo: string): Promi
   return entries.find((e) => e.type === 'blob' && CHANGELOG.test(e.name))?.name ?? null;
 }, 'rgh-changelog-file');
 
-/** convert-release-to-draft: PATCH draft:true (the release URL then becomes an untagged draft URL). */
+/** PATCH draft:true (the release URL then becomes an untagged draft URL). */
 export const convertReleaseToDraft = (owner: string, repo: string, id: number) =>
   gh<Release>(`/repos/${owner}/${repo}/releases/${id}`, { method: 'PATCH', body: { draft: true } });
 

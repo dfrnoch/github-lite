@@ -157,11 +157,11 @@ export function CommitRow(props: CommitListOptions & { commit: HistoryCommit }) 
   const href = () => (props.commitHref ? props.commitHref(props.commit.oid) : `${props.base}/commit/${props.commit.oid}`);
   const owner = () => props.base.split('/')[1];
   const repo = () => props.base.split('/')[2];
-  const isMerge = () => feature('mark-merge-commits-in-list') && props.commit.parentCount > 1;
+  const isMerge = () => props.commit.parentCount > 1;
   const tags = () => (feature('tags-on-commits-list') ? (props.tags?.[props.commit.oid] ?? []) : []);
-  /** easy-toggle-commit-messages: a click anywhere on the row (but not on a control or while selecting) toggles the body. */
+  /** A click anywhere on the row (but not on a control or while selecting) toggles the body. */
   const onRowClick = (e: MouseEvent) => {
-    if (!feature('easy-toggle-commit-messages') || !props.commit.messageBody) return;
+    if (!props.commit.messageBody) return;
     if ((e.target as HTMLElement).closest('a, button, input, details, summary')) return;
     if (getSelection()?.toString()) return;
     setOpen(!open());

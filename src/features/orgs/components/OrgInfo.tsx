@@ -6,7 +6,6 @@ import { compactNumber } from '../../../lib/format';
 import { getViewerFollows, type OrgProfile } from '../../profile/api';
 import FollowButton from '../../profile/components/FollowButton';
 import { locationMapHref } from '../../profile/links';
-import { feature } from '../../refined';
 
 const withProtocol = (url: string) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
 
@@ -42,11 +41,9 @@ export default function OrgInfo(props: { org: OrgProfile }) {
             <Show when={props.org.location}>
               <li class="inline-flex items-center gap-1">
                 <Octicon icon={locationIcon} />
-                <Show when={feature('linkify-user-location')} fallback={props.org.location}>
-                  <a class="link-muted" href={locationMapHref(props.org.location ?? '')} target="_blank" rel="noreferrer">
-                    {props.org.location}
-                  </a>
-                </Show>
+                <a class="link-muted" href={locationMapHref(props.org.location ?? '')} target="_blank" rel="noreferrer">
+                  {props.org.location}
+                </a>
               </li>
             </Show>
             <Show when={props.org.websiteUrl}>

@@ -61,9 +61,10 @@ A lightweight GitHub client. Routes mirror github.com URLs exactly (swap the hos
 
 ### Refined GitHub features
 
-Refined GitHub's features are reimplemented natively, each behind a toggle on `/settings/refined`.
+Refined GitHub's best quality-of-life features are built into the app as **permanent behaviour** (no gate, no setting). Only the opinionated ones — visual preferences, nags, automatic actions, features that call outside services or add per-page API cost — stay optional, each behind a toggle on `/settings/refined`.
 
-- Registry: `src/features/refined/registry/<area>.ts` (one file per owning area). Each entry has `status`: `todo` → set to `done` when implemented (add `note` for caveats, `options` for settings, `hotkeys` for shortcuts), `native` when this app already behaves that way (with a `note`), `na` when it can't/shouldn't apply (with a `note`). `defaultEnabled: false` only for features that would be surprising on by default.
-- Gate behaviour with `feature('id')` from `src/features/refined` (reactive — read it in JSX/memos/handlers, never in a component body). Options: `featureOption<T>('id', 'key')`.
-- Keyboard shortcuts: `useHotkey({ keys: 'g m', description, group, feature: 'id', handler })` from `src/lib/hotkeys.ts` — they appear in the `?` dialog automatically and are inactive while their feature is off.
+- Registry of the optional ones: `src/features/refined/registry/<area>.ts` (one file per owning area; entry fields: `id`, `section`, `description`, `status: 'done'`, optional `note`, `options`, `hotkeys`, `defaultEnabled`). Add a new optional feature here; make a feature permanent by just implementing it ungated.
+- Gate optional behaviour with `feature('id')` from `src/features/refined` (reactive — read it in JSX/memos/handlers, never in a component body). Options: `featureOption<T>('id', 'key')`.
+- Keyboard shortcuts: `useHotkey({ keys: 'g m', description, group, handler })` from `src/lib/hotkeys.ts` — they appear in the `?` dialog automatically. Add `feature: 'id'` only for shortcuts that belong to an optional feature.
+- `src/features/refined/registry.test.ts` guards the registry: code may only reference ids that exist, and every registered id must be used.
 - Read the original implementation for behaviour details when useful: `gh api repos/refined-github/refined-github/contents/source/features/<id>.tsx -H "Accept: application/vnd.github.raw"`.

@@ -83,9 +83,8 @@ export function selectMatching(selection: Selection, threads: ThreadFacts[]): st
 }
 
 /**
- * Refined GitHub's `select-notifications`: a "Select by" menu next to the
- * select-all checkbox (`S` opens it). Picks combine as (any type) AND (any
- * status) AND (any read state).
+ * A "Select by" menu next to the select-all checkbox (`S` opens it). Picks
+ * combine as (any type) AND (any status) AND (any read state).
  */
 export default function SelectBy(props: { onChange: (selection: Selection) => void }) {
   const [selection, setSelection] = createSignal<Selection>({ Type: [], Status: [], Read: [] });
@@ -94,7 +93,6 @@ export default function SelectBy(props: { onChange: (selection: Selection) => vo
     keys: 'S',
     description: 'Open the "Select by" menu',
     group: 'Notifications',
-    feature: 'select-notifications',
     handler: () => root.querySelector('button')?.click(),
   });
 

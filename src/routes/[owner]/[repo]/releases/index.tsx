@@ -2,7 +2,6 @@ import { Title } from '@solidjs/meta';
 import { type RouteDefinition, useLocation, useSearchParams } from '@solidjs/router';
 import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show } from 'solid-js';
 import { Blankslate, PageSpinner, Pagination, pageHref } from '../../../../components/ui';
-import { feature } from '../../../../features/refined';
 import { getLatestReleaseId, getReleases, getTagCommits, searchReleases } from '../../../../features/releases/api';
 import ReleaseCard from '../../../../features/releases/components/ReleaseCard';
 import ReleaseListNav from '../../../../features/releases/components/ReleaseListNav';
@@ -18,7 +17,7 @@ const HIDE_PRERELEASES = 'prerelease:false';
 /** Anchor id of a release on the list page (github.com's `#release-<tag>`). */
 const anchorId = (tag: string) => `release-${tag}`;
 
-// Start the page's requests with the navigation (tag-changes-link's tag list
+// Start the page's requests with the navigation (the tag list
 // doesn't depend on the releases, so it shouldn't wait for them).
 export const route = {
   preload: ({ params, location }) => {
@@ -27,11 +26,11 @@ export const route = {
     const page = Math.max(1, Number(search.get('page')) || 1);
     if (!q) void getReleases(params.owner!, params.repo!, page);
     void getLatestReleaseId(params.owner!, params.repo!);
-    if (feature('tag-changes-link')) void getTagCommits(params.owner!, params.repo!, tagDepth(page, !!q));
+    void getTagCommits(params.owner!, params.repo!, tagDepth(page, !!q));
   },
 } satisfies RouteDefinition;
 
-/** tag-changes-link: how many tags to look through (older pages and searches reach further back). */
+/** How many tags to look through (older pages and searches reach further back). */
 const tagDepth = (page: number, searching: boolean) => (page > 1 || searching ? 1000 : 100);
 
 /** /:owner/:repo/releases — the release list column + the page's releases stacked. */
@@ -40,21 +39,18 @@ export default function ReleasesPage() {
   const location = useLocation();
   const [search, setSearch] = useSearchParams<{ page?: string; q?: string }>();
   const page = () => Math.max(1, Number(search.page) || 1);
-  // releases-dropdown: `prerelease:false` hides pre-releases (on the current page).
-  const hidePrereleases = () => feature('releases-dropdown') && !!search.q?.includes(HIDE_PRERELEASES);
-  const text = () => (feature('releases-dropdown') ? (search.q ?? '').replace(HIDE_PRERELEASES, '') : (search.q ?? '')).trim();
+  // `prerelease:false` hides pre-releases (on the current page).
+  const hidePrereleases = () => !!search.q?.includes(HIDE_PRERELEASES);
+  const text = () => (search.q ?? '').replace(HIDE_PRERELEASES, '').trim();
   const releases = createMemo(() => (text() ? searchReleases(ctx.owner(), ctx.name(), text()) : getReleases(ctx.owner(), ctx.name(), page())));
   const latestId = createMemo(() => getLatestReleaseId(ctx.owner(), ctx.name()));
   const canEdit = () => !!ctx.repo().permissions?.push;
   const items = createMemo(() => (hidePrereleases() ? releases().items.filter((r) => !r.prerelease) : releases().items));
-  // tag-changes-link: one tag list for every card, started alongside the releases.
-  const tags = createMemo(() =>
-    feature('tag-changes-link') ? getTagCommits(ctx.owner(), ctx.name(), tagDepth(page(), !!text())) : null,
-  );
+  // One tag list for every card, started alongside the releases.
+  const tags = createMemo(() => getTagCommits(ctx.owner(), ctx.name(), tagDepth(page(), !!text())));
   /** The tag before `tag` (undefined: not in the list we have — the link looks further itself). */
   const previousFor = (tag: string) => {
     const list = tags();
-    if (!list) return null;
     return previousTag(tag, list) ?? (list.length >= 100 && list.length < 1000 ? undefined : null);
   };
   useCreateReleaseHotkey();

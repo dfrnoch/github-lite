@@ -1,4 +1,4 @@
-/** Version-tag helpers (Refined GitHub's unreleased-commits / tag-changes-link logic). */
+/** Version-tag helpers (Refined GitHub's unreleased-commits / tag-changes logic). */
 
 /** Link to a release page by tag (slashes in tags stay path separators). */
 export const tagHref = (base: string, tag: string) => `${base}/releases/tag/${tag.split('/').map(encodeURIComponent).join('/')}`;

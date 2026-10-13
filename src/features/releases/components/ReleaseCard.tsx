@@ -13,11 +13,9 @@ import {
   lockIcon,
   packageIcon,
   pencilIcon,
-  tagIcon,
   trashIcon,
 } from '../../../icons/octicons';
 import { compactNumber, formatBytes, formatNumber, pluralize } from '../../../lib/format';
-import { feature } from '../../refined';
 import { ConfirmDialog } from '../../repo-settings/components/ui';
 import type { Release, ReleaseCommit } from '../api';
 import { removeRelease } from '../api';
@@ -26,7 +24,7 @@ import { TagChangesLink } from './RefinedReleases';
 
 /**
  * GitHub's 10-step heat scale (1 = hottest) over a list of values
- * (release-download-count colors the most downloaded assets).
+ * (the most downloaded assets are colored).
  */
 export function heatIndex(values: number[]) {
   const min = Math.min(...values);
@@ -85,11 +83,11 @@ export default function ReleaseCard(props: {
   canEdit: boolean;
   /** The tag's commit (short SHA + signature check); omitted while unknown. */
   commit?: ReleaseCommit | null;
-  /** tag-changes-link's previous tag when the page already looks it up (else the link fetches it). */
+  /** The previous tag when the page already looks it up (else the link fetches it). */
   previousTag?: string | null;
   /** Extra meta entries after the author (e.g. "N commits to main since this release"). */
   extraMeta?: JSX.Element;
-  /** Extra header buttons before edit / delete (e.g. convert-release-to-draft). */
+  /** Extra header buttons before edit / delete (e.g. convert to draft). */
   actions?: JSX.Element;
   /** Cut long notes short with a "Read more" link (list page). */
   clampNotes?: boolean;
@@ -167,8 +165,8 @@ export default function ReleaseCard(props: {
             </Show>
             <div class="mr-4 mb-2">
               <a class="flex items-center gap-1 link-muted" href={`${props.base}/tree/${r().tag_name}`} title={r().tag_name}>
-                {/* visit-tag: this link opens the code, so say so. */}
-                <Octicon icon={feature('visit-tag') ? codeIcon : tagIcon} />
+                {/* This link opens the code, so say so. */}
+                <Octicon icon={codeIcon} />
                 <span class="ml-1 truncate max-w-[125px]">{r().tag_name}</span>
               </a>
             </div>
@@ -220,23 +218,14 @@ export default function ReleaseCard(props: {
                     {a.name}
                   </a>
                   <span class="text-xs text-fg-muted w-20 text-right">{formatBytes(a.size)}</span>
-                  <Show
-                    when={feature('release-download-count')}
-                    fallback={
-                      <span class="text-xs text-fg-muted w-32 text-right" title={`${formatNumber(a.download_count)} downloads`}>
-                        {pluralize(a.download_count, 'download')}
-                      </span>
-                    }
+                  {/* Heat-colored count; kept invisible at 0 so the columns stay aligned. */}
+                  <span
+                    class={['text-xs w-20 text-right inline-flex items-center justify-end gap-1', { invisible: !a.download_count }]}
+                    title={`${formatNumber(a.download_count)} downloads`}
+                    style={{ color: heatColor(heat()(a.download_count)) }}
                   >
-                    {/* Heat-colored count; kept invisible at 0 so the columns stay aligned. */}
-                    <span
-                      class={['text-xs w-20 text-right inline-flex items-center justify-end gap-1', { invisible: !a.download_count }]}
-                      title={`${formatNumber(a.download_count)} downloads`}
-                      style={{ color: heatColor(heat()(a.download_count)) }}
-                    >
-                      {compactNumber(a.download_count)} <Octicon icon={downloadIcon} />
-                    </span>
-                  </Show>
+                    {compactNumber(a.download_count)} <Octicon icon={downloadIcon} />
+                  </span>
                   <span class="text-xs text-fg-muted w-28 text-right">
                     <RelativeTime datetime={a.updated_at} />
                   </span>

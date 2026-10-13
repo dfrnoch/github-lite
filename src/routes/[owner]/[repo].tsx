@@ -74,7 +74,7 @@ export const route = {
     if (feature('bugs-tab') || feature('extend-repo-tabs')) {
       void getRepoTabExtras(params.owner!, params.repo!, feature('bugs-tab'), feature('extend-repo-tabs'));
     }
-    if (feature('repo-header-info')) void getRepoHeaderInfo(params.owner!, params.repo!);
+    void getRepoHeaderInfo(params.owner!, params.repo!);
   },
 } satisfies RouteDefinition;
 
@@ -105,7 +105,7 @@ export default function RepoLayout(props: ParentProps) {
   return (
     <RepoContext value={ctx}>
       <RepoFileFinderHotkey />
-      <nav class={['AppHeader AppHeader--bordered px-4 flex items-center', { 'rgh-mobile-tabs': feature('mobile-tabs') }]} aria-label="Repository">
+      <nav class="AppHeader AppHeader--bordered px-4 flex items-center rgh-mobile-tabs" aria-label="Repository">
         <div class="UnderlineNav flex-1 min-w-0" style={{ 'box-shadow': 'none' }}>
           <ul class="UnderlineNav-body">
             <RepoTabs section={section()} query={String(location.query.q ?? '')} />
@@ -122,10 +122,8 @@ export default function RepoLayout(props: ParentProps) {
               <Octicon icon={archiveIcon} />
               <span>
                 This repository has been archived by the owner. It is now read-only.
-                <Show when={feature('archive-forks-link')}>
-                  {' '}
-                  You can check out <a href={`${ctx.base()}/forks`}>its forks</a>.
-                </Show>
+                {' '}
+                You can check out <a href={`${ctx.base()}/forks`}>its forks</a>.
               </span>
             </div>
           </div>
@@ -133,7 +131,7 @@ export default function RepoLayout(props: ParentProps) {
       </Loading>
       <Errored fallback={(err, reset) => <ErrorView error={err()} reset={reset} />}>
         <Loading fallback={<PageSpinner />}>
-          <div class={['contents', { 'rgh-clean-filelist': feature('clean-repo-filelist-actions') }]}>{props.children}</div>
+          <div class="contents rgh-clean-filelist">{props.children}</div>
         </Loading>
       </Errored>
     </RepoContext>

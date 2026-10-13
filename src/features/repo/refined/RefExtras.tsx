@@ -3,7 +3,6 @@ import Octicon from '../../../components/Octicon';
 import { arrowUpRightIcon, plusIcon, tagIcon } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
 import type { Repository } from '../../../lib/types';
-import { feature } from '../../refined';
 import { checkTagExists } from '../../releases/api';
 import { tagHref } from '../../releases/versions';
 import { getPublishState, MANY_UNRELEASED } from '../api';
@@ -16,18 +15,18 @@ export const unreleasedLabel = (aheadBy: number) =>
 
 /**
  * Buttons next to the branch picker of the code views (DirectoryView /
- * FileView): unreleased-commits on the repo root, visit-tag on tags.
+ * FileView): unreleased commits on the repo root, a link to the tag's page on tags.
  */
 export default function RefPickerExtras(props: { repo: Repository; gitRef: string; path: string }) {
   const isDefault = () => props.gitRef === props.repo.default_branch;
   return (
     <Errored fallback={null}>
-      <Show when={feature('unreleased-commits') && isDefault() && !props.path}>
+      <Show when={isDefault() && !props.path}>
         <Loading>
           <UnreleasedCommitsButton repo={props.repo} />
         </Loading>
       </Show>
-      <Show when={feature('visit-tag') && !isDefault() && !/^[0-9a-f]{40}$/i.test(props.gitRef)}>
+      <Show when={!isDefault() && !/^[0-9a-f]{40}$/i.test(props.gitRef)}>
         <Loading>
           <VisitTagButton repo={props.repo} gitRef={props.gitRef} />
         </Loading>
@@ -36,7 +35,7 @@ export default function RefPickerExtras(props: { repo: Repository; gitRef: strin
   );
 }
 
-/** unreleased-commits: 🏷 +N linking to the compare view since the latest tag (+ "Draft a new release" for pushers). */
+/** 🏷 +N linking to the compare view since the latest tag (+ "Draft a new release" for pushers). */
 export function UnreleasedCommitsButton(props: { repo: Repository; withDraft?: boolean }) {
   const state = createMemo(() => getPublishState(props.repo.owner.login, props.repo.name));
   const base = () => `/${props.repo.full_name}`;
@@ -66,7 +65,7 @@ export function UnreleasedCommitsButton(props: { repo: Repository; withDraft?: b
   );
 }
 
-/** visit-tag: ↗ next to the ref picker when browsing a tag, to its release / tag page. */
+/** ↗ next to the ref picker when browsing a tag, to its release / tag page. */
 function VisitTagButton(props: { repo: Repository; gitRef: string }) {
   const isTag = createMemo(() => checkTagExists(props.repo.owner.login, props.repo.name, props.gitRef));
   return (

@@ -130,7 +130,7 @@ export default function CommitsPage() {
             commits={history()!.commits}
             base={ctx.base()}
             browsePath={resolved().path ? encodePath(resolved().path) : undefined}
-            authorHref={feature('same-branch-author-commits') ? authorHref : undefined}
+            authorHref={authorHref}
             tags={feature('tags-on-commits-list') ? commitTags() : undefined}
           />
           <div class="flex justify-center my-4">

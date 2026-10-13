@@ -2,7 +2,8 @@
  * Refined GitHub "Writing comments" features as small reusable helpers.
  *
  * `MarkdownEditor` applies all of them. Other text fields opt in with ref
- * directives (they gate themselves on their feature toggle at event time):
+ * directives (tab-to-indent, monospace-textareas, no-self-reference and
+ * unfinished-comments gate themselves on their feature toggle at event time):
  *
  *   <textarea ref={[tabToIndent, oneKeyFormatting, fitTextarea]} />   // plain comment-like textareas
  *   <input ref={[oneKeyFormatting, monospaceField]} />                 // commit / PR title inputs
@@ -111,7 +112,7 @@ const QUOTES = new Set(['`', "'", '"']);
 /** one-key-formatting: typing a Markdown symbol with text selected wraps the selection instead of replacing it. */
 export function oneKeyFormatting(el: TextField) {
   (el as HTMLElement).addEventListener('keydown', (e) => {
-    if (!feature('one-key-formatting') || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey) return;
+    if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey) return;
     const i = FORMATTING.indexOf(e.key);
     const start = el.selectionStart ?? 0;
     const end = el.selectionEnd ?? 0;
@@ -123,7 +124,7 @@ export function oneKeyFormatting(el: TextField) {
   });
 }
 
-/** fit-textareas: grow with the content instead of scrolling. */
+/** fit-textareas: grow with the content instead of scrolling (CSS field-sizing, Chromium only). */
 export function fitTextarea(el: HTMLTextAreaElement) {
   el.classList.add('rgh-fit-textarea');
 }
@@ -144,7 +145,7 @@ export function avoidAccidentalSubmissions(el: HTMLInputElement) {
   el.addEventListener(
     'keydown',
     (e) => {
-      if (!feature('avoid-accidental-submissions') || e.key !== 'Enter' || e.isComposing || !el.form) return;
+      if (e.key !== 'Enter' || e.isComposing || !el.form) return;
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         el.form.requestSubmit();
@@ -190,7 +191,7 @@ export function noSelfReference(el: HTMLElement) {
 
 /** prevent-comment-loss: links clicked in a comment preview open in a new tab. Use as a click handler on the preview. */
 export function openPreviewLinksInNewTab(e: MouseEvent) {
-  if (!feature('prevent-comment-loss') || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href]');
   if (!a || a.getAttribute('href')!.startsWith('#')) return;
   e.preventDefault();
@@ -253,12 +254,11 @@ if (typeof document !== 'undefined') {
     document.title = flag ? UNFINISHED_PREFIX + clean : clean;
   });
 
-  // CSS-only parts (fit-textareas, monospace-textareas) are gated by attributes on <html>.
+  // The CSS-only part of monospace-textareas is gated by an attribute on <html>.
   createRoot(() =>
     createEffect(
-      () => ({ fit: feature('fit-textareas'), mono: feature('monospace-textareas') }),
-      ({ fit, mono }) => {
-        document.documentElement.toggleAttribute('data-rgh-fit-textareas', fit);
+      () => feature('monospace-textareas'),
+      (mono) => {
         document.documentElement.toggleAttribute('data-rgh-monospace-textareas', mono);
       },
     ),

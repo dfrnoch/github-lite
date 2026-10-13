@@ -14,7 +14,6 @@ import {
   xCircleFillIcon,
 } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
-import { feature } from '../../refined';
 import { getViewer } from '../../user/api';
 import { getAssignableUsers, getListCounts, getMilestones, getPinnedIssues, getRepoLabels, type PinnedIssue, PER_PAGE, searchIssues } from '../api';
 import { qualifier, qualifiers, setQualifier, SORTS, stateOf, tokenize, withState } from '../query';
@@ -79,16 +78,16 @@ export default function IssueList(props: IssueListProps) {
   };
   const result = createMemo(() => searchIssues(fullQuery(), page()));
   const viewer = createMemo(() => getViewer());
-  // Shared (deduped) with ListHeader's buttons; clean-conversation-filters hides empty filters.
+  // Shared (deduped) with ListHeader's buttons; filters for labels / milestones are hidden when the repo has none.
   const counts = createMemo(() => (repoScoped() ? getListCounts(props.owner!, props.repo!) : null));
   // Pinned issues above the default repo issue list (like github.com).
   const showPinned = () => repoScoped() && props.kind === 'issue' && params.q == null && page() === 1;
   const pinned = createMemo(() => (showPinned() ? getPinnedIssues(props.owner!, props.repo!) : []));
 
-  // fix-no-pr-search: an issue search on the PR list belongs on the issue list.
+  // An issue search on the PR list belongs on the issue list.
   createEffect(
     () => {
-      if (props.kind !== 'pr' || !repoScoped() || !feature('fix-no-pr-search')) return null;
+      if (props.kind !== 'pr' || !repoScoped()) return null;
       const types = tokenize(q()).filter((t) => (t.key === 'is' || t.key === 'type') && !t.negated).map((t) => t.value!.toLowerCase());
       return types.includes('issue') && !types.some((t) => t === 'pr' || t === 'pull-request') ? `/${props.owner}/${props.repo}/issues?q=${encodeURIComponent(q())}` : null;
     },
@@ -166,12 +165,7 @@ export default function IssueList(props: IssueListProps) {
         </Loading>
       </Show>
       <div class="Box">
-        <div
-          class={[
-            'Box-header ListToolbar',
-            { 'rgh-sticky-list-toolbar sticky top-0 z-10 rounded-t-md': feature('sticky-conversation-list-toolbar') },
-          ]}
-        >
+        <div class="Box-header ListToolbar rgh-sticky-list-toolbar sticky top-0 z-10 rounded-t-md">
           <div class="flex items-center">
             <Loading fallback={<span class="ListToolbar-state">Loading…</span>}>
               <a class="ListToolbar-state" aria-current={state() === 'open' ? 'page' : undefined} href={hrefFor(withState(q(), 'open'))}>
@@ -199,7 +193,7 @@ export default function IssueList(props: IssueListProps) {
                 selected={qualifiers(q(), 'author')}
                 onApply={(keys) => go(setQualifier(q(), 'author', keys[0] ?? null))}
               />
-              <Show when={!feature('clean-conversation-filters') || latestCount('labels') !== 0}>
+              <Show when={latestCount('labels') !== 0}>
               <SelectPanel
                 triggerClass={filterClass}
                 trigger={caret('Labels')}
@@ -225,7 +219,7 @@ export default function IssueList(props: IssueListProps) {
                 onApply={(keys) => go(setQualifier(q(), 'label', keys))}
               />
               </Show>
-              <Show when={!feature('clean-conversation-filters') || latestCount('milestones') !== 0}>
+              <Show when={latestCount('milestones') !== 0}>
               <SelectPanel
                 triggerClass={filterClass}
                 trigger={caret('Milestones')}
@@ -271,7 +265,7 @@ export default function IssueList(props: IssueListProps) {
                 onApply={(keys) => go(setQualifier(q(), 'assignee', keys[0] ?? null))}
               />
             </Show>
-            <Show when={props.kind === 'pr' && feature('pr-filters')}>
+            <Show when={props.kind === 'pr'}>
               <SelectPanel
                 triggerClass={filterClass}
                 trigger={caret('Checks')}
@@ -375,76 +369,34 @@ function UserOption(props: { login: string; avatarUrl: string; name: string | nu
   );
 }
 
-/**
- * Pinned issues: cards side by side like github.com, or (clean-pinned-issues)
- * a standard list. pinned-issues-update-time shows when they were last updated.
- */
+/** Pinned issues as a standard list above the issue list, with when each was last updated. */
 function PinnedIssues(props: { items: PinnedIssue[]; base: string }) {
-  const time = (i: PinnedIssue) =>
-    feature('pinned-issues-update-time') ? (
-      <>
-        updated <RelativeTime datetime={i.updatedAt} />
-      </>
-    ) : (
-      <>
-        opened <RelativeTime datetime={i.createdAt} />
-      </>
-    );
-  const meta = (i: PinnedIssue) => (
-    <>
-      #{i.number} · {i.author?.login ?? 'ghost'} {time(i)}
-    </>
-  );
   return (
     <Show when={props.items.length}>
-      <Show
-        when={feature('clean-pinned-issues')}
-        fallback={
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 rgh-pinned-cards">
-            <For each={props.items}>
-              {(i) => (
-                <div class="Box p-3 flex flex-col gap-2">
-                  <div class="flex items-center gap-2 text-xs text-fg-muted">
-                    <StateIcon state={itemState({ isPull: false, state: i.state, stateReason: i.stateReason })} />
-                    <span class="flex-1">{meta(i)}</span>
-                    <Octicon icon={pinIcon} />
-                  </div>
-                  {/* oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub */}
-                  <a class={['link-plain font-semibold break-words', TITLE_CODE]} href={`${props.base}/issues/${i.number}`} innerHTML={i.titleHTML || i.title} />
-                  <Show when={i.comments.totalCount}>
-                    <span class="text-xs text-fg-muted inline-flex items-center gap-1">
-                      <Octicon icon={commentIcon} size={12} /> {i.comments.totalCount}
-                    </span>
-                  </Show>
-                </div>
-              )}
-            </For>
-          </div>
-        }
-      >
-        <div class="Box mb-4 rgh-clean-pinned-issues">
-          <div class="Box-header py-2! px-4! text-sm font-semibold flex items-center gap-2">
-            <Octicon icon={pinIcon} /> Pinned issues
-          </div>
-          <For each={props.items}>
-            {(i) => (
-              <div class="Box-row Box-row--hover flex items-start gap-3 py-2! px-4!">
-                <StateIcon class="mt-1 shrink-0" state={itemState({ isPull: false, state: i.state, stateReason: i.stateReason })} />
-                <div class="flex-1 min-w-0">
-                  {/* oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub */}
-                  <a class={['link-plain font-semibold text-base break-words', TITLE_CODE]} href={`${props.base}/issues/${i.number}`} innerHTML={i.titleHTML || i.title} />
-                  <div class="mt-1 text-xs text-fg-muted">{meta(i)}</div>
-                </div>
-                <Show when={i.comments.totalCount}>
-                  <a class="link-muted text-xs inline-flex items-center gap-1 pt-1" href={`${props.base}/issues/${i.number}`}>
-                    <Octicon icon={commentIcon} /> {i.comments.totalCount}
-                  </a>
-                </Show>
-              </div>
-            )}
-          </For>
+      <div class="Box mb-4 rgh-clean-pinned-issues">
+        <div class="Box-header py-2! px-4! text-sm font-semibold flex items-center gap-2">
+          <Octicon icon={pinIcon} /> Pinned issues
         </div>
-      </Show>
+        <For each={props.items}>
+          {(i) => (
+            <div class="Box-row Box-row--hover flex items-start gap-3 py-2! px-4!">
+              <StateIcon class="mt-1 shrink-0" state={itemState({ isPull: false, state: i.state, stateReason: i.stateReason })} />
+              <div class="flex-1 min-w-0">
+                {/* oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub */}
+                <a class={['link-plain font-semibold text-base break-words', TITLE_CODE]} href={`${props.base}/issues/${i.number}`} innerHTML={i.titleHTML || i.title} />
+                <div class="mt-1 text-xs text-fg-muted">
+                  #{i.number} · {i.author?.login ?? 'ghost'} updated <RelativeTime datetime={i.updatedAt} />
+                </div>
+              </div>
+              <Show when={i.comments.totalCount}>
+                <a class="link-muted text-xs inline-flex items-center gap-1 pt-1" href={`${props.base}/issues/${i.number}`}>
+                  <Octicon icon={commentIcon} /> {i.comments.totalCount}
+                </a>
+              </Show>
+            </div>
+          )}
+        </For>
+      </div>
     </Show>
   );
 }

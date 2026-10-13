@@ -3,7 +3,6 @@ import type { JSX } from '@solidjs/web';
 import { createMemo, createUniqueId, Errored, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { searchIcon } from '../../../icons/octicons';
-import { feature } from '../../refined';
 import { UnreleasedCommitsButton } from '../../repo/refined/RefExtras';
 import { useRepo } from '../../repo/context';
 import { getReleaseTagNames } from '../api';
@@ -30,7 +29,7 @@ export default function ReleasesSubnav(props: { base: string; active: 'releases'
 
 /**
  * Right side of the releases header (list and single release pages):
- * Refined GitHub extras, "Draft a new release" and "Find a release".
+ * Subscribe, unreleased commits, "Draft a new release" and "Find a release".
  */
 export function ReleasesActions(props: { query?: string; unreleased?: boolean; onSearch?: (q: string | undefined) => void }) {
   const ctx = useRepo();
@@ -38,7 +37,7 @@ export function ReleasesActions(props: { query?: string; unreleased?: boolean; o
   return (
     <div class="flex flex-wrap items-center gap-2">
       <SubscribeReleases />
-      <Show when={feature('unreleased-commits') && props.unreleased}>
+      <Show when={props.unreleased}>
         <Errored fallback={null}>
           <Loading>
             <UnreleasedCommitsButton repo={ctx.repo()} withDraft={false} />
@@ -56,16 +55,14 @@ export function ReleasesActions(props: { query?: string; unreleased?: boolean; o
 }
 
 /**
- * "Find a release": submits `?q=` to the releases list. With
- * releases-dropdown, every release tag is suggested (picking one opens it)
- * and `prerelease:false` hides pre-releases.
+ * "Find a release": submits `?q=` to the releases list. Every release tag is
+ * suggested (picking one opens it) and `prerelease:false` hides pre-releases.
  */
 export function FindRelease(props: { value: string; onSearch?: (q: string | undefined) => void }) {
   const ctx = useRepo();
   const navigate = useNavigate();
   const listId = createUniqueId();
-  const dropdown = () => feature('releases-dropdown');
-  const tags = createMemo(() => (dropdown() ? getReleaseTagNames(ctx.owner(), ctx.name()) : []));
+  const tags = createMemo(() => getReleaseTagNames(ctx.owner(), ctx.name()));
   const knownTags = () => {
     try {
       return tags();
@@ -84,7 +81,7 @@ export function FindRelease(props: { value: string; onSearch?: (q: string | unde
       onSubmit={(e) => {
         e.preventDefault();
         const value = String(new FormData(e.currentTarget).get('q') ?? '').trim();
-        if (value && dropdown() && knownTags().includes(value)) return navigate(tagHref(ctx.base(), value));
+        if (value && knownTags().includes(value)) return navigate(tagHref(ctx.base(), value));
         search(value || undefined);
       }}
     >
@@ -95,11 +92,10 @@ export function FindRelease(props: { value: string; onSearch?: (q: string | unde
         type="search"
         placeholder="Find a release"
         aria-label="Find a release"
-        list={dropdown() ? listId : undefined}
+        list={listId}
         autocomplete="off"
         value={props.value}
         onInput={(e) => {
-          if (!dropdown()) return;
           // Picking a datalist suggestion fires `input` without an inputType.
           if ('inputType' in e && (e as InputEvent).inputType) return;
           const value = e.currentTarget.value;
@@ -110,16 +106,14 @@ export function FindRelease(props: { value: string; onSearch?: (q: string | unde
           if (!e.currentTarget.value && props.value) search(undefined);
         }}
       />
-      <Show when={dropdown()}>
-        <Errored fallback={null}>
-          <Loading>
-            <datalist id={listId}>
-              <option value="prerelease:false">Hide pre-releases</option>
-              <For each={tags()}>{(t) => <option value={t} />}</For>
-            </datalist>
-          </Loading>
-        </Errored>
-      </Show>
+      <Errored fallback={null}>
+        <Loading>
+          <datalist id={listId}>
+            <option value="prerelease:false">Hide pre-releases</option>
+            <For each={tags()}>{(t) => <option value={t} />}</For>
+          </datalist>
+        </Loading>
+      </Errored>
     </form>
   );
 }

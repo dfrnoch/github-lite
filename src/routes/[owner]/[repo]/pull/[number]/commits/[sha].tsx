@@ -6,7 +6,6 @@ import Octicon from '../../../../../../components/Octicon';
 import { getCommit } from '../../../../../../features/code/api';
 import CommitDetails from '../../../../../../features/code/components/CommitDetails';
 import { getPullCommits } from '../../../../../../features/code/pullApi';
-import { feature } from '../../../../../../features/refined';
 import { useRepo } from '../../../../../../features/repo/context';
 import { chevronLeftIcon, chevronRightIcon, fileCodeIcon } from '../../../../../../icons/octicons';
 
@@ -78,12 +77,10 @@ export default function PullCommitPage() {
           </>
         }
         footer={
-          // previous-next-commit-buttons: the same navigation again under the diff.
-          <Show when={feature('previous-next-commit-buttons')}>
-            <div class="flex justify-end mb-3">
-              <PrevNext />
-            </div>
-          </Show>
+          // The same navigation again under the diff.
+          <div class="flex justify-end mb-3">
+            <PrevNext />
+          </div>
         }
       />
     </>

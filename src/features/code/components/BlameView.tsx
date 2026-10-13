@@ -11,7 +11,6 @@ import Breadcrumbs from '../../repo/components/Breadcrumbs';
 import { useFileTreeOpen } from '../../repo/components/CodeLayout';
 import LatestCommit from '../../repo/components/LatestCommit';
 import RefPicker from '../../repo/components/RefPicker';
-import { feature } from '../../refined';
 import { getBlame, type BlameRange } from '../api';
 import { codeTransformOptions, DefaultBranchButton, tabSizeStyle, transformCodeLine } from '../refined';
 import { getPullBlameCommit } from '../refinedApi';
@@ -106,8 +105,8 @@ export default function BlameView(props: { repo: Repository; gitRef: string; pat
 
 function BlameHunk(props: { range: BlameRange; lines: string[]; base: string; owner: string; repo: string; path: string }) {
   const navigate = useNavigate();
-  /** deep-reblame applies to commits whose title links a PR ("… (#123)"), i.e. squash merges. */
-  const deep = () => feature('deep-reblame') && /\(#\d+\)/.test(c().messageHeadline);
+  /** Alt-click deep reblame applies to commits whose title links a PR ("… (#123)"), i.e. squash merges. */
+  const deep = () => /\(#\d+\)/.test(c().messageHeadline);
   const reblameTitle = () =>
     deep() ? 'View blame prior to this change. Hold Alt to extract commits from this PR first' : 'View blame prior to this change';
   const deepReblame = async (e: MouseEvent) => {

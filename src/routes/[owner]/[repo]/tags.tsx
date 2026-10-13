@@ -3,7 +3,6 @@ import { useAction, useSearchParams } from '@solidjs/router';
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Blankslate, Dropdown, RelativeTime, toast } from '../../../components/ui';
-import { feature } from '../../../features/refined';
 import { deleteTag, getTagCommits, getTags } from '../../../features/releases/api';
 import { previousTag } from '../../../features/releases/versions';
 import { tagHref } from '../../../features/releases/components/ReleaseCard';
@@ -21,14 +20,11 @@ export default function TagsPage() {
   const remove = useAction(deleteTag);
   const [deleting, setDeleting] = createSignal<string | null>(null);
   const canEdit = () => !!ctx.repo().permissions?.push;
-  // tag-changes-link: one tag list for every row, started alongside the page (older pages look further back).
-  const tagList = createMemo(() =>
-    feature('tag-changes-link') ? getTagCommits(ctx.owner(), ctx.name(), search.after || search.before ? 1000 : 100) : null,
-  );
+  // One tag list for every row, started alongside the page (older pages look further back).
+  const tagList = createMemo(() => getTagCommits(ctx.owner(), ctx.name(), search.after || search.before ? 1000 : 100));
   /** The tag before `tag` (undefined: not in the list we have — the link looks further itself). */
   const previousFor = (tag: string) => {
     const list = tagList();
-    if (!list) return null;
     return previousTag(tag, list) ?? (list.length >= 100 && list.length < 1000 ? undefined : null);
   };
   useCreateReleaseHotkey();

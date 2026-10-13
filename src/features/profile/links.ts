@@ -9,5 +9,5 @@ export const userReposHref = (login: string) => `/${login}?tab=repositories${fea
 
 export const orgReposHref = (org: string) => `/orgs/${org}/repositories${feature('hide-user-forks') ? '?type=source' : ''}`;
 
-/** `linkify-user-location`: a location string → an OpenStreetMap search. */
+/** A location string → an OpenStreetMap search. */
 export const locationMapHref = (location: string) => `https://www.openstreetmap.org/search?query=${encodeURIComponent(location.trim())}`;

@@ -81,7 +81,7 @@ export default function ComparePage() {
           hrefFor={(ref) => hrefFor(ref, range()?.head ?? ctx.repo().default_branch)}
         />
         <Show
-          when={feature('swap-branches-on-compare') && range()}
+          when={range()}
           fallback={<Octicon icon={arrowLeftIcon} class="text-fg-muted" />}
         >
           {(r) => (
@@ -350,21 +350,18 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
   const [body, setBody] = createSignal(
     () => props.defaultBody ?? (firstCommit()?.slice(1).join('\n').trim() || (props.cmp.commits.length === 1 ? '' : props.template)),
   );
-  const [draft, setDraft] = createSignal(false);
   const [maintainerEdits, setMaintainerEdits] = createSignal(true);
   const [busy, setBusy] = createOptimistic(false);
-  /** prevent-duplicate-pr-submission: stays set once a submission went out (until it fails). */
+  /** Stays set once a submission went out (until it fails), so the create buttons can't submit twice. */
   const [submitted, setSubmitted] = createSignal(false);
   const crossRepo = () => props.head.includes(':');
   const headOwner = () => (crossRepo() ? props.head.split(':')[0]! : ctx.owner());
   const headBranch = () => (crossRepo() ? props.head.split(':').slice(1).join(':') : props.head);
 
-  const submit = async (asDraft = draft()) => {
+  const submit = async (asDraft: boolean) => {
     if (!title().trim()) return;
-    if (feature('prevent-duplicate-pr-submission')) {
-      if (submitted()) return;
-      setSubmitted(true);
-    }
+    if (submitted()) return;
+    setSubmitted(true);
     setBusy(true);
     try {
       const pr = await create(ctx.owner(), ctx.name(), {
@@ -412,7 +409,7 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
             repo={ctx.fullName()}
             minHeight={200}
             placeholder="Add your description here..."
-            onSubmit={() => void submit()}
+            onSubmit={() => void submit(false)}
           />
         </Loading>
         <Show when={feature('warn-pr-from-master') && crossRepo()}>
@@ -437,64 +434,13 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
             </label>
           </Show>
           <div class="flex-1" />
-          <Show when={feature('one-click-pr-or-gist')}>
-            {/* one-click-pr-or-gist: both PR types as plain buttons instead of a split button. */}
-            <button type="button" class="btn" disabled={disabled()} onClick={() => void submit(true)}>
-              Create draft PR
-            </button>
-            <button type="button" class="btn btn-primary" disabled={disabled()} onClick={() => void submit(false)}>
-              {busy() ? 'Creating…' : 'Create pull request'}
-            </button>
-          </Show>
-          <Show when={!feature('one-click-pr-or-gist')}>
-          <div class="BtnGroup">
-            <button type="button" class="btn btn-primary" disabled={disabled()} onClick={() => void submit()}>
-              {busy() ? 'Creating…' : draft() ? 'Draft pull request' : 'Create pull request'}
-            </button>
-            <Dropdown class="btn btn-primary px-2!" align="right" menuClass="w-80" title="Select type of pull request" button={<Octicon icon={triangleDownIcon} />}>
-              {(close) => (
-                <>
-                  <button
-                    type="button"
-                    class="SelectMenu-item items-start!"
-                    onClick={() => {
-                      setDraft(false);
-                      close();
-                    }}
-                  >
-                    <span class="w-4 mt-0.5">
-                      <Show when={!draft()}>
-                        <Octicon icon={checkIcon} />
-                      </Show>
-                    </span>
-                    <span>
-                      <span class="block font-semibold">Create pull request</span>
-                      <span class="block text-xs text-fg-muted">Open a pull request that is ready for review</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="SelectMenu-item items-start!"
-                    onClick={() => {
-                      setDraft(true);
-                      close();
-                    }}
-                  >
-                    <span class="w-4 mt-0.5">
-                      <Show when={draft()}>
-                        <Octicon icon={checkIcon} />
-                      </Show>
-                    </span>
-                    <span>
-                      <span class="block font-semibold">Create draft pull request</span>
-                      <span class="block text-xs text-fg-muted">Cannot be merged until marked ready for review</span>
-                    </span>
-                  </button>
-                </>
-              )}
-            </Dropdown>
-          </div>
-          </Show>
+          {/* Both PR types as plain buttons instead of a split button. */}
+          <button type="button" class="btn" disabled={disabled()} onClick={() => void submit(true)}>
+            Create draft PR
+          </button>
+          <button type="button" class="btn btn-primary" disabled={disabled()} onClick={() => void submit(false)}>
+            {busy() ? 'Creating…' : 'Create pull request'}
+          </button>
         </div>
       </div>
     </div>

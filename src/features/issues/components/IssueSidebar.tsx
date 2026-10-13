@@ -16,7 +16,6 @@ import {
   unlockIcon,
   xIcon,
 } from '../../../icons/octicons';
-import { feature } from '../../refined';
 import { getViewer } from '../../user/api';
 import {
   deleteIssue,
@@ -46,30 +45,26 @@ export function SidebarSection(props: {
   canEdit?: boolean;
   children: JSX.Element;
   last?: boolean;
-  /**
-   * The section has nothing to show (clean-conversation-sidebar hides it, or
-   * just its "None yet" text when it can be edited).
-   */
+  /** The section has nothing to show: hidden, or just its heading when it can be edited. */
   empty?: boolean;
-  /** Hide the heading too when not editable (clean-conversation-sidebar, labels). */
+  /** Hide the heading too when not editable (labels). */
   bare?: boolean;
 }) {
-  const clean = () => feature('clean-conversation-sidebar');
   const editable = () => !!(props.canEdit && props.picker);
   return (
-    <Show when={!(clean() && props.empty && !editable())}>
-      <div class={['py-4', { 'border-b border-line-muted': !props.last, 'rgh-clean-sidebar pb-2!': clean() && !!props.empty }]}>
+    <Show when={!(props.empty && !editable())}>
+      <div class={['py-4', { 'border-b border-line-muted': !props.last, 'rgh-clean-sidebar pb-2!': !!props.empty }]}>
         <Show
           when={editable()}
           fallback={
-            <Show when={!(clean() && props.bare)}>
+            <Show when={!props.bare}>
               <h3 class="text-xs font-semibold text-fg-muted mb-2">{props.title}</h3>
             </Show>
           }
         >
           {props.picker}
         </Show>
-        <Show when={!(clean() && props.empty)}>
+        <Show when={!props.empty}>
           <div class="text-xs">{props.children}</div>
         </Show>
       </div>
@@ -121,6 +116,7 @@ export default function IssueSidebar(props: IssueSidebarProps) {
     }
   };
   const thing = () => (props.isPull ? 'pull request' : 'issue');
+  const labelHref = (name: string) => `/${props.owner}/${props.repo}/${props.isPull ? 'pulls' : 'issues'}?q=${encodeURIComponent(`label:"${name}"`)}`;
 
   return (
     <div class="text-sm">
@@ -158,15 +154,11 @@ export default function IssueSidebar(props: IssueSidebarProps) {
           when={props.item.assignees.nodes.length}
           fallback={
             <span class="text-fg-muted">
-              {feature('clean-conversation-sidebar') && editable() ? '' : 'No one '}
-              <Show when={editable()} fallback="assigned">
-                <Loading fallback="assigned">
-                  {feature('clean-conversation-sidebar') ? '' : '— '}
-                  <button type="button" class="btn-link text-xs" onClick={() => apply({ assignees: [viewer().login] })}>
-                    assign yourself
-                  </button>
-                </Loading>
-              </Show>
+              <Loading fallback="assigned">
+                <button type="button" class="btn-link text-xs" onClick={() => apply({ assignees: [viewer().login] })}>
+                  assign yourself
+                </button>
+              </Loading>
             </span>
           }
         >
@@ -218,54 +210,42 @@ export default function IssueSidebar(props: IssueSidebarProps) {
             />
         }
       >
-        <Show when={props.item.labels.nodes.length} fallback={<span class="text-fg-muted">None yet</span>}>
-          <div class="flex flex-wrap gap-1">
-            <For each={props.item.labels.nodes}>
-              {(l) => (
-                <Show
-                  when={feature('quick-label-removal') && (editable() || props.item.viewerCanLabel)}
-                  fallback={
-                    <IssueLabel
-                      name={l.name}
-                      color={l.color}
-                      title={l.description}
-                      href={`/${props.owner}/${props.repo}/${props.isPull ? 'pulls' : 'issues'}?q=${encodeURIComponent(`label:"${l.name}"`)}`}
-                    />
-                  }
-                >
-                  <span class="IssueLabel rgh-quick-label-removal pr-0.5!" style={hexToVars(l.color)} title={l.description ?? l.name}>
-                    <a
-                      class="text-inherit! no-underline!"
-                      href={`/${props.owner}/${props.repo}/${props.isPull ? 'pulls' : 'issues'}?q=${encodeURIComponent(`label:"${l.name}"`)}`}
-                    >
-                      {l.name}
-                    </a>
-                    <button
-                      type="button"
-                      class="inline-flex items-center justify-center ml-0.5 w-4 h-4 rounded-full bg-transparent border-0 p-0 text-inherit cursor-pointer opacity-70 hover:opacity-100"
-                      aria-label={`Remove label ${l.name}`}
-                      title={`Remove label ${l.name}`}
-                      onClick={async () => {
-                        try {
-                          await dropLabel(props.owner, props.repo, props.number, l.name);
-                        } catch (e) {
-                          toastError(e);
-                        }
-                      }}
-                    >
-                      <Octicon icon={xIcon} size={12} />
-                    </button>
-                  </span>
-                </Show>
-              )}
-            </For>
-          </div>
-        </Show>
+        <div class="flex flex-wrap gap-1">
+          <For each={props.item.labels.nodes}>
+            {(l) => (
+              <Show
+                when={editable() || props.item.viewerCanLabel}
+                fallback={<IssueLabel name={l.name} color={l.color} title={l.description} href={labelHref(l.name)} />}
+              >
+                <span class="IssueLabel rgh-quick-label-removal pr-0.5!" style={hexToVars(l.color)} title={l.description ?? l.name}>
+                  <a class="text-inherit! no-underline!" href={labelHref(l.name)}>
+                    {l.name}
+                  </a>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center ml-0.5 w-4 h-4 rounded-full bg-transparent border-0 p-0 text-inherit cursor-pointer opacity-70 hover:opacity-100"
+                    aria-label={`Remove label ${l.name}`}
+                    title={`Remove label ${l.name}`}
+                    onClick={async () => {
+                      try {
+                        await dropLabel(props.owner, props.repo, props.number, l.name);
+                      } catch (e) {
+                        toastError(e);
+                      }
+                    }}
+                  >
+                    <Octicon icon={xIcon} size={12} />
+                  </button>
+                </span>
+              </Show>
+            )}
+          </For>
+        </div>
       </SidebarSection>
 
       <Show when={!props.isPull}>
         <SidebarSection title="Type" empty={!props.issueType}>
-          <Show when={props.issueType} fallback={<span class="text-fg-muted">No type</span>}>
+          <Show when={props.issueType}>
             {(t) => (
               <span class="Label" title={t().description ?? undefined}>
                 {t().name}
@@ -315,7 +295,7 @@ export default function IssueSidebar(props: IssueSidebarProps) {
             />
         }
       >
-        <Show when={props.item.milestone} fallback={<span class="text-fg-muted">No milestone</span>}>
+        <Show when={props.item.milestone}>
           {(m) => (
             <>
               <div class="h-2 rounded-full bg-canvas-inset border border-line-muted overflow-hidden mb-1">
@@ -330,43 +310,35 @@ export default function IssueSidebar(props: IssueSidebarProps) {
       </SidebarSection>
 
       <SidebarSection title="Development" empty={!props.linked.length && !props.branches?.length}>
-        <Show when={props.isPull && !feature('clean-conversation-sidebar')}>
-          <p class="text-fg-muted mb-1">Successfully merging this pull request may close these issues.</p>
-        </Show>
-        <Show
-          when={props.linked.length || props.branches?.length}
-          fallback={<span class="text-fg-muted">{props.isPull ? 'None yet' : 'No branches or pull requests'}</span>}
-        >
-          <ul class="flex flex-col gap-1.5">
-            <For each={props.branches ?? []}>
-              {(b) => (
-                <li class="flex items-center gap-1.5">
-                  <Octicon icon={gitBranchIcon} class="text-fg-muted" />
-                  <a class="link-plain font-mono" href={`/${props.owner}/${props.repo}/tree/${b}`}>
-                    {b}
-                  </a>
-                </li>
-              )}
-            </For>
-            <For each={props.linked}>
-              {(l) => (
-                <li class="flex items-start gap-1.5">
-                  <StateIcon
-                    class="mt-0.5"
-                    state={itemState({ isPull: !props.isPull, state: l.state, stateReason: l.stateReason, merged: l.merged, draft: l.isDraft })}
-                  />
-                  <a class="link-plain font-semibold break-words min-w-0" href={new URL(l.url).pathname}>
-                    <RichText text={l.title} links={false} />
-                    <span class="text-fg-muted font-normal">
-                      {' '}
-                      {l.repository.nameWithOwner === `${props.owner}/${props.repo}` ? '' : l.repository.nameWithOwner}#{l.number}
-                    </span>
-                  </a>
-                </li>
-              )}
-            </For>
-          </ul>
-        </Show>
+        <ul class="flex flex-col gap-1.5">
+          <For each={props.branches ?? []}>
+            {(b) => (
+              <li class="flex items-center gap-1.5">
+                <Octicon icon={gitBranchIcon} class="text-fg-muted" />
+                <a class="link-plain font-mono" href={`/${props.owner}/${props.repo}/tree/${b}`}>
+                  {b}
+                </a>
+              </li>
+            )}
+          </For>
+          <For each={props.linked}>
+            {(l) => (
+              <li class="flex items-start gap-1.5">
+                <StateIcon
+                  class="mt-0.5"
+                  state={itemState({ isPull: !props.isPull, state: l.state, stateReason: l.stateReason, merged: l.merged, draft: l.isDraft })}
+                />
+                <a class="link-plain font-semibold break-words min-w-0" href={new URL(l.url).pathname}>
+                  <RichText text={l.title} links={false} />
+                  <span class="text-fg-muted font-normal">
+                    {' '}
+                    {l.repository.nameWithOwner === `${props.owner}/${props.repo}` ? '' : l.repository.nameWithOwner}#{l.number}
+                  </span>
+                </a>
+              </li>
+            )}
+          </For>
+        </ul>
       </SidebarSection>
 
       <Show when={props.item.viewerCanSubscribe}>

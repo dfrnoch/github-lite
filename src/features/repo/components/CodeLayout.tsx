@@ -19,7 +19,6 @@ import { encodePath } from '../../../lib/github';
 import { useHotkey } from '../../../lib/hotkeys';
 import type { Repository } from '../../../lib/types';
 import { usePermalinkHotkey } from '../../code/refined';
-import { feature } from '../../refined';
 import { getTree, type TreeEntry } from '../api';
 import RefPicker from './RefPicker';
 
@@ -172,12 +171,13 @@ function TreeItem(props: { entry: TreeEntry; repo: Repository; gitRef: string; c
   const href = () =>
     `${base()}/${isDir() ? 'tree' : 'blob'}/${encodePath(props.gitRef)}/${encodePath(props.entry.path)}`;
   const pad = () => ({ 'padding-left': `${props.depth * 16 + 8}px` });
+  // Hovering a file's icon turns it into an edit link (not on permalinks, archived repos or symlinks).
   const quickEdit = () =>
-    feature('quick-file-edit') && !props.repo.archived && !/^[0-9a-f]{40}$/i.test(props.gitRef) && props.entry.mode !== SYMLINK_MODE;
+    !props.repo.archived && !/^[0-9a-f]{40}$/i.test(props.gitRef) && props.entry.mode !== SYMLINK_MODE;
   let row!: HTMLDivElement;
-  // sidebar-focus-file: bring the current file / folder into view in the tree.
+  // Bring the current file / folder into view in the tree.
   createEffect(
-    () => isCurrent() && feature('sidebar-focus-file'),
+    () => isCurrent(),
     (focus) => {
       if (focus) requestAnimationFrame(() => row?.scrollIntoView({ block: 'nearest' }));
     },

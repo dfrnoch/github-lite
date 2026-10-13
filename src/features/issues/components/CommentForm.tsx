@@ -160,12 +160,10 @@ export default function CommentForm(props: {
                     </button>
                   }
                 >
-                  <Show when={feature('close-as-unplanned')}>
-                    <button type="button" class="btn rgh-close-as-unplanned" disabled={busy()} onClick={closeAsUnplanned} title="Close as not planned: won’t fix, can’t repro, stale">
-                      <Octicon icon={skipIcon} class="text-fg-muted!" />
-                      Close as not planned
-                    </button>
-                  </Show>
+                  <button type="button" class="btn rgh-close-as-unplanned" disabled={busy()} onClick={closeAsUnplanned} title="Close as not planned: won’t fix, can’t repro, stale">
+                    <Octicon icon={skipIcon} class="text-fg-muted!" />
+                    Close as not planned
+                  </button>
                   <div class="BtnGroup">
                     <button type="button" class="btn" disabled={busy()} onClick={close}>
                       <Octicon

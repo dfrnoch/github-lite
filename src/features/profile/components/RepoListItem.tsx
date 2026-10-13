@@ -74,7 +74,7 @@ export default function RepoListItem(props: {
   showOwner?: boolean;
   /** Hide the Star button (e.g. compact lists). */
   hideStar?: boolean;
-  /** Issues / pull requests icon links before "Updated" (`conversation-links-on-repo-lists`). */
+  /** Issues / pull requests icon links before "Updated". */
   conversationLinks?: boolean;
 }) {
   const href = () => `/${props.repo.fullName}`;

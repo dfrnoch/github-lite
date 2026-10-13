@@ -1,5 +1,4 @@
 import { createEffect, createMemo, onSettled, untrack } from 'solid-js';
-import { feature } from '../../features/refined';
 import { commitAt } from '../../features/issues/refined';
 import { encodePath, gh, ghBlob } from '../../lib/github';
 import { escapeLines, highlightLines } from '../../lib/highlight';
@@ -29,8 +28,8 @@ export default function Markdown(props: { html: string | null | undefined; class
     // root-relative "/owner/repo" paths that must not be resolved again.
     const raw = props.html ?? '';
     let out = props.file ? resolveRepoUrls(raw, props.file) : raw;
-    if (feature('shorten-links')) out = shortenLinks(out, props.comment?.repo ?? (props.file ? `${props.file.owner}/${props.file.repo}` : undefined));
-    if (feature('small-user-avatars')) out = mentionAvatars(out);
+    out = shortenLinks(out, props.comment?.repo ?? (props.file ? `${props.file.owner}/${props.file.repo}` : undefined));
+    out = mentionAvatars(out);
     return rewriteHtmlLinks(out);
   });
 
@@ -63,7 +62,7 @@ export default function Markdown(props: { html: string | null | undefined; class
 
   // embed-gist-inline: gist links alone on their line become the gist's code.
   createEffect(
-    () => [html(), !!props.comment && feature('embed-gist-inline')] as const,
+    () => [html(), !!props.comment] as const,
     ([, on]) => {
       if (!on) return;
       const added: Element[] = [];
@@ -93,7 +92,7 @@ export default function Markdown(props: { html: string | null | undefined; class
 
   // comments-time-machine-links: links to branch files get a "view at the time of the comment" icon.
   createEffect(
-    () => [html(), props.comment?.createdAt && feature('comments-time-machine-links') ? props.comment.createdAt : null] as const,
+    () => [html(), props.comment?.createdAt || null] as const,
     ([, date]) => {
       if (!date) return;
       const added: Element[] = [];
@@ -118,7 +117,7 @@ export default function Markdown(props: { html: string | null | undefined; class
     // reload-failed-proxied-images: camo sometimes fails under load; retry once.
     const onError = (e: Event) => {
       const img = e.target;
-      if (!(img instanceof HTMLImageElement) || !feature('reload-failed-proxied-images')) return;
+      if (!(img instanceof HTMLImageElement)) return;
       if (!/^https:\/\/(camo|private-user-images)\.githubusercontent\.com\//.test(img.src) || img.dataset.rghRetried) return;
       setTimeout(() => {
         const clone = img.cloneNode() as HTMLImageElement;
@@ -134,7 +133,7 @@ export default function Markdown(props: { html: string | null | undefined; class
       const target = e.target as HTMLElement;
       // toggle-everything-with-alt: alt-click a <summary> toggles every <details> in this body.
       const summary = target.closest('summary');
-      if (summary && e.altKey && feature('toggle-everything-with-alt')) {
+      if (summary && e.altKey) {
         e.preventDefault();
         const open = !(summary.parentElement as HTMLDetailsElement).open;
         for (const d of el.querySelectorAll('details')) d.open = open;
@@ -173,7 +172,7 @@ export default function Markdown(props: { html: string | null | undefined; class
   return (
     <div
       ref={el}
-      class={['markdown-body', props.class, { 'rgh-scrollable': !!props.comment && feature('scrollable-areas') }]}
+      class={['markdown-body', props.class, { 'rgh-scrollable': !!props.comment }]}
       // oxlint-disable-next-line solid/no-innerhtml -- HTML is sanitized by GitHub's renderer
       innerHTML={html()}
     />

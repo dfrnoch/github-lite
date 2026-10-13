@@ -4,7 +4,6 @@ import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Dropdown, toastError } from '../../../components/ui';
 import { checkIcon, eyeClosedIcon, eyeIcon, lockIcon, triangleDownIcon } from '../../../icons/octicons';
-import { feature } from '../../refined';
 import { ACTIVITY_STATES, type ActivityFilter, activityFilter, CONVERSATION_PATH, RichText, setActivityFilter } from '../refined';
 
 /**
@@ -22,7 +21,7 @@ export default function IssueHeader(props: {
   bordered?: boolean;
   /** State badge + meta line. */
   children: JSX.Element;
-  /** Conversation is locked (locked-issue shows a label). */
+  /** Conversation is locked (shows a Locked label). */
   locked?: boolean;
 }) {
   const location = useLocation();
@@ -31,9 +30,9 @@ export default function IssueHeader(props: {
   const repo = () => location.pathname.split('/').slice(1, 3).join('/');
   const conversationPath = () => (CONVERSATION_PATH.test(location.pathname) ? location.pathname.replace(/\/$/, '') : null);
 
-  // jump-to-conversation-close-event: clicking the Closed / Merged badge scrolls to the latest close event.
+  // Clicking the Closed / Merged badge scrolls to the latest close event.
   const jumpToClose = (e: MouseEvent) => {
-    if (!feature('jump-to-conversation-close-event') || !(e.target as HTMLElement).closest('.State')) return;
+    if (!(e.target as HTMLElement).closest('.State')) return;
     const events = document.querySelectorAll<HTMLElement>('[data-rgh-close-event]');
     const last = events[events.length - 1];
     if (!last) return;
@@ -111,16 +110,16 @@ export default function IssueHeader(props: {
         </form>
       </Show>
       <div
-        class={['flex flex-wrap items-center gap-2 mt-2 text-sm text-fg-muted', { 'rgh-jump-to-close-event': feature('jump-to-conversation-close-event') }]}
+        class="flex flex-wrap items-center gap-2 mt-2 text-sm text-fg-muted rgh-jump-to-close-event"
         onClick={jumpToClose}
       >
         {props.children}
-        <Show when={props.locked && feature('locked-issue')}>
+        <Show when={props.locked}>
           <span class="Label Label--secondary inline-flex items-center gap-1 rgh-locked-issue" title="This conversation is locked">
             <Octicon icon={lockIcon} size={12} /> Locked
           </span>
         </Show>
-        <Show when={feature('conversation-activity-filter') && conversationPath()}>
+        <Show when={conversationPath()}>
           {(path) => <ActivityFilterMenu path={path()} />}
         </Show>
       </div>
@@ -128,7 +127,7 @@ export default function IssueHeader(props: {
   );
 }
 
-/** conversation-activity-filter: "Show all activities / Hide events / Hide events, bots, collapsed comments". */
+/** "Show all activities / Hide events / Hide events, bots, collapsed comments". */
 function ActivityFilterMenu(props: { path: string }) {
   const current = () => activityFilter(props.path);
   return (

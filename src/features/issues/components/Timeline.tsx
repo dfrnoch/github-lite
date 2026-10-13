@@ -143,7 +143,7 @@ export default function Timeline(props: TimelineProps) {
     setCursor(page.pageInfo.endCursor ?? null);
     return page;
   };
-  /** Next page of hidden items — or, with `all` (expand-all-hidden-comments), every hidden item. */
+  /** Next page of hidden items — or, with `all` (alt-click), every hidden item. */
   const loadMore = async (all = false) => {
     let after = cursor() ?? props.head.pageInfo.endCursor;
     if (!after) return;
@@ -200,7 +200,7 @@ export default function Timeline(props: TimelineProps) {
     return filter() === 'hideAllNoise' ? all.filter((t) => !t.isResolved) : all;
   };
 
-  // conversation-activity-filter + hide-low-quality-comments
+  // The activity filter and hidden low-quality comments.
   const visible = createMemo(() => {
     const f = filter();
     const hiddenLowQuality = new Set(showLowQuality() ? [] : lowQuality());
@@ -221,7 +221,7 @@ export default function Timeline(props: TimelineProps) {
     });
   });
 
-  // keyboard-navigation: j / k move between comments.
+  // j / k move between comments.
   const focusComment = (direction: 1 | -1) => {
     const items = [...document.querySelectorAll<HTMLElement>('[data-rgh-comment][id]')].filter(
       (el) => el.offsetParent !== null && !el.querySelector(':scope > .timeline-comment > .rgh-minimized-comment, :scope > div > .timeline-comment > .rgh-minimized-comment'),
@@ -236,21 +236,20 @@ export default function Timeline(props: TimelineProps) {
     el.classList.add('rgh-keyboard-target');
     el.scrollIntoView({ block: 'start' });
   };
-  useHotkey({ keys: 'j', description: 'Focus the comment below', group: 'Conversations', feature: 'keyboard-navigation', handler: () => focusComment(1) });
-  useHotkey({ keys: 'k', description: 'Focus the comment above', group: 'Conversations', feature: 'keyboard-navigation', handler: () => focusComment(-1) });
+  useHotkey({ keys: 'j', description: 'Focus the comment below', group: 'Conversations', handler: () => focusComment(1) });
+  useHotkey({ keys: 'k', description: 'Focus the comment above', group: 'Conversations', handler: () => focusComment(-1) });
   useHotkey({
     keys: 'h',
     description: 'Cycle through conversation activity filters',
     group: 'Conversations',
-    feature: 'conversation-activity-filter',
     handler: () => cycleActivityFilter(path()),
   });
 
   onSettled(() => {
-    // hidden-content: warn that the browser's find won't see unloaded / hidden items.
+    // Warn that the browser's find won't see unloaded / hidden items.
     const onKey = (e: KeyboardEvent) => {
       const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? e.metaKey : e.ctrlKey;
-      if (!mod || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'f' || !feature('hidden-content')) return;
+      if (!mod || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'f') return;
       const loadMoreEl = document.querySelector('[data-rgh-load-more]');
       const filtered = filter() !== 'showAll' || (lowQuality().length > 0 && !showLowQuality());
       if (!loadMoreEl && !filtered) return;
@@ -261,21 +260,21 @@ export default function Timeline(props: TimelineProps) {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  // easy-toggle-hidden-comments + toggle-everything-with-alt for review threads (rendered by ReviewThread).
+  // Review threads (rendered by ReviewThread): alt-click toggles them all, clicking a header bar toggles one.
   const onClick = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     const toggle = target.closest<HTMLButtonElement>('button[aria-label="Expand thread"], button[aria-label="Collapse thread"]');
-    if (toggle && e.altKey && feature('toggle-everything-with-alt')) {
+    if (toggle && e.altKey) {
       for (const b of document.querySelectorAll<HTMLButtonElement>(`button[aria-label="${toggle.getAttribute('aria-label')}"]`)) if (b !== toggle) b.click();
       return;
     }
     const minimized = target.closest('.rgh-show-minimized, .rgh-hide-minimized');
-    if (minimized && e.altKey && feature('toggle-everything-with-alt')) {
+    if (minimized && e.altKey) {
       const cls = minimized.classList.contains('rgh-show-minimized') ? '.rgh-show-minimized' : '.rgh-hide-minimized';
       for (const b of document.querySelectorAll<HTMLButtonElement>(cls)) if (b !== minimized) b.click();
       return;
     }
-    if (toggle || !feature('easy-toggle-hidden-comments') || target.closest('a, button, input, textarea, select, summary')) return;
+    if (toggle || target.closest('a, button, input, textarea, select, summary')) return;
     const header = target.closest('.Box > div:first-child');
     const headerToggle = header?.querySelector<HTMLButtonElement>(':scope > button[aria-label="Expand thread"], :scope > button[aria-label="Collapse thread"]');
     headerToggle?.click();
@@ -304,8 +303,8 @@ export default function Timeline(props: TimelineProps) {
                       type="button"
                       class="btn btn-sm"
                       disabled={loading()}
-                      title={feature('expand-all-hidden-comments') ? 'Alt-click to load all remaining items' : undefined}
-                      onClick={(e) => void loadMore(e.altKey && feature('expand-all-hidden-comments'))}
+                      title="Alt-click to load all remaining items"
+                      onClick={(e) => void loadMore(e.altKey)}
                     >
                       {loading() ? 'Loading…' : 'Load more…'}
                     </button>
@@ -390,7 +389,7 @@ export function Event(props: {
   badgeClass?: string;
   children: JSX.Element;
   extra?: JSX.Element;
-  /** Marks a close / merge event (jump-to-conversation-close-event). */
+  /** Marks a close / merge event (the header badge jumps to the latest one). */
   closeEvent?: boolean;
 }) {
   return (
@@ -601,38 +600,23 @@ function TimelineNodeView(p: { node: TimelineNode; props: TimelineProps; threads
         </Event>
       </Match>
       <Match when={n().__typename === 'RenamedTitleEvent'}>
-        <Show
-          when={feature('readable-title-change-events')}
-          fallback={
-            <Event icon={pencilIcon} actor={n().actor} createdAt={n().createdAt}>
-              changed the title{' '}
-              <del class="text-fg-muted">
+        <Event
+          icon={pencilIcon}
+          actor={n().actor}
+          createdAt={n().createdAt}
+          extra={
+            <div class="rgh-readable-title-change mt-1 flex flex-col gap-0.5 text-sm">
+              <del class="text-fg-muted break-words">
                 <RichText text={n().previousTitle} />
-              </del>{' '}
-              <span class="font-semibold text-fg">
+              </del>
+              <span class="font-semibold text-fg break-words">
                 <RichText text={n().currentTitle} repo={repoName()} />
               </span>
-            </Event>
+            </div>
           }
         >
-          <Event
-            icon={pencilIcon}
-            actor={n().actor}
-            createdAt={n().createdAt}
-            extra={
-              <div class="rgh-readable-title-change mt-1 flex flex-col gap-0.5 text-sm">
-                <del class="text-fg-muted break-words">
-                  <RichText text={n().previousTitle} />
-                </del>
-                <span class="font-semibold text-fg break-words">
-                  <RichText text={n().currentTitle} repo={repoName()} />
-                </span>
-              </div>
-            }
-          >
-            changed the title
-          </Event>
-        </Show>
+          changed the title
+        </Event>
       </Match>
       <Match when={n().__typename === 'CrossReferencedEvent'}>
         <Event

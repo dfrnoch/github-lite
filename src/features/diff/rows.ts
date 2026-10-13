@@ -26,10 +26,8 @@ export interface RowRenderContext {
   selection: Selection | null;
   /** Show the hover "+" (add a review comment) button. */
   commentable: boolean;
-  /** Hunk rows get an expand button. */
+  /** Hunk rows get an expand button, and the whole row expands on click. */
   canExpand: (hunk: DiffLine) => boolean;
-  /** extend-diff-expander: the whole hunk row expands. */
-  wideExpand: (hunk: DiffLine) => boolean;
 }
 
 function svg(icon: OcticonData, size = 16) {
@@ -90,7 +88,7 @@ function expandButton(hunk: DiffLine, ctx: RowRenderContext) {
 }
 
 function hunkRow(hunk: DiffLine, split: boolean, ctx: RowRenderContext) {
-  const cls = ctx.wideExpand(hunk) ? ' class="rgh-extend-diff-expander"' : '';
+  const cls = ctx.canExpand(hunk) ? ' class="rgh-extend-diff-expander"' : '';
   const num = `<td${split ? '' : ' colspan="2"'} class="blob-num blob-num-hunk p-0! cursor-default!">${expandButton(hunk, ctx)}</td>`;
   return `<tr${cls} data-hunk="${hunk.hunkIndex}">${num}<td${split ? ' colspan="3"' : ''} class="blob-code blob-code-hunk">${escapeHtml(hunk.text)}</td></tr>`;
 }

@@ -18,7 +18,6 @@ import {
 } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
 import { useHotkey } from '../../../lib/hotkeys';
-import { feature } from '../../refined';
 import { useRepo } from '../../repo/context';
 import { cancelRun, deleteRunLogs, getRun, getRunJobs, getWorkflows, rerunRun } from '../api';
 import { RunContext, type RunContextValue } from '../context';
@@ -156,16 +155,13 @@ function RunHeader(props: { run: WorkflowRun; attempt: number; attempts: number 
   const workflows = createMemo(() => getWorkflows(ctx.owner(), ctx.name()));
   const workflowName = () => workflows().find((w) => w.id === props.run.workflow_id)?.name ?? props.run.name;
   const location = useLocation();
-  // action-pr-link: the PR this run was opened from (?pr=), else the run's own PR.
-  const pullNumber = () =>
-    feature('action-pr-link') ? Number(location.query.pr) || props.run.pull_requests[0]?.number || null : null;
+  // The PR this run was opened from (?pr=), else the run's own PR.
+  const pullNumber = () => Number(location.query.pr) || props.run.pull_requests[0]?.number || null;
   const canRerunFailed = () => canWrite() && latest() && isDone(props.run.status) && failed();
-  // rerun-workflow
   useHotkey({
     keys: 'r f',
     description: 'Re-run failed jobs',
     group: 'Actions',
-    feature: 'rerun-workflow',
     when: canRerunFailed,
     handler: () => setRerun('failed'),
   });
@@ -231,44 +227,13 @@ function RunHeader(props: { run: WorkflowRun; attempt: number; attempts: number 
                   </button>
                 }
               >
-                <Show
-                  when={!feature('rerun-workflow')}
-                  fallback={
-                    <>
-                      <button type="button" class="btn btn-sm" onClick={() => setRerun('failed')} title="Re-run failed jobs (r f)">
-                        <Octicon icon={syncIcon} />
-                        Re-run failed jobs
-                      </button>
-                      <button type="button" class="btn btn-sm" onClick={() => setRerun('all')}>
-                        Re-run all jobs
-                      </button>
-                    </>
-                  }
-                >
-                <Dropdown
-                  class="btn btn-sm"
-                  align="right"
-                  menuClass="w-[220px]"
-                  button={
-                    <>
-                      <Octicon icon={syncIcon} />
-                      Re-run jobs
-                      <Octicon icon={triangleDownIcon} />
-                    </>
-                  }
-                >
-                  {(close) => (
-                    <>
-                      <button type="button" class="SelectMenu-item" onClick={() => (close(), setRerun('failed'))}>
-                        Re-run failed jobs
-                      </button>
-                      <button type="button" class="SelectMenu-item" onClick={() => (close(), setRerun('all'))}>
-                        Re-run all jobs
-                      </button>
-                    </>
-                  )}
-                </Dropdown>
-                </Show>
+                <button type="button" class="btn btn-sm" onClick={() => setRerun('failed')} title="Re-run failed jobs (r f)">
+                  <Octicon icon={syncIcon} />
+                  Re-run failed jobs
+                </button>
+                <button type="button" class="btn btn-sm" onClick={() => setRerun('all')}>
+                  Re-run all jobs
+                </button>
               </Show>
             </Show>
           </Show>

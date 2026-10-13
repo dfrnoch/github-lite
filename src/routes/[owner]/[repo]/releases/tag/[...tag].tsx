@@ -2,7 +2,6 @@ import { Title } from '@solidjs/meta';
 import { type RouteDefinition, useNavigate, useParams } from '@solidjs/router';
 import { createMemo, createSignal, Errored, Loading, Show } from 'solid-js';
 import { Blankslate, PageSpinner, toast, toastError } from '../../../../../components/ui';
-import { feature } from '../../../../../features/refined';
 import {
   convertReleaseToDraft,
   deleteRelease,
@@ -36,7 +35,7 @@ export const route = {
     void getReleaseList(params.owner!, params.repo!, tag);
     void getLatestReleaseId(params.owner!, params.repo!);
     void getCommitsSinceRelease(params.owner!, params.repo!, tag, 'HEAD');
-    if (feature('tag-changes-link')) void getPreviousTag(params.owner!, params.repo!, tag);
+    void getPreviousTag(params.owner!, params.repo!, tag);
   },
 } satisfies RouteDefinition;
 
@@ -50,7 +49,7 @@ export default function ReleasePage() {
   // Everything the card shows starts with the release, not after it.
   const commit = createMemo(() => getReleaseCommit(ctx.owner(), ctx.name(), tag()));
   const since = createMemo(() => getCommitsSinceRelease(ctx.owner(), ctx.name(), tag(), 'HEAD'));
-  const previous = createMemo(() => (feature('tag-changes-link') ? getPreviousTag(ctx.owner(), ctx.name(), tag()) : null));
+  const previous = createMemo(() => getPreviousTag(ctx.owner(), ctx.name(), tag()));
   useCreateReleaseHotkey();
 
   return (
@@ -156,7 +155,7 @@ function SingleRelease(props: {
         </Errored>
       }
       actions={
-        <Show when={feature('convert-release-to-draft') && canEdit() && !props.release.draft}>
+        <Show when={canEdit() && !props.release.draft}>
           <button type="button" class="btn btn-sm" disabled={converting()} onClick={convert}>
             {converting() ? 'Converting…' : 'Convert to draft'}
           </button>

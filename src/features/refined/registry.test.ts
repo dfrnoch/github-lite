@@ -23,7 +23,8 @@ describe('refined feature registry', () => {
 
   test('the scan sees the source tree', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(300);
-    expect(used.size).toBeGreaterThan(100);
+    // Only toggleable features are referenced; the rest are permanent behaviour.
+    expect(used.size).toBeGreaterThan(20);
   });
 
   test('ids are unique', () => {

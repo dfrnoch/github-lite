@@ -383,7 +383,7 @@ export interface RepoHeaderInfo {
   ci: { oid: string; state: string } | null;
 }
 
-/** repo-header-info: stars, privacy, fork parent and CI state in one request. */
+/** Stars, privacy, fork parent and CI state in one request. */
 export const getRepoHeaderInfo = query(async (owner: string, repo: string): Promise<RepoHeaderInfo> => {
   const data = await gql<any>(
     `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){
@@ -408,7 +408,7 @@ export const getRepoHeaderInfo = query(async (owner: string, repo: string): Prom
 export const MANY_UNRELEASED = Number.MAX_SAFE_INTEGER;
 
 /**
- * unreleased-commits: the latest version tag and how many default-branch
+ * The latest version tag and how many default-branch
  * commits came after it (looking at the newest 20 commits / tags).
  */
 export const getPublishState = query(async (owner: string, repo: string) => {
@@ -433,7 +433,7 @@ export const getPublishState = query(async (owner: string, repo: string) => {
   return { latestTag, aheadBy: index === -1 ? MANY_UNRELEASED : index, defaultBranch };
 }, 'rgh-publish-state');
 
-/** repo-age: date (and sha) of the first commit on the default branch. */
+/** Date (and sha) of the first commit on the default branch. */
 export const getFirstCommit = query(async (owner: string, repo: string) => {
   const head = await gql<any>(
     `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){
@@ -531,7 +531,7 @@ export const getProjectsCount = query(async (owner: string, repo: string): Promi
 }, 'rgh-projects-count');
 
 /**
- * show-open-prs-of-forks: the viewer's open PRs from this fork into its
+ * The viewer's open PRs from this fork into its
  * parent. One PR → link to it directly.
  */
 export const getForkOpenPulls = query(async (parent: string, fork: string, viewer: string) => {

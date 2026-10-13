@@ -64,9 +64,10 @@ function useForkPulls(repo: () => Repository) {
   );
 }
 
-const enabledFor = (repo: Repository) => feature('show-open-prs-of-forks') && repo.fork && !!repo.parent && !!repo.permissions?.admin;
+/** Only for forks you administer. */
+const enabledFor = (repo: Repository) => repo.fork && !!repo.parent && !!repo.permissions?.admin;
 
-/** show-open-prs-of-forks: " with 2 open pull requests" after "forked from owner/repo". */
+/** " with 2 open pull requests" after "forked from owner/repo". */
 export function ForkPullsHint(props: { repo: Repository }) {
   return (
     <Show when={enabledFor(props.repo)}>
@@ -89,7 +90,7 @@ function ForkPullsHintInner(props: { repo: Repository }) {
   );
 }
 
-/** show-open-prs-of-forks: warning in the delete dialog of a fork with open PRs. */
+/** Warning in the delete dialog of a fork with open PRs. */
 export function ForkPullsDeleteWarning(props: { repo: Repository }) {
   return (
     <Show when={enabledFor(props.repo)}>

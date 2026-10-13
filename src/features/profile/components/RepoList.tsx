@@ -29,7 +29,7 @@ export const REPO_SORTS: FilterOption[] = [
 export function RepoList(props: {
   result: RepoListResult;
   showOwner?: boolean;
-  /** Issues / pull requests links on each row (`conversation-links-on-repo-lists`). */
+  /** Issues / pull requests links on each row. */
   conversationLinks?: boolean;
   empty: string;
 }) {

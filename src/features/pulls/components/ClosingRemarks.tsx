@@ -6,7 +6,7 @@ import { tagIcon } from '../../../icons/octicons';
 const EXPLANATION = 'https://github.com/refined-github/refined-github/wiki/Extended-feature-descriptions#closing-remarks';
 
 /**
- * Refined GitHub closing-remarks: under a merged PR's timeline, the first
+ * Closing remarks (from Refined GitHub): under a merged PR's timeline, the first
  * tag that includes it — or, if none yet, a nudge to draft a release.
  */
 export default function ClosingRemarks(props: { owner: string; repo: string; info: { tag: string | null; hasTags: boolean; sha: string }; canPush: boolean }) {

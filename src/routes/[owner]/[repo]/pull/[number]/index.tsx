@@ -5,7 +5,6 @@ import CommentForm from '../../../../../features/issues/components/CommentForm';
 import IssueSidebar from '../../../../../features/issues/components/IssueSidebar';
 import Timeline from '../../../../../features/issues/components/Timeline';
 import { canPush, canTriage, type PullDetail, type PullRepoMeta, type TimelineConnection } from '../../../../../features/issues/types';
-import { feature } from '../../../../../features/refined';
 import { noSelfReference } from '../../../../../features/refined/editor';
 import { deploymentKey, getFirstTag, getPullDeployments, getPullPage } from '../../../../../features/pulls/api';
 import ClosingRemarks from '../../../../../features/pulls/components/ClosingRemarks';
@@ -22,16 +21,15 @@ export default function PullConversation() {
   const data = createMemo(() => getPullPage(pr.owner(), pr.repo(), pr.number()));
   const projects = createMemo(() => getProjectItems(pr.owner(), pr.repo(), pr.number()));
   const viewer = createMemo(() => getViewer());
-  // hide-inactive-deployments: inactive / failed deployments, except the latest one.
+  // Inactive / failed deployments are hidden from the timeline, except the latest one.
+  // Deployments in the collapsed middle of very long timelines are still shown when loaded.
   const hiddenDeployments = createMemo(() =>
-    feature('hide-inactive-deployments')
-      ? getPullDeployments(pr.owner(), pr.repo(), pr.number())
-          .then((list) => new Set(list.slice(0, -1).filter((d) => ['INACTIVE', 'FAILURE', 'ERROR'].includes(d.state)).map((d) => deploymentKey(d.createdAt, d.environment))))
-          .catch(() => null)
-      : null,
+    getPullDeployments(pr.owner(), pr.repo(), pr.number())
+      .then((list) => new Set(list.slice(0, -1).filter((d) => ['INACTIVE', 'FAILURE', 'ERROR'].includes(d.state)).map((d) => deploymentKey(d.createdAt, d.environment))))
+      .catch(() => null),
   );
-  // closing-remarks (starts with the page data, not after it).
-  const firstTag = createMemo(() => (feature('closing-remarks') ? getFirstTag(pr.owner(), pr.repo(), pr.number()).catch(() => null) : null));
+  // Closing remarks (starts with the page data, not after it).
+  const firstTag = createMemo(() => getFirstTag(pr.owner(), pr.repo(), pr.number()).catch(() => null));
   return (
     <Show when={data().pull}>
       {(pull) => (
@@ -115,7 +113,7 @@ function Conversation(props: {
             onQuote={quote}
             threads={props.pull.reviewThreads.nodes}
           />
-          <Show when={feature('closing-remarks') && props.firstTag}>
+          <Show when={props.firstTag}>
             {(info) => <ClosingRemarks owner={pr.owner()} repo={pr.repo()} info={info()} canPush={canPush(props.meta.viewerPermission)} />}
           </Show>
           <Loading>

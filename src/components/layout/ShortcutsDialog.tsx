@@ -57,11 +57,9 @@ export default function ShortcutsDialog() {
           )}
         </For>
       </div>
-      <Show when={feature('improve-shortcut-help')}>
-        <p class="mt-4 text-xs text-fg-muted">
-          Shortcuts from Refined GitHub features are included. Manage them in <a href="/settings/refined">Settings → Refined GitHub</a>.
-        </p>
-      </Show>
+      <p class="mt-4 text-xs text-fg-muted">
+        Shortcuts from Refined GitHub features are included. Manage them in <a href="/settings/refined">Settings → Refined GitHub</a>.
+      </p>
     </Dialog>
   );
 }

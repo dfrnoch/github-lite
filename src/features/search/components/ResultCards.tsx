@@ -17,7 +17,6 @@ import { compactNumber, commitTitle, shortSha } from '../../../lib/format';
 import { languageColor } from '../../../lib/languages';
 import { toAppUrl } from '../../../lib/markdown';
 import type { Repository } from '../../../lib/types';
-import { feature } from '../../refined';
 import type { CodeHit, CommitHit, DiscussionHit, IssueHit, OwnerDetails, TopicHit, UserHit } from '../api';
 import { Fragment, Highlight } from './Highlight';
 
@@ -91,19 +90,17 @@ export function RepoCard(props: { repo: Repository; terms?: string[]; showForks?
             {compactNumber(repo().stargazers_count)}
           </a>
         </li>
-        <Show when={feature('conversation-links-on-repo-lists')}>
-          <Dot />
-          <li class="flex">
-            <a class="link-muted flex" href={`/${repo().full_name}/issues`} title="Issues" aria-label={`Issues of ${repo().full_name}`}>
-              <Octicon icon={issueOpenedIcon} />
-            </a>
-          </li>
-          <li class="flex ml-1">
-            <a class="link-muted flex" href={`/${repo().full_name}/pulls`} title="Pull requests" aria-label={`Pull requests of ${repo().full_name}`}>
-              <Octicon icon={gitPullRequestIcon} />
-            </a>
-          </li>
-        </Show>
+        <Dot />
+        <li class="flex">
+          <a class="link-muted flex" href={`/${repo().full_name}/issues`} title="Issues" aria-label={`Issues of ${repo().full_name}`}>
+            <Octicon icon={issueOpenedIcon} />
+          </a>
+        </li>
+        <li class="flex ml-1">
+          <a class="link-muted flex" href={`/${repo().full_name}/pulls`} title="Pull requests" aria-label={`Pull requests of ${repo().full_name}`}>
+            <Octicon icon={gitPullRequestIcon} />
+          </a>
+        </li>
         <Show when={props.showForks}>
           <Dot />
           <li>

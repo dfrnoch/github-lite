@@ -4,7 +4,6 @@ import { Spinner } from '../../../components/ui';
 import { alertIcon, copilotIcon, fileIcon } from '../../../icons/octicons';
 import { diffAnchor } from '../../diff/parse';
 import type { PullDetail } from '../../issues/types';
-import { feature } from '../../refined';
 import { getPullConflictFiles } from '../api';
 import { MergeSection, StatusCircle } from './MergeSection';
 
@@ -41,8 +40,8 @@ export default function MergeConflicts(props: {
           <a class="btn btn-sm" href={conflictsUrl()} target="_blank" rel="noreferrer" title="Resolve conflicts in GitHub’s web editor">
             Resolve conflicts
           </a>
-          {/* quick-resolve-conflicts: Copilot next to the plain "Resolve conflicts" button. */}
-          <Show when={feature('quick-resolve-conflicts') && props.onInsertComment}>
+          {/* Copilot next to the plain "Resolve conflicts" button. */}
+          <Show when={props.onInsertComment}>
             <button
               type="button"
               class="btn btn-sm"

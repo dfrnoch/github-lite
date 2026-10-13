@@ -8,7 +8,6 @@ import { copyIcon, kebabHorizontalIcon, linkExternalIcon, syncIcon } from '../..
 import { toAppUrl } from '../../../lib/markdown';
 import { rerunJob } from '../../actions/api';
 import type { CheckContext, PullDetail } from '../../issues/types';
-import { feature } from '../../refined';
 import { type CheckCounts, ChecksDonut, MergeSection } from './MergeSection';
 
 // The rollup helpers only read fields both shapes share.
@@ -55,12 +54,12 @@ export default function MergeChecks(props: { pull: PullDetail; owner: string; re
     },
     { name: 'mergeChecksCounts' },
   );
-  // clean-checks-list: failing first, then running, then the rest (stable within each group).
-  const clean = () => feature('clean-checks-list');
-  const shown = createMemo(() => (clean() ? [...contexts()].sort((a, b) => RANK[checkOutcome(a)] - RANK[checkOutcome(b)]) : contexts()), {
+  // Failing first, then running, then the rest (stable within each group); passing checks are dimmed
+  // while something fails or is still running (hover the list to undim).
+  const shown = createMemo(() => [...contexts()].sort((a, b) => RANK[checkOutcome(a)] - RANK[checkOutcome(b)]), {
     name: 'mergeChecksShown',
   });
-  const dim = () => clean() && (counts().failure > 0 || counts().pending > 0);
+  const dim = () => counts().failure > 0 || counts().pending > 0;
   const title = () => {
     if (props.conflicting) return 'Checks awaiting conflict resolution';
     switch (rollup()?.state) {
@@ -89,10 +88,7 @@ export default function MergeChecks(props: { pull: PullDetail; owner: string; re
         toggleLabel={open() ? 'Collapse checks' : 'Expand checks'}
       >
         <Show when={open()}>
-          <ul
-            class={['MergeBox-checks rgh-checks-list', { 'rgh-checks-dim': dim() }]}
-            aria-label="Checks"
-          >
+          <ul class={['MergeBox-checks rgh-checks-list', { 'rgh-checks-dim': dim() }]} aria-label="Checks">
             <For each={shown()}>
               {(c) => (
                 <li class={['MergeBox-check', { 'rgh-check-done': ['success', 'neutral'].includes(checkOutcome(c)) }]}>
@@ -102,7 +98,7 @@ export default function MergeChecks(props: { pull: PullDetail; owner: string; re
                   <span class="MergeBox-app">
                     <Show when={c.checkSuite?.app?.logoUrl ?? c.avatarUrl}>{(src) => <Avatar src={src()} size={20} square />}</Show>
                   </span>
-                  <span class={['min-w-0 flex-1', clean() ? 'break-words' : 'truncate']} title={`${checkName(c)} — ${contextDescription(asRollup(c))}`}>
+                  <span class="min-w-0 flex-1 break-words" title={`${checkName(c)} — ${contextDescription(asRollup(c))}`}>
                     <strong class="text-fg">{checkName(c)}</strong> <span class="text-fg-muted">{contextDescription(asRollup(c))}</span>
                   </span>
                   <Show when={c.isRequired}>

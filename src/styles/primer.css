@@ -1609,8 +1609,8 @@ dialog.Drawer::backdrop {
 }
 
 /* refined: pulls */
-/* fit-textareas (gated by <html data-rgh-fit-textareas>, see src/features/refined/editor.ts) */
-:root[data-rgh-fit-textareas] textarea.rgh-fit-textarea {
+/* fit-textareas: comment fields grow with their content (Chromium field-sizing). */
+textarea.rgh-fit-textarea {
   field-sizing: content;
   min-height: 4.5lh;
   max-height: none !important;
@@ -1796,7 +1796,7 @@ dialog.Drawer::backdrop {
 [data-rgh-conventional-commits='test'] { --label-r: 251; --label-g: 202; --label-b: 4; --label-h: 48; --label-s: 96; --label-l: 50; }
 [data-rgh-conventional-commits='ci'] { --label-r: 197; --label-g: 222; --label-b: 245; --label-h: 208; --label-s: 70; --label-l: 86; }
 [data-rgh-conventional-commits='perf'] { --label-r: 83; --label-g: 25; --label-b: 231; --label-h: 256; --label-s: 81; --label-l: 50; }
-/* CSV/TSV previews (+ sticky-csv-header) */
+/* CSV/TSV previews (the first column sticks while scrolling horizontally) */
 .markdown-body table.csv-data {
   display: table;
   width: max-content;
@@ -1820,14 +1820,14 @@ dialog.Drawer::backdrop {
   z-index: 2;
   background-color: var(--bgColor-muted);
 }
-.markdown-body .rgh-sticky-csv :is(td, th):first-child {
+.markdown-body .csv-data :is(td, th):first-child {
   position: sticky;
   left: 0;
   z-index: 1;
   background-color: var(--bgColor-default);
   background-clip: padding-box;
 }
-.markdown-body .rgh-sticky-csv thead th:first-child {
+.markdown-body .csv-data thead th:first-child {
   z-index: 3;
   background-color: var(--bgColor-muted);
 }
@@ -2007,7 +2007,7 @@ code.rgh-backticks {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
-/* mark-private-orgs: eye-closed badge on an org avatar */
+/* eye-closed badge on an org avatar */
 .rgh-private-org {
   position: absolute;
   right: -3px;
@@ -2025,7 +2025,7 @@ code.rgh-backticks {
   color: var(--fgColor-attention);
   border-color: var(--borderColor-attention-emphasis);
 }
-/* sticky-notifications-actions */
+/* sticky notifications action bar */
 @media (min-height: 500px) {
   .Box-header.rgh-sticky-notifications {
     position: sticky;

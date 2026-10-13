@@ -6,7 +6,6 @@ import { gitBranchIcon, gitPullRequestIcon } from '../../../icons/octicons';
 import { formatNumber, pluralize } from '../../../lib/format';
 import { encodePath } from '../../../lib/github';
 import DiffView, { Diffstat } from '../../diff/DiffView';
-import { feature } from '../../refined';
 import { fetchRaw, type CommitDetails as CommitData } from '../api';
 import { ChecksBadge, CommitAuthors } from './CommitList';
 
@@ -74,17 +73,15 @@ export default function CommitDetails(props: {
           </For>
           <div class="flex-1" />
           <span class="text-fg-muted font-mono flex items-center gap-1 flex-wrap">
-            <Show when={feature('patch-diff-links')}>
-              <span class="rgh-patch-diff-links">
-                <a class="text-fg underline" href={gitUrl('patch')} target="_blank" rel="noreferrer">
-                  patch
-                </a>{' '}
-                <a class="text-fg underline" href={gitUrl('diff')} target="_blank" rel="noreferrer">
-                  diff
-                </a>
-                <span class="px-2">·</span>
-              </span>
-            </Show>
+            <span>
+              <a class="text-fg underline" href={gitUrl('patch')} target="_blank" rel="noreferrer">
+                patch
+              </a>{' '}
+              <a class="text-fg underline" href={gitUrl('diff')} target="_blank" rel="noreferrer">
+                diff
+              </a>
+              <span class="px-2">·</span>
+            </span>
             {pluralize(info().parents.length, 'parent')}
             <For each={info().parents}>
               {(p, i) => (
@@ -97,7 +94,7 @@ export default function CommitDetails(props: {
               )}
             </For>
             <span class="ml-2">commit</span>
-            <Show when={props.inPull && feature('linkify-commit-sha')} fallback={<span class="text-fg">{sha().slice(0, 7)}</span>}>
+            <Show when={props.inPull} fallback={<span class="text-fg">{sha().slice(0, 7)}</span>}>
               <a class="text-fg underline rgh-linkify-commit-sha" href={`${base()}/commit/${sha()}`} title="View this commit outside the pull request">
                 {sha().slice(0, 7)}
               </a>
@@ -111,11 +108,9 @@ export default function CommitDetails(props: {
             <span class="text-fg-muted text-xs">(GitHub's API lists at most 3,000 files)</span>
           </Show>
           <div class="flex-1" />
-          <Show when={!props.inPull || feature('pr-commit-lines-changed')}>
-            <span title={pluralize(stats().additions + stats().deletions, 'line') + ' changed'}>
-              <Diffstat additions={stats().additions} deletions={stats().deletions} />
-            </span>
-          </Show>
+          <span title={pluralize(stats().additions + stats().deletions, 'line') + ' changed'}>
+            <Diffstat additions={stats().additions} deletions={stats().deletions} />
+          </span>
         </div>
       </div>
 

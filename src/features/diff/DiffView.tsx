@@ -151,10 +151,9 @@ export default function DiffView(props: DiffViewProps) {
     keys: 'd w',
     description: 'Show/hide whitespace changes in diffs',
     group: 'Pull request list / diffs',
-    feature: 'one-click-diff-options',
     handler: () => navigate(whitespaceHref(), { replace: true, scroll: false }),
   });
-  /** "/owner/repo" of the page, for linkify-code's issue references. */
+  /** "/owner/repo" of the page, for linking issue references in code. */
   const repoBase = () => location.pathname.split('/').slice(0, 3).join('/');
   const [localViewed, setLocalViewed] = createSignal<Record<string, boolean>>(() => readViewed(props.viewedKey));
   const viewable = () => !!props.viewedKey || !!props.onViewedChange;
@@ -162,7 +161,7 @@ export default function DiffView(props: DiffViewProps) {
   const setViewed = (path: string, value: boolean) => {
     if (props.onViewedChange) props.onViewedChange(path, value);
     if (!props.viewed && props.viewedKey) {
-      // Updater form: several files can change in one tick (batch-mark-files-as-viewed).
+      // Updater form: several files can change in one tick (shift-click batch marking).
       const key = `gh-lite:viewed:${props.viewedKey}`;
       setLocalViewed((prev) => {
         const next = { ...prev, [path]: value };
@@ -173,10 +172,10 @@ export default function DiffView(props: DiffViewProps) {
     }
   };
 
-  /** batch-mark-files-as-viewed: shift-click marks every file between the last clicked checkbox and this one. */
+  /** Shift-click marks every file between the last clicked checkbox and this one. */
   let lastViewedIndex: number | null = null;
   const onViewedClick = (index: number, value: boolean, shift: boolean) => {
-    if (shift && lastViewedIndex != null && lastViewedIndex !== index && feature('batch-mark-files-as-viewed')) {
+    if (shift && lastViewedIndex != null && lastViewedIndex !== index) {
       const [from, to] = [Math.min(lastViewedIndex, index), Math.max(lastViewedIndex, index)];
       for (let i = from; i <= to; i++) {
         const path = props.files[i]?.filename;
@@ -185,7 +184,7 @@ export default function DiffView(props: DiffViewProps) {
     } else setViewed(props.files[index]!.filename, value);
     lastViewedIndex = index;
   };
-  /** pr-jump-to-first-non-viewed-file */
+  /** Clicking the "N / M viewed" counter jumps to the first file not marked as viewed. */
   const jumpToFirstUnviewed = () => {
     const file = props.files.find((f) => !isViewed(f.filename));
     if (file) jumpTo(file);
@@ -268,42 +267,31 @@ export default function DiffView(props: DiffViewProps) {
               {props.summary}
             </Show>
             <Show when={viewable()}>
-              <Show
-                when={feature('pr-jump-to-first-non-viewed-file')}
-                fallback={
-                  <span class="ml-2">
-                    {props.files.filter((f) => isViewed(f.filename)).length} / {props.files.length} viewed
-                  </span>
-                }
+              <button
+                type="button"
+                class="ml-2 text-fg-muted hover:text-fg-accent hover:underline"
+                title="Jump to the first file that isn't marked as viewed"
+                onClick={jumpToFirstUnviewed}
               >
-                <button
-                  type="button"
-                  class="ml-2 text-fg-muted hover:text-fg-accent hover:underline"
-                  title="Jump to the first file that isn't marked as viewed"
-                  onClick={jumpToFirstUnviewed}
-                >
-                  {props.files.filter((f) => isViewed(f.filename)).length} / {props.files.length} viewed
-                </button>
-              </Show>
+                {props.files.filter((f) => isViewed(f.filename)).length} / {props.files.length} viewed
+              </button>
             </Show>
           </div>
           <div class="flex-1" />
-          <Show when={feature('one-click-diff-options')}>
-            <a
-              class={['btn btn-sm', { 'text-fg-muted!': hideWhitespace() }]}
-              href={whitespaceHref()}
-              title={`${hideWhitespace() ? 'Show' : 'Hide'} whitespace changes (d w)`}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(whitespaceHref(), { replace: true, scroll: false });
-              }}
-            >
-              <Show when={hideWhitespace()}>
-                <Octicon icon={checkIcon} />
-              </Show>
-              No whitespace
-            </a>
-          </Show>
+          <a
+            class={['btn btn-sm', { 'text-fg-muted!': hideWhitespace() }]}
+            href={whitespaceHref()}
+            title={`${hideWhitespace() ? 'Show' : 'Hide'} whitespace changes (d w)`}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(whitespaceHref(), { replace: true, scroll: false });
+            }}
+          >
+            <Show when={hideWhitespace()}>
+              <Octicon icon={checkIcon} />
+            </Show>
+            No whitespace
+          </a>
           <div class="SegmentedControl" role="group" aria-label="Diff view">
             <button type="button" class={['SegmentedControl-item text-xs!', { selected: !split() }]} onClick={() => setDiffSplit(false)}>
               Unified
@@ -319,7 +307,8 @@ export default function DiffView(props: DiffViewProps) {
             <DiffFileView
               file={file}
               anchor={anchors().get(file) ?? ''}
-              split={split() && !(feature('no-unnecessary-split-diff-view') && (!file.additions || !file.deletions))}
+              // Split mode is pointless for files with only additions or only deletions.
+              split={split() && !!file.additions && !!file.deletions}
               hideWhitespace={hideWhitespace()}
               repoBase={repoBase()}
               fileMenu={props.fileMenu}
@@ -482,8 +471,6 @@ function DiffFileView(props: {
   const splitRows = createMemo(() => (props.split ? toSplitRows(rows()) : []));
   const canExpandEnd = () => expandable() && !expanded().has(END);
   const canExpandHunk = (hunk: DiffLine) => expandable() && !!hunk.hunk && hunk.hunk.newStart > 1;
-  /** extend-diff-expander: the whole hunk row expands, not just the small button. */
-  const wideExpand = (hunk: DiffLine) => feature('extend-diff-expander') && canExpandHunk(hunk);
 
   // ---- line selection (#diff-…R12 / shift-click ranges)
   const [selection, setSelection] = createSignal<Selection | null>(null);
@@ -600,7 +587,6 @@ function DiffFileView(props: {
         selection: sel(),
         commentable: !!props.onAddComment,
         canExpand: canExpandHunk,
-        wideExpand,
       };
       let out = '';
       if (props.split) {
@@ -702,12 +688,11 @@ function DiffFileView(props: {
     <div id={props.anchor} class="Box mb-4 scroll-mt-2" data-path={path()}>
       <div
         class={[
-          'Box-header sticky top-0 z-2 flex items-center gap-2 py-1.5! px-2! text-sm',
-          { 'rounded-b-md': collapsed() || !loaded(), 'cursor-pointer': feature('easy-toggle-files') },
+          'Box-header sticky top-0 z-2 flex items-center gap-2 py-1.5! px-2! text-sm cursor-pointer',
+          { 'rounded-b-md': collapsed() || !loaded() },
         ]}
         onClick={(e) => {
-          // easy-toggle-files: a click on the bar (not on its controls or while selecting text) toggles the file.
-          if (!feature('easy-toggle-files')) return;
+          // A click on the bar (not on its controls or while selecting text) toggles the file.
           if ((e.target as HTMLElement).closest('a, button, input, label, summary, [role="menu"]')) return;
           if (getSelection()?.toString()) return;
           setCollapsed(!collapsed());
@@ -771,7 +756,7 @@ function DiffFileView(props: {
                 <a class="SelectMenu-item" href={props.href} onClick={close}>
                   View file
                 </a>
-                <Show when={feature('more-file-links') && moreFileLinks(props.href)}>
+                <Show when={moreFileLinks(props.href)}>
                   {(links) => (
                     <>
                       <a class="SelectMenu-item" href={links().raw} target="_blank" rel="noreferrer" onClick={close}>

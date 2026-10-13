@@ -2,7 +2,6 @@ import { useAction } from '@solidjs/router';
 import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, toast, toastError } from '../../../components/ui';
-import { feature } from '../../refined';
 import { checkIcon, commentIcon, dotFillIcon, fileDiffIcon, gitPullRequestDraftIcon, peopleIcon } from '../../../icons/octicons';
 import { getAssignableUsers, type PickerUser } from '../../issues/api';
 import { userHref } from '../../issues/components/Comment';
@@ -25,7 +24,7 @@ export default function ReviewersSection(props: { owner: string; repo: string; p
   const approve = useAction(approvePull);
   const [busy, setBusy] = createSignal(false);
 
-  // quick-review: "review now" (Files tab with the review menu open, hotkey v) and "approve now".
+  // "Review now" (Files tab with the review menu open, hotkey v) and "approve now".
   const canApprove = () => props.pull.state === 'OPEN' && !!props.viewerLogin && props.viewerLogin !== props.pull.author?.login;
   const quickApprove = async (e: MouseEvent) => {
     const body = e.altKey ? '' : prompt('Approve instantly? You can add a custom message or leave empty');
@@ -101,19 +100,17 @@ export default function ReviewersSection(props: { owner: string; repo: string; p
         />
       }
     >
-      <Show when={feature('quick-review')}>
-        <p class="mb-2 text-fg-muted flex flex-wrap items-center gap-x-1">
-          <a class="link-muted" href={`/${props.owner}/${props.repo}/pull/${props.pull.number}/files#review-changes-modal`} title="Review now (v)">
-            Review now
-          </a>
-          <Show when={canApprove()}>
-            <span aria-hidden="true">–</span>
-            <button type="button" class="btn-link link-muted text-xs" disabled={busy()} title="Hold Alt to approve without confirmation" onClick={quickApprove}>
-              Approve now
-            </button>
-          </Show>
-        </p>
-      </Show>
+      <p class="mb-2 text-fg-muted flex flex-wrap items-center gap-x-1">
+        <a class="link-muted" href={`/${props.owner}/${props.repo}/pull/${props.pull.number}/files#review-changes-modal`} title="Review now (v)">
+          Review now
+        </a>
+        <Show when={canApprove()}>
+          <span aria-hidden="true">–</span>
+          <button type="button" class="btn-link link-muted text-xs" disabled={busy()} title="Hold Alt to approve without confirmation" onClick={quickApprove}>
+            Approve now
+          </button>
+        </Show>
+      </p>
       <Show when={requested().length || reviews().length} fallback={<span class="text-fg-muted">No reviews</span>}>
         <ul class="flex flex-col gap-2">
           <For each={reviews()}>

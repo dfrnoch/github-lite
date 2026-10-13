@@ -39,11 +39,12 @@ export default function RefinedSettings() {
         </span>
       </div>
       <p class="text-sm text-fg-muted mb-4">
-        Features from the{' '}
+        Optional extras from the{' '}
         <a href="https://github.com/refined-github/refined-github" target="_blank" rel="noreferrer">
           Refined GitHub
         </a>{' '}
-        browser extension, built natively into this app. All of them are on by default; settings are stored in this browser.
+        browser extension, built natively into this app. The best of Refined GitHub is always on and not listed here; these are the
+        opinionated ones you can switch off. Settings are stored in this browser.
       </p>
 
       <div class="flex flex-wrap items-center gap-2 mb-6">

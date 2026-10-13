@@ -35,7 +35,7 @@ export interface IssueRowProps {
   /** Prefix the number with owner/repo (global lists). */
   showRepo?: boolean;
   labelHref?: (name: string) => string;
-  /** The current list with one more qualifier (linkify-pr-review-state), e.g. filterHref('review:approved'). */
+  /** The current list with one more qualifier (links the review state), e.g. filterHref('review:approved'). */
   filterHref?: (qualifier: string) => string;
   /** Logged-in user (conversation-authors). */
   viewerLogin?: string;
@@ -69,10 +69,10 @@ export default function IssueRow(props: IssueRowProps) {
   };
   const commentsHref = () => {
     const last = props.item.lastComment?.nodes[0]?.databaseId;
-    return feature('open-issue-to-latest-comment') && last ? `${path()}#issuecomment-${last}` : path();
+    return last ? `${path()}#issuecomment-${last}` : path();
   };
   const filterLink = (qualifier: string, text: string, cls?: string) => (
-    <Show when={feature('linkify-pr-review-state') && props.filterHref} fallback={<span class={cls}>{text}</span>}>
+    <Show when={props.filterHref} fallback={<span class={cls}>{text}</span>}>
       <a class={['link-muted rgh-linkify-pr-review-state', cls]} href={props.filterHref!(qualifier)} title={`Show only PRs with ${qualifier}`}>
         {text}
       </a>
@@ -92,28 +92,27 @@ export default function IssueRow(props: IssueRowProps) {
       />
       <div class="flex-1 min-w-0">
         <div class="leading-snug">
-          <Show when={draft() && feature('emphasize-draft-pr-label')}>
+          <Show when={draft()}>
             <span class="Label Label--secondary mr-1 align-middle rgh-draft-label">Draft</span>
           </Show>
           <a
-            class={['link-plain font-semibold text-base mr-1 break-words', TITLE_CODE, { 'text-fg-muted!': draft() && feature('emphasize-draft-pr-label') }]}
+            class={['link-plain font-semibold text-base mr-1 break-words', TITLE_CODE, { 'text-fg-muted!': draft() }]}
             href={path()}
             // oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub
             innerHTML={props.item.titleHTML || props.item.title}
           />
-          <Show when={props.item.isPinned && feature('mark-pinned')}>
+          <Show when={props.item.isPinned}>
             <span class="text-fg-muted mr-1 align-middle rgh-pinned" title="Pinned issue" aria-label="Pinned issue">
               <Octicon icon={pinIcon} size={14} />
             </span>
           </Show>
-          <Show when={props.item.locked && feature('mark-locked')}>
+          <Show when={props.item.locked}>
             <span class="text-fg-muted mr-1 align-middle rgh-locked" title="Locked conversation" aria-label="Locked conversation">
               <Octicon icon={lockIcon} size={14} />
             </span>
           </Show>
-          <Show when={!feature('align-issue-labels')}>{labels()}</Show>
         </div>
-        <Show when={feature('align-issue-labels') && props.item.labels.nodes.length}>
+        <Show when={props.item.labels.nodes.length}>
           <div class="mt-1 flex flex-wrap gap-y-1 rgh-align-issue-labels">{labels()}</div>
         </Show>
         <div class="mt-1 text-xs text-fg-muted flex flex-wrap items-center gap-x-1">
@@ -122,9 +121,7 @@ export default function IssueRow(props: IssueRowProps) {
           </span>
           <span>·</span>
           <a class={['link-muted inline-flex items-center gap-1', authorClass()]} href={userHref(author())}>
-            <Show when={feature('small-user-avatars')}>
-              <Avatar src={props.item.author?.avatarUrl} login={author()} size={14} class="rgh-small-user-avatars" />
-            </Show>
+            <Avatar src={props.item.author?.avatarUrl} login={author()} size={14} class="rgh-small-user-avatars" />
             {author()}
           </a>
           <Show
@@ -138,9 +135,6 @@ export default function IssueRow(props: IssueRowProps) {
             <span>
               opened <RelativeTime datetime={props.item.createdAt} />
             </span>
-          </Show>
-          <Show when={draft() && !feature('emphasize-draft-pr-label')}>
-            <span>· {filterLink('draft:true', 'Draft')}</span>
           </Show>
           <Show when={isPull() && !props.item.isDraft && props.item.state === 'OPEN' && props.item.reviewDecision}>
             {(d) => <span>· {filterLink(REVIEW_TEXT[d()]?.filter ?? '', REVIEW_TEXT[d()]?.text ?? '', REVIEW_TEXT[d()]?.class)}</span>}
@@ -162,7 +156,7 @@ export default function IssueRow(props: IssueRowProps) {
               </span>
             )}
           </Show>
-          <Show when={feature('highlight-non-default-base-branch') && nonDefaultBase()}>
+          <Show when={nonDefaultBase()}>
             {(base) => (
               <span class="inline-flex items-center gap-1">
                 ·
@@ -193,12 +187,12 @@ export default function IssueRow(props: IssueRowProps) {
         </div>
       </div>
       <div class="hidden sm:flex items-center gap-4 shrink-0 text-xs text-fg-muted pt-1">
-        <Show when={feature('conflict-marker') && isPull() && props.item.state === 'OPEN' && props.item.mergeable === 'CONFLICTING'}>
+        <Show when={isPull() && props.item.state === 'OPEN' && props.item.mergeable === 'CONFLICTING'}>
           <a class="inline-flex items-center text-fg-danger! rgh-conflict-marker" href={path()} title="This PR has conflicts that must be resolved">
             <Octicon icon={alertIcon} />
           </a>
         </Show>
-        <Show when={feature('pr-approvals-count') && isPull() && (reviews().approved || reviews().changes)}>
+        <Show when={isPull() && (reviews().approved || reviews().changes)}>
           <span class="inline-flex items-center gap-2 rgh-pr-approvals-count">
             <Show when={reviews().approved}>
               <span class="inline-flex items-center gap-0.5 text-fg-success" title={`${reviews().approved} approval${reviews().approved === 1 ? '' : 's'}`}>

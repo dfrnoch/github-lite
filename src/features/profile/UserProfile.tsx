@@ -22,7 +22,6 @@ import { listPageInfo, page, REPO_SORTS, RepoList } from './components/RepoList'
 import UserListItem from './components/UserListItem';
 import UserSidebar from './components/UserSidebar';
 import { userReposHref } from './links';
-import { feature } from '../refined';
 
 type Tab = 'overview' | 'repositories' | 'projects' | 'packages' | 'stars' | 'followers' | 'following';
 const TABS: Tab[] = ['overview', 'repositories', 'projects', 'packages', 'stars', 'followers', 'following'];
@@ -127,11 +126,9 @@ function Overview(props: { user: UserProfileData }) {
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-base font-normal">
               {props.user.pinned.length ? 'Pinned' : 'Popular repositories'}
-              <Show when={feature('show-user-top-repositories')}>
-                {' / '}
-                {/* No type=source on purpose: forks can be popular too. */}
-                <a href={`/${props.user.login}?tab=repositories&sort=stargazers`}>Top repositories</a>
-              </Show>
+              {' / '}
+              {/* No type=source on purpose: forks can be popular too. */}
+              <a href={`/${props.user.login}?tab=repositories&sort=stargazers`}>Top repositories</a>
             </h2>
             <Show when={props.user.isViewer}>
               <a class="text-xs link-muted" href={`https://github.com/${props.user.login}`} target="_blank" rel="noreferrer">
@@ -203,7 +200,7 @@ function Repositories(props: { user: UserProfileData }) {
         />
         <RepoList
           result={result()}
-          conversationLinks={feature('conversation-links-on-repo-lists')}
+          conversationLinks
           empty={`${props.user.login} doesn’t have any repositories that match.`}
         />
       </Loading>

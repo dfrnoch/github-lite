@@ -1,7 +1,6 @@
 import { Title } from '@solidjs/meta';
 import { useSearchParams } from '@solidjs/router';
 import { For } from 'solid-js';
-import { feature } from '../../refined';
 import { qualifier, setQualifier } from '../query';
 import IssueList from './IssueList';
 
@@ -20,13 +19,8 @@ export default function GlobalList(props: { kind: 'issue' | 'pr' }) {
     { label: 'Assigned', key: 'assignee', value: '@me' },
     { label: 'Mentioned', key: 'mentions', value: '@me' },
     ...(props.kind === 'pr' ? [{ label: 'Review requests', key: 'review-requested', value: '@me' }] : []),
-    // global-conversation-list-filters
-    ...(feature('global-conversation-list-filters')
-      ? [
-          { label: 'Commented', key: 'commenter', value: '@me' },
-          { label: 'Yours', key: 'user', value: '@me' },
-        ]
-      : []),
+    { label: 'Commented', key: 'commenter', value: '@me' },
+    { label: 'Yours', key: 'user', value: '@me' },
   ];
   const defaultQuery = () => `is:open ${type()} author:@me archived:false sort:updated-desc`;
   const q = () => params.q ?? defaultQuery();

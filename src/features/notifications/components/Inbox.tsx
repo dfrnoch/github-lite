@@ -204,7 +204,6 @@ export default function Inbox(props: { page: Page<NotificationThread>; query: In
     keys: 'O',
     description: 'Open selection in new tab',
     group,
-    feature: 'selection-in-new-tab',
     when: () => !!focusedThread(),
     handler: () => {
       const n = focusedThread()!;
@@ -222,7 +221,6 @@ export default function Inbox(props: { page: Page<NotificationThread>; query: In
     keys: 'a',
     description: 'Select all notifications',
     group,
-    feature: 'select-all-notifications-shortcut',
     handler: () => setSelected(new Set<string>(allSelected() ? [] : visible().map((n) => n.id))),
   });
   useHotkey({
@@ -249,7 +247,7 @@ export default function Inbox(props: { page: Page<NotificationThread>; query: In
       }
     >
       <div class={['Box transition-opacity', { 'opacity-60': props.pending }]}>
-        <div class={['Box-header flex items-center gap-3 py-2! px-4!', { 'rgh-sticky-notifications': feature('sticky-notifications-actions') }]}>
+        <div class="Box-header rgh-sticky-notifications flex items-center gap-3 py-2! px-4!">
           <input
             type="checkbox"
             aria-label="Select all notifications"
@@ -273,9 +271,7 @@ export default function Inbox(props: { page: Page<NotificationThread>; query: In
               <Octicon icon={checkIcon} /> Done
             </button>
           </Show>
-          <Show when={feature('select-notifications')}>
-            <SelectBy onChange={onSelectBy} />
-          </Show>
+          <SelectBy onChange={onSelectBy} />
           <div class="flex-1" />
           <Show when={feature('open-all-notifications') && visible().some(isUnread)}>
             <button

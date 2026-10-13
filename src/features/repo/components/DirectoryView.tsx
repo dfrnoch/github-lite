@@ -232,7 +232,7 @@ function BranchInfoBar(props: { repo: Repository; branch: string }) {
               <span class="font-mono text-xs px-1.5 py-0.5 rounded-md bg-accent-muted text-fg-accent">{props.repo.default_branch}</span>.
             </Show>
           </span>
-          <Show when={feature('delete-branch') && props.repo.permissions?.push && !openPull()}>
+          <Show when={props.repo.permissions?.push && !openPull()}>
             <button
               type="button"
               class="btn btn-sm btn-danger rgh-delete-branch"
@@ -248,38 +248,9 @@ function BranchInfoBar(props: { repo: Repository; branch: string }) {
             when={openPull()}
             fallback={
               <Show when={s().ahead}>
-                <Show
-                  when={feature('pr-from-branch')}
-                  fallback={
-                    <Dropdown
-                      class="btn btn-sm"
-                      align="right"
-                      menuClass="w-80"
-                      button={
-                        <>
-                          <Octicon icon={gitPullRequestIcon} /> Contribute <Octicon icon={triangleDownIcon} />
-                        </>
-                      }
-                    >
-                      {(close) => (
-                        <div class="p-3 text-sm">
-                          <p class="mb-2">
-                            This branch is {s().ahead} commit{s().ahead === 1 ? '' : 's'} ahead of{' '}
-                            <span class="font-mono text-xs">{props.repo.default_branch}</span>.
-                          </p>
-                          <p class="text-fg-muted mb-3">Open a pull request to contribute your changes upstream.</p>
-                          <a class="btn btn-sm btn-primary w-full justify-center" href={`${compareHref()}?expand=1`} onClick={close}>
-                            Open pull request
-                          </a>
-                        </div>
-                      )}
-                    </Dropdown>
-                  }
-                >
-                  <a class="btn btn-sm" href={`${compareHref()}?expand=1`}>
-                    <Octicon icon={gitPullRequestIcon} /> Open pull request
-                  </a>
-                </Show>
+                <a class="btn btn-sm" href={`${compareHref()}?expand=1`}>
+                  <Octicon icon={gitPullRequestIcon} /> Open pull request
+                </a>
               </Show>
             }
           >

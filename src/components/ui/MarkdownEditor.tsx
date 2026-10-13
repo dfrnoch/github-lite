@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Loading, onSettled, Show, untrack } from 'solid-js';
-import { feature } from '../../features/refined';
 import {
+  fitTextarea,
   fixLinkLoss,
   insertText,
   isVulnerableToLinkLoss,
@@ -48,10 +48,11 @@ const FORMATS: { icon: typeof boldIcon; label: string; format: Format }[] = [
  * preview rendered by the API (so it matches the final result exactly).
  * Ctrl/Cmd+Enter calls `onSubmit`.
  *
- * Refined GitHub writing features live here too (each behind its toggle):
- * tab-to-indent, one-key-formatting, fit-textareas, collapsible-content-button,
- * table-input, prevent-comment-loss, prevent-link-loss, unfinished-comments
- * and (with `monospace`) monospace-textareas.
+ * Refined GitHub writing features live here too: one-key-formatting,
+ * fit-textareas, collapsible-content-button, table-input, prevent-comment-loss
+ * and prevent-link-loss, plus the optional tab-to-indent and
+ * unfinished-comments (behind their toggles) and (with `monospace`)
+ * monospace-textareas.
  */
 export default function MarkdownEditor(props: {
   value: string;
@@ -74,7 +75,7 @@ export default function MarkdownEditor(props: {
   const initial = untrack(() => props.value);
   onSettled(() => trackUnfinishedComment(() => !!props.value.trim() && props.value !== initial));
 
-  const linkLoss = createMemo(() => feature('prevent-link-loss') && isVulnerableToLinkLoss(props.value, props.repo));
+  const linkLoss = createMemo(() => isVulnerableToLinkLoss(props.value, props.repo));
   const fixLinks = () => {
     if (!textarea) return;
     const fixed = fixLinkLoss(textarea.value, props.repo);
@@ -173,17 +174,11 @@ export default function MarkdownEditor(props: {
                 <Octicon icon={f.icon} />
               </button>
             )}</For>
-            <Show when={feature('collapsible-content-button') || feature('table-input')}>
-              <span class="w-px h-4 mx-1 bg-[var(--borderColor-default)]" aria-hidden="true" />
-            </Show>
-            <Show when={feature('collapsible-content-button')}>
-              <button type="button" class="btn-octicon w-7 h-7" title="Add collapsible content" aria-label="Add collapsible content" onClick={insertDetails}>
-                <Octicon icon={foldDownIcon} />
-              </button>
-            </Show>
-            <Show when={feature('table-input')}>
-              <TableInput onPick={insertTable} />
-            </Show>
+            <span class="w-px h-4 mx-1 bg-[var(--borderColor-default)]" aria-hidden="true" />
+            <button type="button" class="btn-octicon w-7 h-7" title="Add collapsible content" aria-label="Add collapsible content" onClick={insertDetails}>
+              <Octicon icon={foldDownIcon} />
+            </button>
+            <TableInput onPick={insertTable} />
           </div>
         </Show>
       </div>
@@ -192,12 +187,9 @@ export default function MarkdownEditor(props: {
           when={tab() === 'preview'}
           fallback={
             <textarea
-              ref={[(el: HTMLTextAreaElement) => (textarea = el), tabToIndent, oneKeyFormatting]}
+              ref={[(el: HTMLTextAreaElement) => (textarea = el), tabToIndent, oneKeyFormatting, fitTextarea]}
               id={props.id}
-              class={[
-                'form-control border-none! shadow-none! bg-canvas',
-                { 'rgh-fit-textarea': feature('fit-textareas'), 'rgh-monospace-field': !!props.monospace },
-              ]}
+              class={['form-control border-none! shadow-none! bg-canvas', { 'rgh-monospace-field': !!props.monospace }]}
               style={{ 'min-height': `${props.minHeight ?? 120}px` }}
               placeholder={props.placeholder ?? 'Add your comment here...'}
               value={props.value}

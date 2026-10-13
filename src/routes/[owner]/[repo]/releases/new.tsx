@@ -1,7 +1,6 @@
 import { Title } from '@solidjs/meta';
 import { useSearchParams } from '@solidjs/router';
 import { createMemo, Errored, Loading, Show } from 'solid-js';
-import { feature } from '../../../../features/refined';
 import ReleaseForm from '../../../../features/releases/components/ReleaseForm';
 import { getPublishState } from '../../../../features/repo/api';
 import { unreleasedLabel } from '../../../../features/repo/refined/RefExtras';
@@ -18,13 +17,11 @@ export default function NewRelease() {
       <Title>{`New release · ${ctx.fullName()}`}</Title>
       <div class="pb-2 mb-4 border-b border-line-muted">
         <h1 class="text-2xl font-normal">Draft a new release</h1>
-        <Show when={feature('unreleased-commits')}>
-          <Errored fallback={null}>
-            <Loading>
-              <UnreleasedHint />
-            </Loading>
-          </Errored>
-        </Show>
+        <Errored fallback={null}>
+          <Loading>
+            <UnreleasedHint />
+          </Loading>
+        </Errored>
       </div>
       <ReleaseForm
         owner={ctx.owner()}
@@ -38,7 +35,7 @@ export default function NewRelease() {
   );
 }
 
-/** unreleased-commits: "12 unreleased commits on main since v1.2.3". */
+/** "12 unreleased commits on main since v1.2.3". */
 function UnreleasedHint() {
   const ctx = useRepo();
   const state = createMemo(() => getPublishState(ctx.owner(), ctx.name()));

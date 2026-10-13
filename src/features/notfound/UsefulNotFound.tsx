@@ -4,10 +4,10 @@ import RelativeTime from '../../components/ui/RelativeTime';
 import { encodePath, gh, gql } from '../../lib/github';
 
 /**
- * Refined GitHub's `useful-not-found-page`: on a 404 for a file or folder
- * URL, explain what happened to it (the commit that removed / renamed it),
- * point to it on the default branch, and cross out the parts of the path that
- * don't exist; on a 404 for a pull request commit, link the commit itself.
+ * On a 404 for a file or folder URL, explain what happened to it (the commit
+ * that removed / renamed it), point to it on the default branch, and cross out
+ * the parts of the path that don't exist; on a 404 for a pull request commit,
+ * link the commit itself.
  */
 
 type Parsed =

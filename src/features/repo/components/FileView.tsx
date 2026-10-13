@@ -273,7 +273,6 @@ function CodeView(props: {
     keys: 'Escape',
     description: 'Deselect the selected lines',
     group: 'Source code browsing',
-    feature: 'esc-to-deselect-line',
     when: () => !!parseLineHash(window.location.hash),
     handler: () => props.onDeselect(),
   });
@@ -419,7 +418,7 @@ function CsvView(props: { owner: string; repo: string; gitRef: string; path: str
   const body = () => rows().slice(1, CSV_MAX_ROWS + 1);
   return (
     <div class="markdown-body overflow-auto max-h-[80vh]">
-      <table class={['csv-data m-0!', { 'rgh-sticky-csv': feature('sticky-csv-header') }]}>
+      <table class="csv-data m-0!">
         <thead>
           <tr>
             <th class="blob-num" />

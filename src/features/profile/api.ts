@@ -396,7 +396,7 @@ export const getOwnerProfile = query(async (login: string): Promise<OwnerProfile
 
 /**
  * Logins of a user's *public* organization memberships (REST lists only
- * those), so `mark-private-orgs` can flag the rest of the viewer's orgs.
+ * those), so the viewer's other orgs can be flagged as private.
  */
 export const getPublicOrgs = query(async (login: string) => {
   const orgs = await gh<{ login: string }[]>(`/users/${login}/orgs`, { query: { per_page: 100 } });

@@ -22,7 +22,6 @@ import {
 import DiffView, { lineKey, type LineRef, type Side } from '../../../../../features/diff/DiffView';
 import { getPull } from '../../../../../features/pulls/api';
 import { useRepo } from '../../../../../features/repo/context';
-import { feature } from '../../../../../features/refined';
 import { getViewer } from '../../../../../features/user/api';
 import { triangleDownIcon } from '../../../../../icons/octicons';
 import { encodePath } from '../../../../../lib/github';
@@ -153,8 +152,8 @@ export default function PullFilesTab() {
           f.status === 'removed' || !pull()
             ? undefined
             : `/${pull()!.head.repo?.full_name ?? ctx.fullName()}/blob/${
-                // actionable-pr-view-file: open PRs link the branch (editable) instead of the commit.
-                feature('actionable-pr-view-file') && pull()!.state === 'open' && pull()!.head.repo
+                // Open PRs link the branch (so the file page offers Edit / Delete) instead of the commit.
+                pull()!.state === 'open' && pull()!.head.repo
                   ? encodePath(pull()!.head.ref)
                   : pull()!.head.sha
               }/${encodePath(f.filename)}`
@@ -162,7 +161,6 @@ export default function PullFilesTab() {
         fileMenu={(f, close) => (
           <Show
             when={
-              feature('restore-file') &&
               pull()?.state === 'open' &&
               pull()?.head.repo &&
               (!!ctx.repo().permissions?.push || viewer()?.login === pull()?.user.login)
@@ -208,7 +206,6 @@ function ReviewMenu(props: {
 }) {
   const ctx = useRepo();
   const [body, setBody] = createSignal('');
-  const [event, setEvent] = createSignal<ReviewEvent>('COMMENT');
   const [busy, setBusy] = createSignal(false);
   const submit = async (ev: ReviewEvent, close: () => void) => {
     setBusy(true);
@@ -247,65 +244,25 @@ function ReviewMenu(props: {
         <div class="text-left" role="dialog" aria-label="Submit review">
           <h3 class="font-semibold mb-2">Finish your review</h3>
           <MarkdownEditor value={body()} onInput={setBody} repo={ctx.fullName()} minHeight={100} placeholder="Leave a comment" />
-          <Show when={feature('one-click-review-submission')}>
-            {/* one-click-review-submission: one button per review type instead of radios + submit. */}
-            <div class="flex flex-wrap justify-end gap-2 mt-3">
-              <button type="button" class="btn btn-sm" onClick={close}>
-                Cancel
-              </button>
-              <For each={options}>
-                {(o) => (
-                  <button
-                    type="button"
-                    class={['btn btn-sm', { 'btn-primary': o.value === 'APPROVE', 'btn-danger': o.value === 'REQUEST_CHANGES' }]}
-                    title={props.isAuthor && o.value !== 'COMMENT' ? 'Pull request authors can’t approve or request changes on their own pull request' : o.desc}
-                    disabled={busy() || (props.isAuthor && o.value !== 'COMMENT') || (o.value !== 'APPROVE' && !body().trim() && !props.pendingCount)}
-                    onClick={() => void submit(o.value, close)}
-                  >
-                    {o.title}
-                  </button>
-                )}
-              </For>
-            </div>
-          </Show>
-          <Show when={!feature('one-click-review-submission')}>
-          <div class="flex flex-col gap-2 mt-3">
-            <For each={options}>
-              {(o) => (
-                <label
-                  class={['flex items-start gap-2 text-sm', { 'opacity-50': props.isAuthor && o.value !== 'COMMENT' }]}
-                  title={props.isAuthor && o.value !== 'COMMENT' ? 'Pull request authors can’t approve or request changes on their own pull request' : undefined}
-                >
-                  <input
-                    type="radio"
-                    name="review-event"
-                    class="mt-1"
-                    checked={event() === o.value}
-                    disabled={props.isAuthor && o.value !== 'COMMENT'}
-                    onChange={() => setEvent(o.value)}
-                  />
-                  <span>
-                    <span class="font-semibold block">{o.title}</span>
-                    <span class="text-xs text-fg-muted">{o.desc}</span>
-                  </span>
-                </label>
-              )}
-            </For>
-          </div>
-          <div class="flex justify-end gap-2 mt-3">
+          {/* One button per review type instead of radios + submit. */}
+          <div class="flex flex-wrap justify-end gap-2 mt-3">
             <button type="button" class="btn btn-sm" onClick={close}>
               Cancel
             </button>
-            <button
-              type="button"
-              class="btn btn-sm btn-primary"
-              disabled={busy() || (event() !== 'APPROVE' && !body().trim() && !props.pendingCount)}
-              onClick={() => void submit(event(), close)}
-            >
-              {busy() ? 'Submitting…' : 'Submit review'}
-            </button>
+            <For each={options}>
+              {(o) => (
+                <button
+                  type="button"
+                  class={['btn btn-sm', { 'btn-primary': o.value === 'APPROVE', 'btn-danger': o.value === 'REQUEST_CHANGES' }]}
+                  title={props.isAuthor && o.value !== 'COMMENT' ? 'Pull request authors can’t approve or request changes on their own pull request' : o.desc}
+                  disabled={busy() || (props.isAuthor && o.value !== 'COMMENT') || (o.value !== 'APPROVE' && !body().trim() && !props.pendingCount)}
+                  onClick={() => void submit(o.value, close)}
+                >
+                  {o.title}
+                </button>
+              )}
+            </For>
           </div>
-          </Show>
         </div>
       )}
     </Dropdown>

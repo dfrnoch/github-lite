@@ -38,8 +38,8 @@ export default function FileTable(props: {
   );
 
   const hover = () => !feature('hide-navigation-hover-highlight');
-  /** quick-file-edit: not on permalinks (a commit can't be edited) or archived repos. */
-  const quickEdit = () => feature('quick-file-edit') && !props.archived && !/^[0-9a-f]{40}$/i.test(props.gitRef);
+  /** Hovering a file's icon turns it into an edit link: not on permalinks (a commit can't be edited) or archived repos. */
+  const quickEdit = () => !props.archived && !/^[0-9a-f]{40}$/i.test(props.gitRef);
   const editHref = (e: TreeEntry) => `${base()}/edit/${encodePath(props.gitRef)}/${encodePath(e.path)}`;
   const hrefFor = (e: TreeEntry) =>
     `${base()}/${e.type === 'tree' ? 'tree' : 'blob'}/${encodePath(props.gitRef)}/${encodePath(e.path)}`;

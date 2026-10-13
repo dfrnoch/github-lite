@@ -3,7 +3,6 @@ import { createMemo, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { RelativeTime } from '../../../components/ui';
 import { cacheIcon, playIcon, serverIcon, stopIcon } from '../../../icons/octicons';
-import { feature } from '../../refined';
 import { useRepo } from '../../repo/context';
 import { getWorkflows, getWorkflowSources } from '../api';
 import { nextCronDate, workflowCrons } from '../cron';
@@ -26,11 +25,9 @@ export default function ActionsShell(props: { active: string; children: JSX.Elem
   );
   const href = (path: string) => `${ctx.base()}/actions${path}`;
   const canDispatch = () => !!ctx.repo().permissions?.push;
-  // github-actions-indicators: manual trigger + next scheduled run per workflow file.
-  const sources = createMemo(() => (feature('github-actions-indicators') ? getWorkflowSources(ctx.owner(), ctx.name()) : null));
+  // Manual trigger + next scheduled run per workflow file.
   const indicators = createMemo(() => {
-    const files = sources();
-    if (!files) return null;
+    const files = getWorkflowSources(ctx.owner(), ctx.name());
     const out: Record<string, { manual: boolean; next: Date | null }> = {};
     for (const [file, source] of Object.entries(files)) {
       let next: Date | null = null;
@@ -70,7 +67,7 @@ export default function ActionsShell(props: { active: string; children: JSX.Elem
                       <span class="truncate flex-1">
                         {w.name}
                         <Loading>
-                          <Show when={indicators()?.[workflowFile(w.path)]?.next}>
+                          <Show when={indicators()[workflowFile(w.path)]?.next}>
                             {(next) => (
                               <em class="text-fg-muted font-normal">
                                 {' '}
@@ -84,7 +81,7 @@ export default function ActionsShell(props: { active: string; children: JSX.Elem
                         <Octicon icon={stopIcon} aria-label="Disabled" />
                       </Show>
                       <Loading>
-                        <Show when={indicators()?.[workflowFile(w.path)]?.manual && !canDispatch()}>
+                        <Show when={indicators()[workflowFile(w.path)]?.manual && !canDispatch()}>
                           <span class="inline-flex text-fg-muted" title="This workflow can be triggered manually">
                             <Octicon icon={playIcon} />
                           </span>
@@ -94,7 +91,7 @@ export default function ActionsShell(props: { active: string; children: JSX.Elem
                     <Loading>
                     <Show
                       when={
-                        indicators()?.[workflowFile(w.path)]?.manual &&
+                        indicators()[workflowFile(w.path)]?.manual &&
                         canDispatch() &&
                         !w.state.startsWith('disabled') &&
                         props.active !== workflowFile(w.path)

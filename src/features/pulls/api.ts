@@ -25,7 +25,7 @@ export const getPull = query(async (owner: string, repo: string, number: number)
 
 /**
  * Number of checks on the head commit (Checks tab counter), plus whether the
- * head branch is gone (Refined GitHub cross-deleted-pr-branches).
+ * head branch is gone.
  */
 export const getPullChecksCount = query(async (owner: string, repo: string, number: number) => {
   const data = await gql<any>(
@@ -59,7 +59,7 @@ export interface PullDeployment {
 /** Key matching a timeline DeployedEvent node to its deployment (the timeline query has no ids). */
 export const deploymentKey = (createdAt: string | undefined, environment: string | null | undefined) => `${createdAt}|${environment ?? ''}`;
 
-/** The PR's deployments, oldest first (hide-inactive-deployments, view-last-pr-deployment). */
+/** The PR's deployments, oldest first. */
 export const getPullDeployments = query(async (owner: string, repo: string, number: number): Promise<PullDeployment[]> => {
   const data = await gql<any>(
     `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){
@@ -81,7 +81,7 @@ export const getPullDeployments = query(async (owner: string, repo: string, numb
 const isVersionTag = (name: string) => !name.includes('nightly') && /\d[.]\d/.test(name);
 
 /**
- * closing-remarks: for a merged PR, the first tag that contains its merge
+ * Closing remarks: for a merged PR, the first tag that contains its merge
  * commit and whether the repo has any tags at all (null when not merged).
  * Walks tags newest → oldest down to the merge date (the first page comes
  * with the PR in one request), then checks containment with the compare API.
@@ -138,7 +138,7 @@ export const getFirstTag = query(async (owner: string, repo: string, number: num
 }, 'pull-first-tag');
 
 /**
- * update-pr-from-base-branch: whether the head branch is behind its base
+ * Whether the head branch is behind its base
  * (and still ahead, i.e. diverged) and the viewer may push to it.
  */
 export const getPullBranchUpdatable = query(async (owner: string, repo: string, number: number, base: string): Promise<boolean> => {
@@ -256,22 +256,15 @@ export const mergePull = action(
   'merge-pull',
 );
 
-export const updatePullBranch = action(async (owner: string, repo: string, number: number, headSha: string) => {
-  await gh(`/repos/${owner}/${repo}/pulls/${number}/update-branch`, {
-    method: 'PUT',
-    body: { expected_head_sha: headSha },
-  });
-}, 'update-pull-branch');
-
-/** update-pr-from-base-branch: merge or rebase the base branch into the head branch (GraphQL supports both). */
-export const updatePullBranchWith = action(async (pullId: string, headOid: string, method: 'MERGE' | 'REBASE') => {
+/** Merge or rebase the base branch into the head branch (GraphQL supports both). */
+export const updatePullBranch = action(async (pullId: string, headOid: string, method: 'MERGE' | 'REBASE') => {
   await gql(
     `mutation($input:UpdatePullRequestBranchInput!){updatePullRequestBranch(input:$input){clientMutationId}}`,
     { input: { pullRequestId: pullId, expectedHeadOid: headOid, updateMethod: method } },
   );
-}, 'update-pull-branch-with');
+}, 'update-pull-branch');
 
-/** quick-review: approve right away (POST /pulls/{n}/reviews, event APPROVE). */
+/** Approve right away (POST /pulls/{n}/reviews, event APPROVE). */
 export const approvePull = action(async (owner: string, repo: string, number: number, body: string) => {
   await gh(`/repos/${owner}/${repo}/pulls/${number}/reviews`, { method: 'POST', body: { event: 'APPROVE', body } });
 }, 'approve-pull');

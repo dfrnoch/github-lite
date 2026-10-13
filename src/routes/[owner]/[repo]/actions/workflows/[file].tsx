@@ -104,7 +104,7 @@ function WorkflowBanner(props: { workflow: Workflow; file: string }) {
   };
   const disabled = () => props.workflow.state.startsWith('disabled');
   const canWrite = () => !!ctx.repo().permissions?.push;
-  // github-actions-indicators: the sidebar's ▶ links here with #rgh-run-workflow to open "Run workflow".
+  // The sidebar's ▶ links here with #rgh-run-workflow to open "Run workflow".
   const location = useLocation();
   let runBox: HTMLSpanElement | undefined;
   createEffect(

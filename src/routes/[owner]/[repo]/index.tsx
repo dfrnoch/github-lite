@@ -3,7 +3,6 @@ import { createMemo, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { CopyButton } from '../../../components/ui';
 import type { RouteDefinition } from '@solidjs/router';
-import { feature } from '../../../features/refined';
 import { getCommunityFiles, getFirstCommit, getLastCommit, getPublishState, getReadme, getRepo, getRepoViewerState, getTree, getTreeCommits } from '../../../features/repo/api';
 import AboutSidebar from '../../../features/repo/components/AboutSidebar';
 import DirectoryView from '../../../features/repo/components/DirectoryView';
@@ -22,8 +21,8 @@ export const route = {
     void getRepoViewerState(owner, repo);
     void getCommunityFiles(owner, repo);
     // Refined GitHub extras, so they don't wait for the file list to render.
-    if (feature('unreleased-commits')) void getPublishState(owner, repo);
-    if (feature('repo-age')) void getFirstCommit(owner, repo);
+    void getPublishState(owner, repo);
+    void getFirstCommit(owner, repo);
     void getRepo(owner, repo).then((r) => {
       const ref = r.default_branch;
       void getLastCommit(owner, repo, ref);

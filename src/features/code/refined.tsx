@@ -10,11 +10,11 @@ import { resolveSha } from './api';
 
 /**
  * Shared helpers for the Refined GitHub features of the code area (file
- * browsing, code views, commits and diffs). Each is gated by `feature(id)`.
+ * browsing, code views, commits and diffs). The optional ones are gated by `feature(id)`.
  */
 
 // ---------------------------------------------------------------------------
-// Code HTML transforms: linkify-code, show-whitespace
+// Code HTML transforms: linkify URLs and issue references, show-whitespace
 
 const TAG = /(<[^>]+>)/;
 const URL_RE = /\bhttps?:\/\/(?:(?!&[lg]t;|&quot;)[^\s<>"'`])+/g;
@@ -49,13 +49,13 @@ const wsSpan = (run: string) => `<span data-rgh-whitespace="${run[0] === '\t' ? 
 
 /**
  * Post-process one line of highlighted (or escaped) code HTML: link URLs and
- * issue references (`linkify-code`) and mark whitespace (`show-whitespace`).
+ * issue references and mark whitespace (`show-whitespace`).
  * Only text between tags is touched.
  */
-export function transformCodeLine(html: string, opts: { linkifyBase?: string; whitespace?: boolean }) {
+export function transformCodeLine(html: string, opts: { linkifyBase: string; whitespace: boolean }) {
   if (!html) return html;
   let out = html;
-  if (opts.linkifyBase && (out.includes('://') || out.includes('#'))) {
+  if (out.includes('://') || out.includes('#')) {
     let inComment = false;
     out = out
       .split(TAG)
@@ -65,7 +65,7 @@ export function transformCodeLine(html: string, opts: { linkifyBase?: string; wh
           else if (/class="[^"]*\bpl-c\b/.test(part)) inComment = true;
           return part;
         }
-        return linkifyText(part, opts.linkifyBase!, inComment);
+        return linkifyText(part, opts.linkifyBase, inComment);
       })
       .join('');
   }
@@ -78,10 +78,10 @@ export function transformCodeLine(html: string, opts: { linkifyBase?: string; wh
   return out;
 }
 
-/** The code-transform options currently enabled (reactive). */
+/** The code-transform options (reactive): `base` is the repository URL issue references resolve against. */
 export function codeTransformOptions(base: string) {
   return {
-    linkifyBase: feature('linkify-code') ? base : undefined,
+    linkifyBase: base,
     whitespace: feature('show-whitespace'),
   };
 }
@@ -153,12 +153,12 @@ export function TitleLengthHint(props: { value: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// default-branch-button
+// Default-branch button
 
 /** "‹" button left of the branch picker that opens the same path on the default branch. */
 export function DefaultBranchButton(props: { gitRef: string; defaultBranch: string; href: string }) {
   return (
-    <Show when={feature('default-branch-button') && props.gitRef !== props.defaultBranch}>
+    <Show when={props.gitRef !== props.defaultBranch}>
       <a
         class="btn btn-sm px-2! rgh-default-branch-button"
         href={props.href}
@@ -172,14 +172,13 @@ export function DefaultBranchButton(props: { gitRef: string; defaultBranch: stri
 }
 
 // ---------------------------------------------------------------------------
-// `y` permalinks (copy-on-y)
+// `y` permalinks
 
 const SHA = /^[0-9a-f]{40}$/i;
 
 /**
  * GitHub's `y`: expand the URL of a tree/blob/blame page to its permalink (the
- * ref replaced by its commit SHA). With `copy-on-y` the permalink is also
- * copied to the clipboard.
+ * ref replaced by its commit SHA) and copy the permalink to the clipboard.
  */
 export function usePermalinkHotkey(get: () => { owner: string; repo: string; gitRef: string; route: string; path: string }) {
   useHotkey({
@@ -194,10 +193,8 @@ export function usePermalinkHotkey(get: () => { owner: string; repo: string; git
           const href = `/${owner}/${repo}/${route}/${sha}${path ? `/${encodePath(path)}` : ''}${window.location.search}${window.location.hash}`;
           // Like github.com, only the address changes: the page already shows this commit's content.
           history.replaceState(history.state, '', href);
-          if (feature('copy-on-y')) {
-            await navigator.clipboard.writeText(new URL(href, window.location.origin).href);
-            toast('Permalink copied to clipboard', 'success');
-          }
+          await navigator.clipboard.writeText(new URL(href, window.location.origin).href);
+          toast('Permalink copied to clipboard', 'success');
         } catch (e) {
           toastError(e);
         }

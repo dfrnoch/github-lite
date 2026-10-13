@@ -29,7 +29,6 @@ import {
   setDraft,
   updatePull,
   updatePullBranch,
-  updatePullBranchWith,
 } from '../api';
 import { cleanCommitMessage, cleanPrCommitTitle, DEFAULT_BRANCH_EXCEPTIONS, defaultSquashMessage, matchesBranchPattern } from '../refined';
 import CommandLineInstructions from './CommandLineInstructions';
@@ -159,8 +158,8 @@ function BranchSection(props: MergeBoxProps & { headRepo: string; title: string;
             <>
               The{' '}
               <code
-                class={['font-mono', { 'rgh-deleted-branch': feature('cross-deleted-pr-branches') }]}
-                title={feature('cross-deleted-pr-branches') ? 'This branch has been deleted' : undefined}
+                class="font-mono rgh-deleted-branch"
+                title="This branch has been deleted"
               >
                 {head()}
               </code>{' '}
@@ -209,8 +208,7 @@ function BranchSection(props: MergeBoxProps & { headRepo: string; title: string;
 
 function OpenBox(props: MergeBoxProps & { push: boolean }) {
   const draft = useAction(setDraft);
-  const update = useAction(updatePullBranch);
-  const updateWith = useAction(updatePullBranchWith);
+  const updateBranch = useAction(updatePullBranch);
   const [busy, setBusy] = createSignal(false);
   const [cli, setCli] = createSignal(false);
   const run = async (fn: () => Promise<unknown>, done?: string) => {
@@ -231,11 +229,11 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
     requestAnimationFrame(() => document.getElementById('merge-cli')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
   };
 
-  // update-pr-from-base-branch: "Update branch | Rebase" whenever the branch is behind its base and you
+  // "Update branch | Rebase" whenever the branch is behind its base and you
   // can push to it — GitHub (and viewerCanUpdateBranch) only offer it when branch protection requires it.
   const updatable = createMemo(
     () =>
-      feature('update-pr-from-base-branch') && props.pull.state === 'OPEN' && props.pull.headRef
+      props.pull.state === 'OPEN' && props.pull.headRef
         ? getPullBranchUpdatable(
             props.owner,
             props.repo,
@@ -252,7 +250,7 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
         class="btn btn-sm"
         title="Update branch with a merge commit"
         disabled={busy()}
-        onClick={() => run(() => updateWith(props.pull.id, props.pull.headRefOid, 'MERGE'), 'Updating branch…')}
+        onClick={() => run(() => updateBranch(props.pull.id, props.pull.headRefOid, 'MERGE'), 'Updating branch…')}
       >
         Update branch
       </button>
@@ -261,7 +259,7 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
         class="btn btn-sm"
         title="Update branch by rebasing it on the base branch"
         disabled={busy()}
-        onClick={() => run(() => updateWith(props.pull.id, props.pull.headRefOid, 'REBASE'), 'Rebasing branch…')}
+        onClick={() => run(() => updateBranch(props.pull.id, props.pull.headRefOid, 'REBASE'), 'Rebasing branch…')}
       >
         Rebase
       </button>
@@ -335,21 +333,7 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
               }
               action={
                 <Show when={props.pull.viewerCanUpdateBranch}>
-                  <Show
-                    when={feature('update-pr-from-base-branch')}
-                    fallback={
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        disabled={busy()}
-                        onClick={() => run(() => update(props.owner, props.repo, props.pull.number, props.pull.headRefOid), 'Updating branch…')}
-                      >
-                        Update branch
-                      </button>
-                    }
-                  >
-                    {updateButtons()}
-                  </Show>
+                  {updateButtons()}
                 </Show>
               }
             />

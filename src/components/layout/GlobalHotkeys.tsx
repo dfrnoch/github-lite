@@ -36,7 +36,6 @@ function SiteHotkeys() {
     keys: 'g m',
     description: 'Go to your profile',
     group,
-    feature: 'profile-hotkey',
     handler: () => {
       void getViewer().then((v) => navigate(`/${v.login}`));
     },

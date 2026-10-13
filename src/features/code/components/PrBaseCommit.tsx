@@ -1,15 +1,13 @@
 import { createMemo, Loading, Show } from 'solid-js';
-import { feature } from '../../refined';
 import { getPullBehind } from '../refinedApi';
 
 /**
- * pr-base-commit: "It’s 3 commits behind (base commit: abc1234)" for an open
- * PR whose branch is out of date. Renders nothing otherwise (or while the
- * feature is off).
+ * "It’s 3 commits behind (base commit: abc1234)" for an open PR whose branch
+ * is out of date. Renders nothing otherwise.
  */
 export default function PrBaseCommit(props: { owner: string; repo: string; baseRef: string; baseRefOid: string; headSha: string }) {
   return (
-    <Show when={feature('pr-base-commit') && props.baseRefOid}>
+    <Show when={props.baseRefOid}>
       <Loading>
         <Notice {...props} />
       </Loading>

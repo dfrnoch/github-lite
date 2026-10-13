@@ -242,7 +242,7 @@ export async function downloadArtifact(artifact: Artifact) {
 }
 
 /**
- * github-actions-indicators: workflow file contents on the default branch,
+ * Workflow file contents on the default branch,
  * by file name (one GraphQL request for the whole directory).
  */
 export const getWorkflowSources = query(async (owner: string, repo: string): Promise<Record<string, string>> => {

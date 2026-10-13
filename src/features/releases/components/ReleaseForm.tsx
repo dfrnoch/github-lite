@@ -4,7 +4,6 @@ import Octicon from '../../../components/Octicon';
 import { MarkdownEditor, Spinner, toast, toastError } from '../../../components/ui';
 import { alertIcon, checkCircleFillIcon, packageIcon, tagIcon, trashIcon, undoIcon, uploadIcon } from '../../../icons/octicons';
 import { formatBytes } from '../../../lib/format';
-import { feature } from '../../refined';
 import { getRefNames } from '../../repo/api';
 import { ConfirmDialog } from '../../repo-settings/components/ui';
 import type { Release, ReleaseInput } from '../api';
@@ -69,8 +68,8 @@ export default function ReleaseForm(props: {
 
   const submit = async (draft: boolean) => {
     if (!tag().trim()) return toastError('Choose or create a tag');
-    // confirm-release: publishing (a new release or a draft) is hard to take back.
-    if (!draft && !isPublished() && feature('confirm-release') && !confirm('Are you sure you want to publish this release?')) return;
+    // Publishing (a new release or a draft) is hard to take back.
+    if (!draft && !isPublished() && !confirm('Are you sure you want to publish this release?')) return;
     setBusy(draft ? 'Saving draft…' : props.release ? 'Updating…' : 'Publishing…');
     try {
       const input: ReleaseInput = {

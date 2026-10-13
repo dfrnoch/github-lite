@@ -107,9 +107,9 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 
 ## Refined GitHub features
 
-- [x] Feature registry with per-feature toggles and options (`/settings/refined`, stored per browser, all on by default)
+- [x] Optional-feature registry with toggles and options (`/settings/refined`, stored per browser, all on by default) for the 41 opinionated features
 - [x] `?` keyboard-shortcut dialog listing every active shortcut; GitHub's `g …` navigation shortcuts
-- [x] All 199 Refined GitHub features resolved: 173 implemented natively, 9 already built into this app, 17 not applicable (each with a reason on the settings page)
+- [x] Refined GitHub features: 129 quality-of-life features are permanent behaviour (no toggle); 41 opinionated ones stay optional; the rest were already built in or don't apply and were dropped
 - [x] Navigation progress bar (GitHub's top loading bar)
 
 ## Quality

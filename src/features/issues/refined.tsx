@@ -112,7 +112,6 @@ const [activityStates, setActivityStates] = createSignal<Record<string, Activity
 
 /** The filter chosen for a conversation (kept per page for the session, like the extension). */
 export function activityFilter(path: string): ActivityFilter {
-  if (!feature('conversation-activity-filter')) return 'showAll';
   const chosen = activityStates()[path];
   if (chosen) return chosen;
   const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(sessionKey(path)) : null;
@@ -168,12 +167,10 @@ const REF = /(^|[\s(])((?:([\w.-]+\/[\w.-]+))?#(\d+))\b|(https?:\/\/[^\s<>()]+[^
 export function RichText(props: { text: string | null | undefined; repo?: string; links?: boolean }) {
   const parts = () => {
     const text = props.text ?? '';
-    const backticks = feature('parse-backticks');
-    const linkify = props.links !== false && !!props.repo && feature('linkify-text');
+    const linkify = props.links !== false && !!props.repo;
     const out: { kind: 'text' | 'code' | 'link'; text: string; href?: string }[] = [];
-    const segments = backticks ? text.split(/(`[^`]+`)/) : [text];
-    for (const seg of segments) {
-      if (backticks && /^`[^`]+`$/.test(seg)) {
+    for (const seg of text.split(/(`[^`]+`)/)) {
+      if (/^`[^`]+`$/.test(seg)) {
         out.push({ kind: 'code', text: seg.slice(1, -1) });
         continue;
       }

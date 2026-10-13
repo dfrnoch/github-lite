@@ -72,7 +72,7 @@ export default function CompareTagMenu(props: { owner: string; repo: string; tag
 }
 
 function TagOptions(props: { owner: string; repo: string; tag: string; filter: string; onPick: (tag: string) => void }) {
-  // Shares the request (and cache) of tag-changes-link.
+  // Shares the request (and cache) of the tag changes link.
   const tags = createMemo(() => getTagCommits(props.owner, props.repo, 100));
   const shown = createMemo(() => {
     const q = props.filter.trim().toLowerCase();

@@ -5,7 +5,6 @@ import { ellipsisIcon, historyIcon, versionsIcon } from '../../../icons/octicons
 import { formatNumber } from '../../../lib/format';
 import { encodePath } from '../../../lib/github';
 import { getPreviousFileCommit } from '../../code/refinedApi';
-import { feature } from '../../refined';
 import { getLastCommit } from '../api';
 import CommitStatusIcon from './CommitStatusIcon';
 
@@ -95,7 +94,7 @@ export default function LatestCommit(props: {
             </a>{' '}
             · <RelativeTime datetime={c().committedDate} relative />
           </span>
-          <Show when={feature('previous-version') && props.path && props.route}>
+          <Show when={props.path && props.route}>
             <Loading>
               <PreviousVersion owner={props.owner} repo={props.repo} gitRef={props.gitRef} path={props.path!} route={props.route!} />
             </Loading>
@@ -116,7 +115,7 @@ export default function LatestCommit(props: {
 }
 
 
-/** previous-version: the same file / folder at the commit before its latest change. */
+/** The same file / folder at the commit before its latest change (one extra GraphQL request). */
 function PreviousVersion(props: { owner: string; repo: string; gitRef: string; path: string; route: 'tree' | 'blob' | 'blame' }) {
   const prev = createMemo(() => getPreviousFileCommit(props.owner, props.repo, props.gitRef, props.path));
   return (

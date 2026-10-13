@@ -41,7 +41,7 @@ export interface SubjectState {
   stateReason?: string | null;
   merged?: boolean;
   isDraft?: boolean;
-  /** Opened by a bot (GitHub App) — `select-notifications`' "Bots" filter. */
+  /** Opened by a bot (GitHub App) — the "Select by" menu's "Bots" filter. */
   isBot?: boolean;
 }
 

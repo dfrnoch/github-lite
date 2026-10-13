@@ -8,7 +8,6 @@ import { updateIssue } from '../../../../features/issues/api';
 import { userHref } from '../../../../features/issues/components/Comment';
 import IssueHeader from '../../../../features/issues/components/IssueHeader';
 import { getFirstTag, getPull, getPullChecksCount, getPullDeployments, type PullDeployment, updatePull } from '../../../../features/pulls/api';
-import { feature } from '../../../../features/refined';
 import SelectPanel from '../../../../features/issues/components/SelectPanel';
 import { getRefNames } from '../../../../features/repo/api';
 import { PullContext, type PullContextValue } from '../../../../features/pulls/context';
@@ -32,10 +31,8 @@ export default function PullLayout(props: ParentProps) {
   const pullOrNull = createMemo(() => getPull(ctx.owner(), ctx.name(), number()));
   // Started together with the pull request (not after it) so they don't waterfall.
   const checks = createMemo(() => getPullChecksCount(ctx.owner(), ctx.name(), number()));
-  const deployments = createMemo(() =>
-    feature('view-last-pr-deployment') ? getPullDeployments(ctx.owner(), ctx.name(), number()).catch((): PullDeployment[] => []) : [],
-  );
-  const firstTag = createMemo(() => (feature('closing-remarks') ? getFirstTag(ctx.owner(), ctx.name(), number()).catch(() => null) : null));
+  const deployments = createMemo(() => getPullDeployments(ctx.owner(), ctx.name(), number()).catch((): PullDeployment[] => []));
+  const firstTag = createMemo(() => getFirstTag(ctx.owner(), ctx.name(), number()).catch(() => null));
   // Not a pull request: github.com redirects to the issue.
   createEffect(
     () => (pullOrNull() === null ? `${ctx.base()}/issues/${params.number}` : null),
@@ -84,7 +81,7 @@ function BranchLabel(props: { gitRef: PullRequestRef; base: PullRequestRef; dele
   );
 }
 
-/** view-last-pr-deployment: rocket button opening the latest successful deployment. */
+/** Rocket button opening the latest successful deployment. */
 function LastDeployment(props: { deployments: PullDeployment[] }) {
   const url = () => {
     const list = props.deployments.filter((d) => d.url);
@@ -111,9 +108,8 @@ function PullHeader(props: {
 }) {
   const ctx = useRepo();
   const viewer = createMemo(() => getViewer());
-  // cross-deleted-pr-branches (only closed PRs wait for this; forks with a deleted repo are known right away).
-  const headDeleted = () =>
-    feature('cross-deleted-pr-branches') && (!props.pull.head.repo || (props.pull.state === 'closed' && props.checks.headDeleted));
+  // The head branch is struck through when gone (only closed PRs wait for this; forks with a deleted repo are known right away).
+  const headDeleted = () => !props.pull.head.repo || (props.pull.state === 'closed' && props.checks.headDeleted);
   const update = useAction(updateIssue);
   const changeBase = useAction(updatePull);
   const state = () => itemState({ isPull: true, state: props.pull.state, merged: props.pull.merged, draft: props.pull.draft });
@@ -128,11 +124,9 @@ function PullHeader(props: {
         locked={props.pull.locked}
         onSave={(title) => update(ctx.owner(), ctx.name(), props.pull.number, { title })}
         actions={
-          <Show when={feature('view-last-pr-deployment')}>
-            <Loading>
-              <LastDeployment deployments={props.deployments} />
-            </Loading>
-          </Show>
+          <Loading>
+            <LastDeployment deployments={props.deployments} />
+          </Loading>
         }
       >
         <StateBadge state={state()} />
@@ -186,8 +180,8 @@ function PullHeader(props: {
           <Show when={props.pull.merged && props.pull.merged_at}>
             <RelativeTime datetime={props.pull.merged_at} />
           </Show>
-          {/* closing-remarks: the first release tag next to the merge time. */}
-          <Show when={feature('closing-remarks') && props.pull.merged}>
+          {/* The first release tag next to the merge time. */}
+          <Show when={props.pull.merged}>
             <Loading>
               <Show when={props.firstTag?.tag}>
                 {(tag) => (
@@ -246,19 +240,19 @@ function PullTabs(props: { pull: PullRequest; checks: ChecksInfo }) {
     return rest === 'commits' || rest === 'checks' || rest === 'files' ? rest : '';
   };
 
-  // pull-request-hotkeys: g ← / g → cycle through the tabs, g 1…g 4 jump to one.
+  // g ← / g → cycle through the tabs, g 1…g 4 jump to one.
   const goTo = (i: number) => {
     const tab = TABS[(i + TABS.length) % TABS.length];
     navigate(tab ? `${base()}/${tab}` : base());
   };
   const current = () => TABS.indexOf(active() as (typeof TABS)[number]);
-  const tabHotkey = { group: 'Pull requests', feature: 'pull-request-hotkeys' };
+  const tabHotkey = { group: 'Pull requests' };
   useHotkey({ ...tabHotkey, keys: 'g ArrowLeft', description: 'Go to previous PR tab', handler: () => goTo(current() - 1) });
   useHotkey({ ...tabHotkey, keys: 'g ArrowRight', description: 'Go to next PR tab', handler: () => goTo(current() + 1) });
   for (const [i, label] of ['Conversation', 'Commits', 'Checks', 'Files changed'].entries())
     useHotkey({ ...tabHotkey, keys: `g ${i + 1}`, description: `Go to PR tab ${i + 1} (${label})`, handler: () => goTo(i) });
 
-  // quick-review: v opens the review menu (from any tab), focusing its textarea.
+  // v opens the review menu (from any tab), focusing its textarea.
   const REVIEW_HASH = '#review-changes-modal';
   const reviewButton = () =>
     [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="menu"]')].find((b) => /Review changes|Finish your review/.test(b.textContent ?? ''));
@@ -274,14 +268,13 @@ function PullTabs(props: { pull: PullRequest; checks: ChecksInfo }) {
     keys: 'v',
     description: 'Review pull request',
     group: 'Pull requests',
-    feature: 'quick-review',
     handler: () => {
       if (active() !== 'files' || !openReviewMenu()) navigate(`${base()}/files${REVIEW_HASH}`);
     },
   });
   // Arriving on Files changed via "review now": open the menu once the diff has loaded.
   createEffect(
-    () => (feature('quick-review') && active() === 'files' && location.hash === REVIEW_HASH ? location.pathname : null),
+    () => (active() === 'files' && location.hash === REVIEW_HASH ? location.pathname : null),
     (path) => {
       if (!path) return;
       const started = Date.now();
@@ -294,7 +287,7 @@ function PullTabs(props: { pull: PullRequest; checks: ChecksInfo }) {
   // Opening the review menu by clicking also focuses its textarea.
   onSettled(() => {
     const onClick = (e: MouseEvent) => {
-      if (feature('quick-review') && reviewButton()?.contains(e.target as Node)) focusReviewBox();
+      if (reviewButton()?.contains(e.target as Node)) focusReviewBox();
     };
     document.addEventListener('click', onClick);
     return () => document.removeEventListener('click', onClick);
@@ -313,7 +306,7 @@ function PullTabs(props: { pull: PullRequest; checks: ChecksInfo }) {
     </a>
   );
   return (
-    <nav class={['UnderlineNav mb-4', { 'rgh-mobile-tabs-pr': feature('mobile-tabs-pr') }]} aria-label="Pull request tabs">
+    <nav class="UnderlineNav mb-4 rgh-mobile-tabs-pr" aria-label="Pull request tabs">
       <div class="UnderlineNav-body overflow-x-auto">
         <Tab tab="" icon={commentDiscussionIcon} label="Conversation" count={() => props.pull.comments + props.pull.review_comments} />
         <Tab tab="commits" icon={gitCommitIcon} label="Commits" count={() => props.pull.commits} />

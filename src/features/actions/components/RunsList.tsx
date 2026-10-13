@@ -17,7 +17,6 @@ import { encodePath } from '../../../lib/github';
 import { formatNumber, shortSha } from '../../../lib/format';
 import { getRefNames } from '../../repo/api';
 import { useRepo } from '../../repo/context';
-import { feature } from '../../refined';
 import { cancelRun, getRuns, getWorkflows, type RunFilters } from '../api';
 import { buildRunQuery, duration, isDone, parseRunQuery, RUN_EVENTS, RUN_STATUSES, runState } from '../status';
 import type { Workflow, WorkflowRun } from '../types';
@@ -275,9 +274,9 @@ export function RunTrigger(props: { run: WorkflowRun }) {
 
 function RunRow(props: { run: WorkflowRun; workflowName: string; onDelete: () => void }) {
   const ctx = useRepo();
-  // action-pr-link: runs of a PR carry ?pr= so the run page can link back to it.
+  // Runs of a PR carry ?pr= so the run page can link back to it.
   const href = () => {
-    const pr = feature('action-pr-link') ? props.run.pull_requests[0]?.number : undefined;
+    const pr = props.run.pull_requests[0]?.number;
     return `${ctx.base()}/actions/runs/${props.run.id}${pr ? `?pr=${pr}` : ''}`;
   };
   const state = () => runState(props.run.status, props.run.conclusion);
@@ -329,8 +328,8 @@ function RunRow(props: { run: WorkflowRun; workflowName: string; onDelete: () =>
         </div>
       </div>
       <div class="flex flex-col items-center -my-3">
-        {/* actions-run-removal: cancel / delete without opening the menu. */}
-        <Show when={feature('actions-run-removal') && canWrite()}>
+        {/* Cancel / delete without opening the menu. */}
+        <Show when={canWrite()}>
           <Show
             when={isDone(props.run.status)}
             fallback={

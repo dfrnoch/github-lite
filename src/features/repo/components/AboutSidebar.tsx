@@ -3,8 +3,6 @@ import { createMemo, createSignal, Errored, For, Loading, Show } from 'solid-js'
 import Octicon from '../../../components/Octicon';
 import { Avatar, Dialog, RelativeTime, toastError } from '../../../components/ui';
 import {
-  bookIcon,
-  codeOfConductIcon,
   eyeIcon,
   gearIcon,
   lawIcon,
@@ -21,7 +19,6 @@ import { compactNumber, formatNumber } from '../../../lib/format';
 import { gh } from '../../../lib/github';
 import { languageColor } from '../../../lib/languages';
 import type { Repository } from '../../../lib/types';
-import { feature } from '../../refined';
 import { tagHref } from '../../releases/versions';
 import { getCommunityFiles, getFirstCommit, getRepoContributors, getRepoOverview, type RepoContributors, type SidebarRelease } from '../api';
 
@@ -45,10 +42,8 @@ export default function AboutSidebar(props: { repo: Repository }) {
   const community = createMemo(() => getCommunityFiles(owner(), name()));
   const [editing, setEditing] = createSignal(false);
   const contributors = createMemo(() => getRepoContributors(owner(), name()));
-  const clean = () => feature('clean-repo-sidebar');
-  const shownReleases = () => (overview().releases.latest ? 1 : 0) + (overview().releases.prerelease ? 1 : 0);
 
-  const Link = (p: { icon: typeof bookIcon; href: string; children: any }) => (
+  const Link = (p: { icon: typeof starIcon; href: string; children: any }) => (
     <a class="link-muted flex items-center gap-2 mt-2" href={p.href}>
       <Octicon icon={p.icon} />
       {p.children}
@@ -58,8 +53,8 @@ export default function AboutSidebar(props: { repo: Repository }) {
   return (
     <div class="text-sm">
       <section class="pb-6 border-b border-line-muted">
-        {/* clean-repo-sidebar: the "About" heading only stays for its edit button. */}
-        <Show when={!clean() || props.repo.permissions?.admin}>
+        {/* The "About" heading only stays for its edit button. */}
+        <Show when={props.repo.permissions?.admin}>
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-base font-semibold">About</h2>
             <Show when={props.repo.permissions?.admin}>
@@ -72,7 +67,7 @@ export default function AboutSidebar(props: { repo: Repository }) {
         <Show
           when={props.repo.description || props.repo.homepage || props.repo.topics?.length}
           fallback={
-            <Show when={!clean() || props.repo.permissions?.admin}>
+            <Show when={props.repo.permissions?.admin}>
               <p class="text-fg-muted italic">No description, website, or topics provided.</p>
             </Show>
           }
@@ -104,22 +99,12 @@ export default function AboutSidebar(props: { repo: Repository }) {
           <Show when={community()}>
             {(c) => (
               <>
-                <Show when={c().files.readme && !clean()}>
-                  <Link icon={bookIcon} href={`${base()}#readme`}>
-                    Readme
-                  </Link>
-                </Show>
                 <Show when={props.repo.license}>
                   {(l) => (
                     <Link icon={lawIcon} href={c().files.license ? new URL(c().files.license!.html_url).pathname : base()}>
                       {l().spdx_id && l().spdx_id !== 'NOASSERTION' ? `${l().spdx_id} license` : l().name}
                     </Link>
                   )}
-                </Show>
-                <Show when={c().files.code_of_conduct && !clean()}>
-                  <Link icon={codeOfConductIcon} href={new URL(c().files.code_of_conduct!.html_url).pathname}>
-                    Code of conduct
-                  </Link>
                 </Show>
                 <Show when={c().files.contributing}>
                   <Link icon={peopleIcon} href={new URL(c().files.contributing!.html_url).pathname}>
@@ -145,65 +130,58 @@ export default function AboutSidebar(props: { repo: Repository }) {
         <Link icon={repoForkedIcon} href={`${base()}/forks`}>
           <strong class="text-fg">{compactNumber(props.repo.forks_count)}</strong> forks
         </Link>
-        <Show when={feature('repo-age')}>
-          <Errored fallback={null}>
-            <Loading>
-              <RepoAge owner={owner()} repo={name()} />
-            </Loading>
-          </Errored>
-        </Show>
+        <Errored fallback={null}>
+          <Loading>
+            <RepoAge owner={owner()} repo={name()} />
+          </Loading>
+        </Errored>
       </section>
 
       <Loading>
-        <Show when={!clean() || overview().releases.totalCount || props.repo.permissions?.push}>
-        <section class="py-6 border-b border-line-muted">
-          <h2 class="text-base font-semibold mb-3">
-            <a class="link-plain" href={`${base()}/releases`}>
-              Releases
-            </a>{' '}
-            <Show when={overview().releases.totalCount}>
-              <span class="Counter">{formatNumber(overview().releases.totalCount)}</span>
+        <Show when={overview().releases.totalCount || props.repo.permissions?.push}>
+          <section class="py-6 border-b border-line-muted">
+            <h2 class="text-base font-semibold mb-3">
+              <a class="link-plain" href={`${base()}/releases`}>
+                Releases
+              </a>{' '}
+              <Show when={overview().releases.totalCount}>
+                <span class="Counter">{formatNumber(overview().releases.totalCount)}</span>
+              </Show>
+            </h2>
+            <Show
+              when={overview().releases.latest || overview().releases.prerelease}
+              fallback={
+                <Show
+                  when={overview().tags}
+                  fallback={
+                    <p class="text-fg-muted">
+                      No releases published
+                      <Show when={props.repo.permissions?.push}>
+                        <br />
+                        <a href={`${base()}/releases/new`}>Create a new release</a>
+                      </Show>
+                    </p>
+                  }
+                >
+                  <a class="link-muted flex items-center gap-2" href={`${base()}/tags`}>
+                    <Octicon icon={tagIcon} />
+                    <span>
+                      <strong class="text-fg">{formatNumber(overview().tags)}</strong> {overview().tags === 1 ? 'tag' : 'tags'}
+                    </span>
+                  </a>
+                </Show>
+              }
+            >
+              <div class="flex flex-col gap-3">
+                <Show when={overview().releases.latest}>
+                  {(rel) => <SidebarReleaseLink base={base()} release={rel()} kind="latest" />}
+                </Show>
+                <Show when={overview().releases.prerelease}>
+                  {(rel) => <SidebarReleaseLink base={base()} release={rel()} kind="prerelease" />}
+                </Show>
+              </div>
             </Show>
-          </h2>
-          <Show
-            when={overview().releases.latest || overview().releases.prerelease}
-            fallback={
-              <Show
-                when={overview().tags}
-                fallback={
-                  <p class="text-fg-muted">
-                    No releases published
-                    <Show when={props.repo.permissions?.push}>
-                      <br />
-                      <a href={`${base()}/releases/new`}>Create a new release</a>
-                    </Show>
-                  </p>
-                }
-              >
-                <a class="link-muted flex items-center gap-2" href={`${base()}/tags`}>
-                  <Octicon icon={tagIcon} />
-                  <span>
-                    <strong class="text-fg">{formatNumber(overview().tags)}</strong> {overview().tags === 1 ? 'tag' : 'tags'}
-                  </span>
-                </a>
-              </Show>
-            }
-          >
-            <div class="flex flex-col gap-3">
-              <Show when={overview().releases.latest}>
-                {(rel) => <SidebarReleaseLink base={base()} release={rel()} kind="latest" />}
-              </Show>
-              <Show when={overview().releases.prerelease}>
-                {(rel) => <SidebarReleaseLink base={base()} release={rel()} kind="prerelease" />}
-              </Show>
-            </div>
-          </Show>
-          <Show when={overview().releases.totalCount > shownReleases() && !clean()}>
-            <a class="block mt-3 text-xs" href={`${base()}/releases`}>
-              + {formatNumber(overview().releases.totalCount - shownReleases())} releases
-            </a>
-          </Show>
-        </section>
+          </section>
         </Show>
 
         <Errored fallback={null}>
@@ -214,7 +192,7 @@ export default function AboutSidebar(props: { repo: Repository }) {
 
         <Show when={overview().languages.items.length}>
           <section class="py-6">
-            <h2 class={['text-base font-semibold mb-3', { 'sr-only': clean() }]}>Languages</h2>
+            <h2 class="sr-only">Languages</h2>
             <div class="flex h-2 rounded-md overflow-hidden gap-0.5 mb-2">
               <For each={overview().languages.items}>
                 {(lang) => (
@@ -329,7 +307,7 @@ const AGE_UNITS: [string, number][] = [
   ['day', 24 * 3600e3],
 ];
 
-/** repo-age: "5 years old" (age of the first commit), linking to that commit. */
+/** "5 years old" (age of the first commit), linking to that commit. */
 function RepoAge(props: { owner: string; repo: string }) {
   const first = createMemo(() => getFirstCommit(props.owner, props.repo));
   const fresh = FRESH[Math.floor(Math.random() * FRESH.length)]!;
