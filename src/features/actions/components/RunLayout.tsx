@@ -87,15 +87,17 @@ export default function RunLayout(props: { children: JSX.Element }) {
                 </a>
               </li>
             </ul>
-            <div class="NavList-heading mt-2">All jobs</div>
+            <div class="NavList-heading mt-2 flex items-center justify-between">
+              All jobs
+              {/* Acknowledges the background refresh while the run is polled, without moving the list. */}
+              <Loading fallback={null}>
+                <Show when={isPending(() => [run(), jobs()])}>
+                  <Spinner size={12} class="text-fg-muted" aria-label="Updating" />
+                </Show>
+              </Loading>
+            </div>
             <hr class="NavList-divider mt-0!" />
             <Loading fallback={<div class="px-2 text-sm text-fg-muted">Loading jobs…</div>}>
-              {/* Acknowledges the background refresh while the run is polled. */}
-              <Show when={isPending(() => [run(), jobs()])}>
-                <div class="flex items-center gap-2 px-2 pb-1 text-xs text-fg-muted">
-                  <Spinner size={12} /> Updating…
-                </div>
-              </Show>
               <ul class="NavList">
                 <For each={jobs()} keyed={(j) => j.id}>
                   {(job) => (

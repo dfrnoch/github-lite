@@ -36,7 +36,7 @@ export default function RefPickerExtras(props: { repo: Repository; gitRef: strin
 }
 
 /** 🏷 +N linking to the compare view since the latest tag (+ "Draft a new release" for pushers). */
-export function UnreleasedCommitsButton(props: { repo: Repository; withDraft?: boolean }) {
+export function UnreleasedCommitsButton(props: { repo: Repository; withDraft?: boolean; size?: 'sm' | 'md' }) {
   const state = createMemo(() => getPublishState(props.repo.owner.login, props.repo.name));
   const base = () => `/${props.repo.full_name}`;
   return (
@@ -44,7 +44,7 @@ export function UnreleasedCommitsButton(props: { repo: Repository; withDraft?: b
       {(s) => (
         <div class="BtnGroup shrink-0">
           <a
-            class="btn btn-sm px-2!"
+            class={['btn px-2!', { 'btn-sm': props.size !== 'md' }]}
             href={`${base()}/compare/${encodePath(s().latestTag!)}...${encodePath(s().defaultBranch)}`}
             title={`${unreleasedLabel(s().aheadBy)}\nsince ${abbreviate(s().latestTag!)}`}
             aria-label={`${unreleasedLabel(s().aheadBy)} since ${s().latestTag}`}
@@ -55,7 +55,7 @@ export function UnreleasedCommitsButton(props: { repo: Repository; withDraft?: b
             </Show>
           </a>
           <Show when={props.withDraft !== false && props.repo.permissions?.push}>
-            <a class="btn btn-sm px-2!" href={`${base()}/releases/new`} title="Draft a new release" aria-label="Draft a new release">
+            <a class={['btn px-2!', { 'btn-sm': props.size !== 'md' }]} href={`${base()}/releases/new`} title="Draft a new release" aria-label="Draft a new release">
               <Octicon icon={plusIcon} />
             </a>
           </Show>

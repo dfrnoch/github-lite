@@ -2,7 +2,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from '@solidjs/r
 import { defineFileRoute } from '@solidjs/router/fs';
 import { createEffect, createMemo, Match, Switch } from 'solid-js';
 import OrgOverview from '../../features/orgs/OrgOverview';
-import { getContributions, getOwnerProfile, getProfileReadme, type OrgProfile, type UserProfile as UserProfileData } from '../../features/profile/api';
+import { contributionRange, getContributions, getDayContributions, getOwnerProfile, getProfileReadme, type OrgProfile, type UserProfile as UserProfileData } from '../../features/profile/api';
 import UserProfile from '../../features/profile/UserProfile';
 
 export const route = defineFileRoute('/:owner/', {
@@ -11,9 +11,10 @@ export const route = defineFileRoute('/:owner/', {
     void getOwnerProfile(params.owner);
     const sp = new URLSearchParams(location.search);
     if (!sp.get('tab') || sp.get('tab') === 'overview') {
-      const year = Number(sp.get('from')?.slice(0, 4)) || undefined;
+      const { year, day } = contributionRange(sp.get('from'), sp.get('to'));
       void getProfileReadme(params.owner, false).catch(() => {});
-      void getContributions(params.owner, year && year > 2000 ? year : undefined).catch(() => {});
+      void getContributions(params.owner, year).catch(() => {});
+      if (day) void getDayContributions(params.owner, day).catch(() => {});
     }
   },
 });

@@ -737,7 +737,8 @@ input[type='radio'] {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 16px;
+  height: 32px;
+  padding: 0 16px;
   font-weight: 500;
   color: var(--fgColor-default);
   border: 1px solid var(--borderColor-default);
@@ -2463,4 +2464,12 @@ code.rgh-backticks {
   margin: -8px 0 16px;
   font-size: 12px;
   color: var(--fgColor-danger);
+}
+
+/* Contribution calendar: a selected day stays bright, the rest dim (like github.com). */
+.has-selection .ContributionCalendar-day:not(.is-selected) {
+  opacity: 0.35;
+}
+.ContributionCalendar-day.is-selected {
+  stroke: var(--fgColor-default) !important;
 }

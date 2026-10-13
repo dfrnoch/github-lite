@@ -125,7 +125,31 @@ export default function JobLogs(props: { jobId: string }) {
           when={job().steps?.length}
           fallback={
             <div class="px-3 py-6 text-sm" style={{ color: 'var(--log-fg-muted)' }}>
-              {done() ? 'This job has no steps.' : 'Waiting for a runner to pick up this job…'}
+              <Switch fallback="Waiting for a runner to pick up this job…">
+                <Match when={done()}>This job has no steps.</Match>
+                {/* Running: the API only lists steps once the runner reports them (github.com streams them live). */}
+                <Match when={job().status === 'in_progress' || job().runner_name}>
+                  <div class="flex items-center gap-2" style={{ color: 'var(--log-fg)' }}>
+                    <StatusIcon status="in_progress" />
+                    <span>
+                      Running
+                      <Show when={job().runner_name}>
+                        {(runner) => (
+                          <>
+                            {' '}on <span class="font-semibold">{runner()}</span>
+                          </>
+                        )}
+                      </Show>
+                    </span>
+                  </div>
+                  <p class="mt-1 ml-6">
+                    Steps appear here as the runner reports them.{' '}
+                    <a href={githubUrl()} target="_blank" rel="noreferrer">
+                      Follow the live log on github.com
+                    </a>
+                  </p>
+                </Match>
+              </Switch>
             </div>
           }
         >

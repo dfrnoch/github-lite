@@ -50,33 +50,34 @@ export default function StatusIcon(props: {
   const state = () => props.state ?? runState(props.status, props.conclusion);
   const size = () => props.size ?? 16;
   const label = () => stateLabel(state());
-  // Octicon takes a plain class string; `!` beats container rules like `.NavList-item .octicon`.
-  const iconClass = (color: string) => `${color}! shrink-0 ${props.class ?? ''}`;
+  // Octicon takes a plain class string. Colors carry `!` to beat container rules like
+  // `.NavList-item .octicon`, written out in full so UnoCSS sees (and generates) them.
+  const iconClass = (color: string) => `${color} shrink-0 ${props.class ?? ''}`;
   const Icon = (p: { icon: typeof checkCircleFillIcon; color: string }) => (
     <Octicon icon={p.icon} size={size()} class={iconClass(p.color)} aria-label={label()} />
   );
   return (
-    <Switch fallback={<Icon icon={squareFillIcon} color="text-fg-muted" />}>
+    <Switch fallback={<Icon icon={squareFillIcon} color="text-fg-muted!" />}>
       <Match when={state() === 'success'}>
-        <Icon icon={checkCircleFillIcon} color="text-fg-success" />
+        <Icon icon={checkCircleFillIcon} color="text-fg-success!" />
       </Match>
       <Match when={state() === 'failure' || state() === 'timed_out' || state() === 'startup_failure'}>
-        <Icon icon={xCircleFillIcon} color="text-fg-danger" />
+        <Icon icon={xCircleFillIcon} color="text-fg-danger!" />
       </Match>
       <Match when={state() === 'cancelled'}>
-        <Icon icon={stopIcon} color="text-fg-muted" />
+        <Icon icon={stopIcon} color="text-fg-muted!" />
       </Match>
       <Match when={state() === 'skipped'}>
-        <Icon icon={skipIcon} color="text-fg-muted" />
+        <Icon icon={skipIcon} color="text-fg-muted!" />
       </Match>
       <Match when={state() === 'action_required'}>
-        <Icon icon={alertIcon} color="text-fg-attention" />
+        <Icon icon={alertIcon} color="text-fg-attention!" />
       </Match>
       <Match when={state() === 'in_progress'}>
-        <ProgressIcon size={size()} class={iconClass('text-fg-attention')} label={label()} />
+        <ProgressIcon size={size()} class={iconClass('text-fg-attention!')} label={label()} />
       </Match>
       <Match when={state() === 'queued' || state() === 'waiting'}>
-        <Icon icon={dotFillIcon} color="text-fg-attention" />
+        <Icon icon={dotFillIcon} color="text-fg-attention!" />
       </Match>
     </Switch>
   );

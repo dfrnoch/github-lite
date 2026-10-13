@@ -1,3 +1,4 @@
+import './lib/ignore-extension-errors';
 import { Title } from '@solidjs/meta';
 import { useLocation } from '@solidjs/router';
 import { Errored, Loading, Show } from 'solid-js';

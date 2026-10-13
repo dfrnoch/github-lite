@@ -1,9 +1,10 @@
 import type { JSX } from '@solidjs/web';
 import { createMemo, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { gitCommitIcon, gitPullRequestIcon, issueOpenedIcon, repoIcon } from '../../../icons/octicons';
+import { StateIcon, itemState } from '../../../components/ui';
+import { codeReviewIcon, gitCommitIcon, gitPullRequestIcon, issueOpenedIcon, repoIcon } from '../../../icons/octicons';
 import { formatNumber, pluralize } from '../../../lib/format';
-import type { ContributionLevel, Contributions } from '../api';
+import type { ContributionLevel, Contributions, DayContributions, DayItem } from '../api';
 
 const LEVEL: Record<ContributionLevel, number> = {
   NONE: 0,
@@ -37,7 +38,13 @@ const dayLabel = (date: string, count: number) => {
 };
 
 /** GitHub's green contribution heatmap (one column per week, Sunday on top). */
-export function ContributionGraph(props: { data: Contributions }) {
+export function ContributionGraph(props: {
+  data: Contributions;
+  /** The selected day (YYYY-MM-DD): other days are dimmed. */
+  selected?: string;
+  /** Click on a day square (the selected one again clears the selection). */
+  onDay?: (date: string | undefined) => void;
+}) {
   const width = () => LEFT + props.data.weeks.length * STEP;
   const height = TOP + 7 * STEP;
   // Month labels sit over the first week that starts in that month; labels
@@ -62,7 +69,13 @@ export function ContributionGraph(props: { data: Contributions }) {
   return (
     // Narrow screens scroll; start at the most recent weeks like github.com.
     <div class="overflow-x-auto" ref={(el) => requestAnimationFrame(() => (el.scrollLeft = el.scrollWidth))}>
-      <svg width={width()} height={height} class="block mx-auto text-xs" role="img" aria-label="Contribution graph">
+      <svg
+        width={width()}
+        height={height}
+        class={['block mx-auto text-xs', { 'has-selection': !!props.selected }]}
+        role="img"
+        aria-label="Contribution graph"
+      >
         <For each={monthLabels()}>
           {(m) => (
             <text x={m.x} y={12} class="fill-fg">
@@ -91,8 +104,10 @@ export function ContributionGraph(props: { data: Contributions }) {
                     ry={2}
                     stroke-width={1}
                     style={cellStyle(LEVEL[day.level])}
+                    class={['ContributionCalendar-day', { 'is-selected': props.selected === day.date, 'cursor-pointer': !!props.onDay }]}
                     data-date={day.date}
                     data-level={LEVEL[day.level]}
+                    onClick={() => props.onDay?.(props.selected === day.date ? undefined : day.date)}
                   >
                     <title>{dayLabel(day.date, day.count)}</title>
                   </rect>
@@ -126,6 +141,8 @@ function Legend() {
 export default function ContributionCalendar(props: {
   data: Contributions;
   year?: number;
+  selected?: string;
+  onDay?: (date: string | undefined) => void;
   /** Link for a year in the picker (`undefined` = last year). */
   yearHref: (year?: number) => string;
   /** Rendered under the calendar, left of the year picker (activity summary). */
@@ -138,7 +155,7 @@ export default function ContributionCalendar(props: {
           {formatNumber(props.data.total)} contributions in {props.year ? props.year : 'the last year'}
         </h2>
         <div class="Box px-4 pt-4 pb-3">
-          <ContributionGraph data={props.data} />
+          <ContributionGraph data={props.data} selected={props.selected} onDay={props.onDay} />
           <div class="flex items-center justify-between mt-2 ml-8 flex-wrap gap-2">
             <a
               class="link-muted text-xs"
@@ -282,6 +299,135 @@ export function ContributionActivity(props: { data: Contributions }) {
                 <Octicon icon={gitPullRequestIcon} />
               </span>
               <h4 class="text-base mt-1">Reviewed {pluralize(a().reviews, 'pull request')}</h4>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+/** Long date like github.com's day heading: "October 1, 2026". */
+const longDate = (date: string) =>
+  new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+/** "Contribution activity" for one selected calendar day: commits per repository and the items themselves. */
+export function DayActivity(props: { login: string; date: string; data: DayContributions | null; clearHref: string }) {
+  const d = () => props.data;
+  const empty = () => {
+    const x = d();
+    return !x || (!x.totalCommits && !x.pulls.length && !x.issues.length && !x.reviews.length && !x.created.length);
+  };
+  const next = () => {
+    const t = new Date(`${props.date}T00:00:00Z`);
+    t.setUTCDate(t.getUTCDate() + 1);
+    return t.toISOString().slice(0, 10);
+  };
+  const Icon = (p: { icon: typeof repoIcon }) => (
+    <span class="w-8 h-8 shrink-0 rounded-full bg-canvas-muted border border-line-muted flex items-center justify-center text-fg-muted">
+      <Octicon icon={p.icon} />
+    </span>
+  );
+  const Items = (p: { items: DayItem[]; isPull: boolean }) => (
+    <ul>
+      <For each={p.items}>
+        {(it) => (
+          <li class="flex items-start gap-2 py-1 text-sm min-w-0">
+            <StateIcon
+              class="mt-0.5 shrink-0"
+              state={itemState({ isPull: p.isPull, state: it.state, stateReason: it.stateReason, merged: it.merged, draft: it.draft })}
+            />
+            <a class="link-plain font-semibold truncate" href={`/${it.repo}/${p.isPull ? 'pull' : 'issues'}/${it.number}`} title={it.title}>
+              {it.title}
+            </a>
+            <span class="text-fg-muted shrink-0 truncate max-w-[40%]">
+              {it.repo}#{it.number}
+            </span>
+          </li>
+        )}
+      </For>
+    </ul>
+  );
+  return (
+    <div class="mt-6">
+      <div class="flex items-baseline justify-between gap-2 mb-2">
+        <h2 class="text-base font-normal">Contribution activity</h2>
+        <a class="text-xs link-muted" href={props.clearHref}>
+          Show all activity
+        </a>
+      </div>
+      <h3 class="text-xs font-semibold py-2 border-b border-line-muted">{longDate(props.date)}</h3>
+      <Show when={!empty()} fallback={<p class="text-fg-muted text-sm py-4">{props.login} had no public activity on this day.</p>}>
+        <div class="divide-y divide-line-muted">
+          <Show when={d()!.totalCommits}>
+            <div class="flex gap-3 py-4">
+              <Icon icon={gitCommitIcon} />
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base mt-1 mb-2">
+                  Created {pluralize(d()!.totalCommits, 'commit')} in {pluralize(d()!.commits.length, 'repository', 'repositories')}
+                </h4>
+                <ul>
+                  <For each={d()!.commits}>
+                    {(c) => (
+                      <li class="flex items-center gap-2 py-1 text-sm">
+                        <a class="truncate" href={`/${c.repo}`}>
+                          {c.repo}
+                        </a>
+                        <a
+                          class="link-muted text-xs whitespace-nowrap"
+                          href={`/${c.repo}/commits?author=${encodeURIComponent(props.login)}&since=${props.date}&until=${next()}`}
+                        >
+                          {pluralize(c.count, 'commit')}
+                        </a>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </div>
+            </div>
+          </Show>
+          <Show when={d()!.created.length}>
+            <div class="flex gap-3 py-4">
+              <Icon icon={repoIcon} />
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base mt-1 mb-2">Created {pluralize(d()!.created.length, 'repository', 'repositories')}</h4>
+                <ul>
+                  <For each={d()!.created}>
+                    {(repo) => (
+                      <li class="py-1 text-sm">
+                        <a href={`/${repo}`}>{repo}</a>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </div>
+            </div>
+          </Show>
+          <Show when={d()!.pulls.length}>
+            <div class="flex gap-3 py-4">
+              <Icon icon={gitPullRequestIcon} />
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base mt-1 mb-2">Opened {pluralize(d()!.pulls.length, 'pull request')}</h4>
+                <Items items={d()!.pulls} isPull />
+              </div>
+            </div>
+          </Show>
+          <Show when={d()!.issues.length}>
+            <div class="flex gap-3 py-4">
+              <Icon icon={issueOpenedIcon} />
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base mt-1 mb-2">Opened {pluralize(d()!.issues.length, 'issue')}</h4>
+                <Items items={d()!.issues} isPull={false} />
+              </div>
+            </div>
+          </Show>
+          <Show when={d()!.reviews.length}>
+            <div class="flex gap-3 py-4">
+              <Icon icon={codeReviewIcon} />
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base mt-1 mb-2">Reviewed {pluralize(d()!.reviews.length, 'pull request')}</h4>
+                <Items items={d()!.reviews} isPull />
+              </div>
             </div>
           </Show>
         </div>

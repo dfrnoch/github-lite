@@ -445,6 +445,19 @@ export interface Contributions {
   };
 }
 
+/**
+ * What a profile's `?from=&to=` selects: a calendar year (`from=Y-01-01&to=Y-12-31`)
+ * or a single day (`from=D&to=D`, a clicked square). A day within the last
+ * year keeps the rolling last-year calendar; older days show their year.
+ */
+export function contributionRange(from?: string | null, to?: string | null): { year?: number; day?: string } {
+  const day = from && from === to && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
+  const y = Number(from?.slice(0, 4));
+  if (!(y > 2000)) return { day };
+  if (day && Date.now() - new Date(`${day}T00:00:00Z`).getTime() < 364 * 86_400_000) return { day };
+  return { year: y, day };
+}
+
 /** Contribution calendar for a user — the last year, or a calendar year. */
 export const getContributions = query(async (login: string, year?: number): Promise<Contributions | null> => {
   const range = year ? { from: `${year}-01-01T00:00:00Z`, to: `${year}-12-31T23:59:59Z` } : { from: null, to: null };
@@ -487,6 +500,66 @@ export const getContributions = query(async (login: string, year?: number): Prom
     },
   };
 }, 'contributions');
+
+export interface DayItem {
+  repo: string;
+  number: number;
+  title: string;
+  state: string;
+  stateReason?: string | null;
+  merged?: boolean;
+  draft?: boolean;
+}
+
+export interface DayContributions {
+  commits: { repo: string; count: number }[];
+  totalCommits: number;
+  pulls: DayItem[];
+  issues: DayItem[];
+  reviews: DayItem[];
+  created: string[];
+}
+
+/** One day's contributions in detail — the "Contribution activity" for a clicked calendar square. */
+export const getDayContributions = query(async (login: string, date: string): Promise<DayContributions | null> => {
+  const data = await gql<any>(
+    `query($login:String!,$from:DateTime!,$to:DateTime!){user(login:$login){contributionsCollection(from:$from,to:$to){
+      totalCommitContributions
+      commitContributionsByRepository(maxRepositories:25){repository{nameWithOwner} contributions{totalCount}}
+      pullRequestContributions(first:25){nodes{pullRequest{number title state merged isDraft repository{nameWithOwner}}}}
+      issueContributions(first:25){nodes{issue{number title state stateReason repository{nameWithOwner}}}}
+      pullRequestReviewContributions(first:25){nodes{pullRequest{number title state merged isDraft repository{nameWithOwner}}}}
+      repositoryContributions(first:25){nodes{repository{nameWithOwner}}}
+    }}}`,
+    // Calendar days are UTC dates.
+    { login, from: `${date}T00:00:00Z`, to: `${date}T23:59:59Z` },
+  );
+  const c = data.user?.contributionsCollection;
+  if (!c) return null;
+  const item = (x: any): DayItem => ({
+    repo: x.repository.nameWithOwner,
+    number: x.number,
+    title: x.title,
+    state: x.state,
+    stateReason: x.stateReason,
+    merged: x.merged,
+    draft: x.isDraft,
+  });
+  // One entry per pull request, even when reviewed several times that day.
+  const reviews = new Map<string, DayItem>();
+  for (const n of c.pullRequestReviewContributions.nodes) {
+    const pr = item(n.pullRequest);
+    reviews.set(`${pr.repo}#${pr.number}`, pr);
+  }
+  return {
+    commits: c.commitContributionsByRepository.map((x: any) => ({ repo: x.repository.nameWithOwner, count: x.contributions.totalCount })),
+    totalCommits: c.totalCommitContributions,
+    pulls: c.pullRequestContributions.nodes.map((n: any) => item(n.pullRequest)),
+    issues: c.issueContributions.nodes.map((n: any) => item(n.issue)),
+    reviews: [...reviews.values()],
+    created: c.repositoryContributions.nodes.map((n: any) => n.repository.nameWithOwner),
+  };
+}, 'day-contributions');
 
 /* ------------------------------------------------------------------ */
 /* Stars, followers, following                                          */

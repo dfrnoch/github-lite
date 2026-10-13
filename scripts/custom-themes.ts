@@ -167,6 +167,9 @@ export function buildPaletteCss(palette: Palette, primerThemesDir: string) {
     '--fgColor-default': c.fg,
     '--fgColor-muted': c.muted,
     '--borderColor-default': c.border,
+    // Empty contribution squares: the recolored Primer value sits too close to
+    // the canvas on very dark (or very light) palettes to read as a grid.
+    '--contribution-default-bgColor-0': `color-mix(in oklab, ${c.surface} 60%, ${c.border})`,
     '--prettylights-syntax-keyword': s.keyword,
     '--prettylights-syntax-string': s.string,
     '--prettylights-syntax-constant': s.constant,

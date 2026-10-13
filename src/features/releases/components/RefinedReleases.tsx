@@ -56,9 +56,10 @@ export function SubscribeReleases() {
         <Show
           when={state().viewerSubscription !== 'SUBSCRIBED'}
           fallback={
-            <button type="button" class="btn" disabled title="You are watching all activity, releases included. You can change your subscription from the repository home.">
-              <Octicon icon={eyeIcon} /> Subscribed
-            </button>
+            // A status, not an action: styled like the other buttons, not greyed out.
+            <span class="btn cursor-default! hover:bg-[var(--button-default-bgColor-rest)]!" title="You are watching all activity, releases included. You can change your subscription from the repository home.">
+              <Octicon icon={eyeIcon} class="text-fg-muted" /> Subscribed
+            </span>
           }
         >
           <Dropdown

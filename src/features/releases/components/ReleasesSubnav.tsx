@@ -40,7 +40,7 @@ export function ReleasesActions(props: { query?: string; unreleased?: boolean; o
       <Show when={props.unreleased}>
         <Errored fallback={null}>
           <Loading>
-            <UnreleasedCommitsButton repo={ctx.repo()} withDraft={false} />
+            <UnreleasedCommitsButton repo={ctx.repo()} withDraft={false} size="md" />
           </Loading>
         </Errored>
       </Show>

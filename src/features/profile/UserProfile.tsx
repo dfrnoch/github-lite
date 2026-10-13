@@ -1,11 +1,13 @@
 import { Title } from '@solidjs/meta';
-import { useLocation, useSearchParams } from '@solidjs/router';
+import { useLocation, useNavigate, useSearchParams } from '@solidjs/router';
 import { createMemo, For, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../components/Octicon';
 import { Blankslate, Markdown, PageSpinner, Pagination, pageHref } from '../../components/ui';
 import { bookIcon, packageIcon, pencilIcon, repoIcon, starIcon, tableIcon } from '../../icons/octicons';
 import {
+  contributionRange,
   getContributions,
+  getDayContributions,
   getFollows,
   getOwnerRepos,
   getProfileReadme,
@@ -13,7 +15,7 @@ import {
   getStarredLanguages,
   type UserProfile as UserProfileData,
 } from './api';
-import ContributionCalendar, { ContributionActivity } from './components/ContributionCalendar';
+import ContributionCalendar, { ContributionActivity, DayActivity } from './components/ContributionCalendar';
 import { PackagesList, ProjectsList } from './components/LinkOutLists';
 import PinnedCard from './components/PinnedCard';
 import { ProfileTabs } from './components/ProfileTabs';
@@ -90,13 +92,16 @@ export default function UserProfile(props: { user: UserProfileData }) {
 /* ------------------------------ Overview ------------------------------ */
 
 function Overview(props: { user: UserProfileData }) {
-  const [sp] = useSearchParams<{ from?: string }>();
-  const year = () => {
-    const y = Number(sp.from?.slice(0, 4));
-    return y > 2000 ? y : undefined;
-  };
+  const [sp] = useSearchParams<{ from?: string; to?: string }>();
+  const navigate = useNavigate();
+  const range = () => contributionRange(sp.from, sp.to);
+  /** A single selected day: `?from=D&to=D` (github.com's URL for a clicked square). */
+  const day = () => range().day;
+  const year = () => range().year;
+  const yearHref = (y?: number) => (y ? `/${props.user.login}?tab=overview&from=${y}-01-01&to=${y}-12-31` : `/${props.user.login}`);
   const readme = createMemo(() => getProfileReadme(props.user.login, false));
   const contributions = createMemo(() => getContributions(props.user.login, year()));
+  const dayData = createMemo(() => (day() ? getDayContributions(props.user.login, day()!) : null));
   const pinned = () => (props.user.pinned.length ? props.user.pinned : props.user.popular.map((r) => ({ kind: 'repo' as const, ...r })));
 
   return (
@@ -149,9 +154,17 @@ function Overview(props: { user: UserProfileData }) {
               <ContributionCalendar
                 data={c()}
                 year={year()}
-                yearHref={(y) => (y ? `/${props.user.login}?tab=overview&from=${y}-01-01&to=${y}-12-31` : `/${props.user.login}`)}
+                yearHref={yearHref}
+                selected={day()}
+                onDay={(d) => navigate(d ? `/${props.user.login}?tab=overview&from=${d}&to=${d}` : yearHref(year()), { scroll: false })}
               >
-                <ContributionActivity data={c()} />
+                <Show when={day()} fallback={<ContributionActivity data={c()} />}>
+                  {(d) => (
+                    <Loading fallback={<div class="mt-6 Box h-24 Skeleton" />}>
+                      <DayActivity login={props.user.login} date={d()} data={dayData()} clearHref={yearHref(year())} />
+                    </Loading>
+                  )}
+                </Show>
               </ContributionCalendar>
             </>
           )}
