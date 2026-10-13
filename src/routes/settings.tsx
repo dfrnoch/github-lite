@@ -18,6 +18,7 @@ import {
   personIcon,
   reportIcon,
   shieldLockIcon,
+  zapIcon,
 } from '../icons/octicons';
 
 /** Layout for /settings/*: account header + side navigation, like github.com/settings. */
@@ -89,6 +90,7 @@ function SettingsNav() {
       <Item href="/settings/profile" icon={personIcon} label="Public profile" />
       <Item href="/settings/admin" icon={gearIcon} label="Account" />
       <Item href="/settings/appearance" icon={paintbrushIcon} label="Appearance" />
+      <Item href="/settings/refined" icon={zapIcon} label="Refined GitHub" />
       <Item href="/settings/notifications" icon={bellIcon} label="Notifications" />
       <li role="presentation">
         <hr class="NavList-divider" />

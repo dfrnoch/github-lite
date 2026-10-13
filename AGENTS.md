@@ -56,3 +56,12 @@ A lightweight GitHub client. Routes mirror github.com URLs exactly (swap the hos
 - Dev server: `npx vite --port 3000` (check `curl -s localhost:3000 >/dev/null` first; one shared instance is usually already running).
 - Screenshot harness: `cd /tmp/shot-tool && GH_TOKEN=$(gh auth token) WAIT=2500 node app.mjs /tmp/appshots /owner/repo/path …` writes PNGs and prints console warnings/errors (Solid diagnostics included). `node eval.mjs <path> '<js expr>'` evaluates in the page.
 - **Never perform mutating API calls against real GitHub data while testing** (no creating/editing/deleting anything) — verify mutation UIs up to the submit button, and check request shapes against the REST docs.
+
+### Refined GitHub features
+
+Refined GitHub's features are reimplemented natively, each behind a toggle on `/settings/refined`.
+
+- Registry: `src/features/refined/registry/<area>.ts` (one file per owning area). Each entry has `status`: `todo` → set to `done` when implemented (add `note` for caveats, `options` for settings, `hotkeys` for shortcuts), `native` when this app already behaves that way (with a `note`), `na` when it can't/shouldn't apply (with a `note`). `defaultEnabled: false` only for features that would be surprising on by default.
+- Gate behaviour with `feature('id')` from `src/features/refined` (reactive — read it in JSX/memos/handlers, never in a component body). Options: `featureOption<T>('id', 'key')`.
+- Keyboard shortcuts: `useHotkey({ keys: 'g m', description, group, feature: 'id', handler })` from `src/lib/hotkeys.ts` — they appear in the `?` dialog automatically and are inactive while their feature is off.
+- Read the original implementation for behaviour details when useful: `gh api repos/refined-github/refined-github/contents/source/features/<id>.tsx -H "Accept: application/vnd.github.raw"`.

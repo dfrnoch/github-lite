@@ -9,6 +9,7 @@ import './styles/primer.css';
 import 'virtual:uno.css';
 import AppHeader from './components/layout/AppHeader';
 import Footer from './components/layout/Footer';
+import ShortcutsDialog from './components/layout/ShortcutsDialog';
 import { ErrorView, PageSpinner, Toasts } from './components/ui';
 import { isSignedIn } from './lib/auth';
 import LoginPage from './routes/login/index';
@@ -38,6 +39,7 @@ export default function App() {
                 </Errored>
               </main>
               <Footer />
+              <ShortcutsDialog />
             </Show>
             <Toasts />
           </>
