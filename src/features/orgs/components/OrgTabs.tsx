@@ -1,6 +1,7 @@
 import { createMemo, Loading } from 'solid-js';
 import { gearIcon, homeIcon, packageIcon, peopleIcon, personIcon, repoIcon, tableIcon } from '../../../icons/octicons';
 import { ProfileTabs } from '../../profile/components/ProfileTabs';
+import { orgReposHref } from '../../profile/links';
 import { getOrgMeta, type OrgMeta } from '../api';
 
 export type OrgTab = 'overview' | 'repositories' | 'projects' | 'packages' | 'teams' | 'people' | 'settings';
@@ -8,7 +9,7 @@ export type OrgTab = 'overview' | 'repositories' | 'projects' | 'packages' | 'te
 function tabsFor(org: OrgMeta | undefined, login: string) {
   const items = [
     { tab: 'overview', label: 'Overview', icon: homeIcon, href: `/${login}` },
-    { tab: 'repositories', label: 'Repositories', icon: repoIcon, href: `/orgs/${login}/repositories`, count: org?.repositories },
+    { tab: 'repositories', label: 'Repositories', icon: repoIcon, href: orgReposHref(login), count: org?.repositories },
     { tab: 'projects', label: 'Projects', icon: tableIcon, href: `/orgs/${login}/projects`, count: org?.projects },
     { tab: 'packages', label: 'Packages', icon: packageIcon, href: `/orgs/${login}/packages` },
   ];

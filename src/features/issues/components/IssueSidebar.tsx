@@ -3,6 +3,7 @@ import type { JSX } from '@solidjs/web';
 import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, Dialog, IssueLabel, itemState, StateIcon, toastError } from '../../../components/ui';
+import { hexToVars } from '../../../components/ui/IssueLabel';
 import {
   arrowRightIcon,
   bellIcon,
@@ -13,13 +14,16 @@ import {
   pinIcon,
   trashIcon,
   unlockIcon,
+  xIcon,
 } from '../../../icons/octicons';
+import { feature } from '../../refined';
 import { getViewer } from '../../user/api';
 import {
   deleteIssue,
   getAssignableUsers,
   getMilestones,
   getRepoLabels,
+  removeLabel,
   setLocked,
   setPinned,
   setSubscription,
@@ -30,6 +34,7 @@ import {
 } from '../api';
 import type { IssueBase, LinkedPull, ViewerPermission } from '../types';
 import { canTriage } from '../types';
+import { RichText } from '../refined';
 import { userHref } from './Comment';
 import SelectPanel from './SelectPanel';
 
@@ -41,14 +46,34 @@ export function SidebarSection(props: {
   canEdit?: boolean;
   children: JSX.Element;
   last?: boolean;
+  /**
+   * The section has nothing to show (clean-conversation-sidebar hides it, or
+   * just its "None yet" text when it can be edited).
+   */
+  empty?: boolean;
+  /** Hide the heading too when not editable (clean-conversation-sidebar, labels). */
+  bare?: boolean;
 }) {
+  const clean = () => feature('clean-conversation-sidebar');
+  const editable = () => !!(props.canEdit && props.picker);
   return (
-    <div class={['py-4', { 'border-b border-line-muted': !props.last }]}>
-      <Show when={props.canEdit && props.picker} fallback={<h3 class="text-xs font-semibold text-fg-muted mb-2">{props.title}</h3>}>
-        {props.picker}
-      </Show>
-      <div class="text-xs">{props.children}</div>
-    </div>
+    <Show when={!(clean() && props.empty && !editable())}>
+      <div class={['py-4', { 'border-b border-line-muted': !props.last, 'rgh-clean-sidebar pb-2!': clean() && !!props.empty }]}>
+        <Show
+          when={editable()}
+          fallback={
+            <Show when={!(clean() && props.bare)}>
+              <h3 class="text-xs font-semibold text-fg-muted mb-2">{props.title}</h3>
+            </Show>
+          }
+        >
+          {props.picker}
+        </Show>
+        <Show when={!(clean() && props.empty)}>
+          <div class="text-xs">{props.children}</div>
+        </Show>
+      </div>
+    </Show>
   );
 }
 
@@ -85,6 +110,7 @@ export interface IssueSidebarProps {
 /** The right column of an issue / PR: assignees, labels, type, projects, milestone, development, notifications, participants. */
 export default function IssueSidebar(props: IssueSidebarProps) {
   const update = useAction(updateIssue);
+  const dropLabel = useAction(removeLabel);
   const viewer = createMemo(() => getViewer());
   const editable = () => canTriage(props.permission);
   const apply = async (patch: IssuePatch) => {
@@ -103,6 +129,7 @@ export default function IssueSidebar(props: IssueSidebarProps) {
       <SidebarSection
         title="Assignees"
         canEdit={editable()}
+        empty={!props.item.assignees.nodes.length && !editable()}
         picker={
             <SelectPanel
               class="block"
@@ -131,10 +158,10 @@ export default function IssueSidebar(props: IssueSidebarProps) {
           when={props.item.assignees.nodes.length}
           fallback={
             <span class="text-fg-muted">
-              No one{' '}
+              {feature('clean-conversation-sidebar') && editable() ? '' : 'No one '}
               <Show when={editable()} fallback="assigned">
                 <Loading fallback="assigned">
-                  —{' '}
+                  {feature('clean-conversation-sidebar') ? '' : '— '}
                   <button type="button" class="btn-link text-xs" onClick={() => apply({ assignees: [viewer().login] })}>
                     assign yourself
                   </button>
@@ -161,6 +188,8 @@ export default function IssueSidebar(props: IssueSidebarProps) {
       <SidebarSection
         title="Labels"
         canEdit={editable() || props.item.viewerCanLabel}
+        empty={!props.item.labels.nodes.length}
+        bare
         picker={
             <SelectPanel
               class="block"
@@ -193,12 +222,41 @@ export default function IssueSidebar(props: IssueSidebarProps) {
           <div class="flex flex-wrap gap-1">
             <For each={props.item.labels.nodes}>
               {(l) => (
-                <IssueLabel
-                  name={l.name}
-                  color={l.color}
-                  title={l.description}
-                  href={`/${props.owner}/${props.repo}/${props.isPull ? 'pulls' : 'issues'}?q=${encodeURIComponent(`label:"${l.name}"`)}`}
-                />
+                <Show
+                  when={feature('quick-label-removal') && (editable() || props.item.viewerCanLabel)}
+                  fallback={
+                    <IssueLabel
+                      name={l.name}
+                      color={l.color}
+                      title={l.description}
+                      href={`/${props.owner}/${props.repo}/${props.isPull ? 'pulls' : 'issues'}?q=${encodeURIComponent(`label:"${l.name}"`)}`}
+                    />
+                  }
+                >
+                  <span class="IssueLabel rgh-quick-label-removal pr-0.5!" style={hexToVars(l.color)} title={l.description ?? l.name}>
+                    <a
+                      class="text-inherit! no-underline!"
+                      href={`/${props.owner}/${props.repo}/${props.isPull ? 'pulls' : 'issues'}?q=${encodeURIComponent(`label:"${l.name}"`)}`}
+                    >
+                      {l.name}
+                    </a>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center ml-0.5 w-4 h-4 rounded-full bg-transparent border-0 p-0 text-inherit cursor-pointer opacity-70 hover:opacity-100"
+                      aria-label={`Remove label ${l.name}`}
+                      title={`Remove label ${l.name}`}
+                      onClick={async () => {
+                        try {
+                          await dropLabel(props.owner, props.repo, props.number, l.name);
+                        } catch (e) {
+                          toastError(e);
+                        }
+                      }}
+                    >
+                      <Octicon icon={xIcon} size={12} />
+                    </button>
+                  </span>
+                </Show>
               )}
             </For>
           </div>
@@ -206,7 +264,7 @@ export default function IssueSidebar(props: IssueSidebarProps) {
       </SidebarSection>
 
       <Show when={!props.isPull}>
-        <SidebarSection title="Type">
+        <SidebarSection title="Type" empty={!props.issueType}>
           <Show when={props.issueType} fallback={<span class="text-fg-muted">No type</span>}>
             {(t) => (
               <span class="Label" title={t().description ?? undefined}>
@@ -217,15 +275,22 @@ export default function IssueSidebar(props: IssueSidebarProps) {
         </SidebarSection>
       </Show>
 
-      <SidebarSection title="Projects">
-        <Loading fallback={<span class="text-fg-muted">…</span>}>
+      <Loading
+        fallback={
+          <SidebarSection title="Projects">
+            <span class="text-fg-muted">…</span>
+          </SidebarSection>
+        }
+      >
+        <SidebarSection title="Projects" empty={!props.projects?.length}>
           <Projects items={props.projects} />
-        </Loading>
-      </SidebarSection>
+        </SidebarSection>
+      </Loading>
 
       <SidebarSection
         title="Milestone"
         canEdit={editable()}
+        empty={!props.item.milestone}
         picker={
             <SelectPanel
               class="block"
@@ -264,8 +329,8 @@ export default function IssueSidebar(props: IssueSidebarProps) {
         </Show>
       </SidebarSection>
 
-      <SidebarSection title="Development">
-        <Show when={props.isPull}>
+      <SidebarSection title="Development" empty={!props.linked.length && !props.branches?.length}>
+        <Show when={props.isPull && !feature('clean-conversation-sidebar')}>
           <p class="text-fg-muted mb-1">Successfully merging this pull request may close these issues.</p>
         </Show>
         <Show
@@ -291,7 +356,7 @@ export default function IssueSidebar(props: IssueSidebarProps) {
                     state={itemState({ isPull: !props.isPull, state: l.state, stateReason: l.stateReason, merged: l.merged, draft: l.isDraft })}
                   />
                   <a class="link-plain font-semibold break-words min-w-0" href={new URL(l.url).pathname}>
-                    {l.title}
+                    <RichText text={l.title} links={false} />
                     <span class="text-fg-muted font-normal">
                       {' '}
                       {l.repository.nameWithOwner === `${props.owner}/${props.repo}` ? '' : l.repository.nameWithOwner}#{l.number}

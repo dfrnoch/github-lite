@@ -7,6 +7,7 @@ import { getMilestones } from '../../../../features/issues/api';
 import { quote } from '../../../../features/issues/query';
 import IssuesSubnav from '../../../../features/issues/components/IssuesSubnav';
 import { DueDate, MilestoneActions, percentComplete, ProgressBar } from '../../../../features/issues/components/Milestones';
+import { RichText } from '../../../../features/issues/refined';
 import { useRepo } from '../../../../features/repo/context';
 import { checkIcon, milestoneIcon, triangleDownIcon } from '../../../../icons/octicons';
 import { formatNumber } from '../../../../lib/format';
@@ -111,7 +112,9 @@ export default function MilestonesPage() {
                     </span>
                   </div>
                   <Show when={m.description}>
-                    <p class="mt-2 text-fg-muted whitespace-pre-line break-words">{m.description}</p>
+                    <p class="mt-2 text-fg-muted whitespace-pre-line break-words">
+                      <RichText text={m.description} repo={ctx.fullName()} />
+                    </p>
                   </Show>
                 </div>
                 <div class="w-full md:w-[420px] shrink-0">

@@ -5,10 +5,23 @@ import Octicon from '../../../../components/Octicon';
 import { Avatar, Blankslate, Dropdown, PageSpinner } from '../../../../components/ui';
 import { getCommitHistory, getRecentAuthors } from '../../../../features/code/api';
 import CommitList from '../../../../features/code/components/CommitList';
+import { DefaultBranchButton } from '../../../../features/code/refined';
+import { getBranchStatus, getCommitTags } from '../../../../features/code/refinedApi';
+import { feature } from '../../../../features/refined';
 import { resolveRefPath } from '../../../../features/repo/api';
 import RefPicker from '../../../../features/repo/components/RefPicker';
 import { useRepo } from '../../../../features/repo/context';
-import { calendarIcon, checkIcon, gitCommitIcon, peopleIcon, triangleDownIcon } from '../../../../icons/octicons';
+import {
+  calendarIcon,
+  checkIcon,
+  gitCommitIcon,
+  gitMergeIcon,
+  gitPullRequestClosedIcon,
+  gitPullRequestDraftIcon,
+  gitPullRequestIcon,
+  peopleIcon,
+  triangleDownIcon,
+} from '../../../../icons/octicons';
 import { encodePath } from '../../../../lib/github';
 
 type Search = { author?: string; since?: string; until?: string; after?: string; before?: string };
@@ -34,6 +47,13 @@ export default function CommitsPage() {
     }),
   );
   const location = useLocation();
+  /** tags-on-commits-list: tags for the commits on this page (fetched only while the feature is on). */
+  const commitTags = createMemo(() => {
+    const commits = history()?.commits;
+    const last = commits?.[commits.length - 1];
+    if (!feature('tags-on-commits-list') || !last) return {} as Record<string, string[]>;
+    return getCommitTags(ctx.owner(), ctx.name(), last.oid).catch(() => ({}) as Record<string, string[]>);
+  });
   const pageHref = (key: 'after' | 'before', cursor: string | null) => {
     const sp = new URLSearchParams(location.search);
     sp.delete('after');
@@ -43,6 +63,9 @@ export default function CommitsPage() {
     return `${location.pathname}${qs ? `?${qs}` : ''}`;
   };
   const crumbs = () => resolved().path.split('/').filter(Boolean);
+  /** same-branch-author-commits: author links filter this branch + path instead of opening the profile. */
+  const authorHref = (login: string) => withParams(location, { author: login });
+  const isBranch = () => resolved().kind === 'branch' && resolved().ref !== ctx.repo().default_branch;
 
   return (
     <div class="container-xl px-4 md:px-6 lg:px-8 py-6">
@@ -72,6 +95,11 @@ export default function CommitsPage() {
         </Show>
       </h1>
       <div class="flex flex-wrap items-center gap-2 mb-4">
+        <DefaultBranchButton
+          gitRef={resolved().ref}
+          defaultBranch={ctx.repo().default_branch}
+          href={`${ctx.base()}/commits/${encodePath(ctx.repo().default_branch)}${resolved().path ? `/${encodePath(resolved().path)}` : ''}`}
+        />
         <RefPicker
           owner={ctx.owner()}
           repo={ctx.name()}
@@ -79,6 +107,11 @@ export default function CommitsPage() {
           defaultBranch={ctx.repo().default_branch}
           hrefFor={(ref) => `${ctx.base()}/commits/${encodePath(ref)}${resolved().path ? `/${encodePath(resolved().path)}` : ''}`}
         />
+        <Show when={feature('list-prs-for-branch') && isBranch()}>
+          <Loading>
+            <BranchPullButton branch={resolved().ref} />
+          </Loading>
+        </Show>
         <div class="flex-1" />
         <AuthorFilter gitRef={resolved().ref} current={search.author} />
         <DateFilter since={search.since} until={search.until} />
@@ -93,7 +126,13 @@ export default function CommitsPage() {
             </Blankslate>
           }
         >
-          <CommitList commits={history()!.commits} base={ctx.base()} browsePath={resolved().path ? encodePath(resolved().path) : undefined} />
+          <CommitList
+            commits={history()!.commits}
+            base={ctx.base()}
+            browsePath={resolved().path ? encodePath(resolved().path) : undefined}
+            authorHref={feature('same-branch-author-commits') ? authorHref : undefined}
+            tags={feature('tags-on-commits-list') ? commitTags() : undefined}
+          />
           <div class="flex justify-center my-4">
             <div class="BtnGroup">
               <Show
@@ -270,5 +309,28 @@ function DateFilter(props: { since?: string; until?: string }) {
         </form>
       )}
     </Dropdown>
+  );
+}
+
+/** list-prs-for-branch: the PR whose head is this branch, next to the branch picker. */
+function BranchPullButton(props: { branch: string }) {
+  const ctx = useRepo();
+  const status = createMemo(() => getBranchStatus(ctx.owner(), ctx.name(), props.branch, ctx.repo().default_branch));
+  const look = (pr: { state: string; isDraft: boolean }) =>
+    pr.state === 'MERGED'
+      ? { icon: gitMergeIcon, cls: 'text-fg-done' }
+      : pr.state === 'CLOSED'
+        ? { icon: gitPullRequestClosedIcon, cls: 'text-fg-closed' }
+        : pr.isDraft
+          ? { icon: gitPullRequestDraftIcon, cls: 'text-fg-muted' }
+          : { icon: gitPullRequestIcon, cls: 'text-fg-open' };
+  return (
+    <Show when={status()?.pull}>
+      {(pr) => (
+        <a class="btn btn-sm rgh-list-prs-for-branch" href={`/${pr().repo}/pull/${pr().number}`} title={pr().title}>
+          <Octicon icon={look(pr()).icon} class={look(pr()).cls} />#{pr().number}
+        </a>
+      )}
+    </Show>
   );
 }

@@ -3,7 +3,9 @@ import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Dropdown, toastError } from '../../../components/ui';
 import { smileyIcon } from '../../../icons/octicons';
+import { feature, featureOption } from '../../refined';
 import { toggleReaction } from '../api';
+import { reactorsOf } from '../refined';
 import type { ReactionContent, ReactionGroup } from '../types';
 
 export const REACTIONS: { content: ReactionContent; emoji: string; label: string }[] = [
@@ -92,8 +94,22 @@ export function ReactionPicker(props: { onPick: (c: ReactionContent) => void; re
 export type ReactionsState = ReturnType<typeof useReactions>;
 
 /** The pills row; `state` comes from useReactions (shared with the header's smiley picker). */
-export default function Reactions(props: { state: ReactionsState; canReact?: boolean }) {
+export default function Reactions(props: { state: ReactionsState; canReact?: boolean; subjectId?: string }) {
   const visible = () => props.state.groups().filter((g) => g.reactors.totalCount > 0);
+  // reactions-avatars: who reacted (one batched request for every comment on the page).
+  const reactors = () => {
+    if (!props.subjectId || !feature('reactions-avatars') || !visible().length) return null;
+    return reactorsOf(`${props.subjectId}|${visible().map((g) => `${g.content}${g.reactors.totalCount}`).join()}`) ?? null;
+  };
+  const who = (g: ReactionGroup) => reactors()?.[g.content] ?? [];
+  const maxAvatars = () => Math.max(1, Math.min(10, featureOption<number>('reactions-avatars', 'max') ?? 3));
+  const tooltip = (g: ReactionGroup) => {
+    const names = who(g).map((r) => r.login);
+    if (!names.length) return undefined;
+    const others = g.reactors.totalCount - names.length;
+    const list = others > 0 ? `${names.join(', ')} and ${others} more` : names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+    return `${list} reacted with ${REACTIONS.find((r) => r.content === g.content)?.label ?? ''} emoji`;
+  };
   return (
     <Show when={visible().length}>
       <div class="flex flex-wrap items-center gap-2 px-4 pb-4">
@@ -110,9 +126,17 @@ export default function Reactions(props: { state: ReactionsState; canReact?: boo
               disabled={props.canReact === false}
               aria-pressed={g.viewerHasReacted ? 'true' : 'false'}
               onClick={() => props.state.toggle(g.content)}
+              title={tooltip(g)}
             >
               <span class="text-sm">{emojiOf(g.content)}</span>
               {g.reactors.totalCount}
+              <Show when={who(g).length}>
+                <span class="rgh-reactions-avatars inline-flex items-center ml-0.5">
+                  <For each={who(g).slice(0, maxAvatars())}>
+                    {(r) => <img class="avatar avatar-user w-4 h-4 -mr-1 last:mr-0 ring-1 ring-[var(--bgColor-default)]" src={`${r.avatarUrl}${r.avatarUrl.includes('?') ? '&' : '?'}s=32`} alt={`@${r.login}`} loading="lazy" />}
+                  </For>
+                </span>
+              </Show>
             </button>
           )}
         </For>

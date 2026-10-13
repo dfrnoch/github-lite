@@ -1,8 +1,11 @@
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, RelativeTime } from '../../../components/ui';
-import { ellipsisIcon, historyIcon } from '../../../icons/octicons';
+import { ellipsisIcon, historyIcon, versionsIcon } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
+import { encodePath } from '../../../lib/github';
+import { getPreviousFileCommit } from '../../code/refinedApi';
+import { feature } from '../../refined';
 import { getLastCommit } from '../api';
 import CommitStatusIcon from './CommitStatusIcon';
 
@@ -27,7 +30,14 @@ export function CommitMessage(props: { message: string; base: string; href: stri
 }
 
 /** The "author  message  ✓  abc1234 · 2 days ago  🕒 1,947 Commits" bar above file lists. */
-export default function LatestCommit(props: { owner: string; repo: string; gitRef: string; path?: string }) {
+export default function LatestCommit(props: {
+  owner: string;
+  repo: string;
+  gitRef: string;
+  path?: string;
+  /** Page type, for the previous-version link (`tree` / `blob` / `blame`). */
+  route?: 'tree' | 'blob' | 'blame';
+}) {
   const commit = createMemo(() => getLastCommit(props.owner, props.repo, props.gitRef, props.path ?? ''));
   const [expanded, setExpanded] = createSignal(false);
   const base = () => `/${props.owner}/${props.repo}`;
@@ -74,6 +84,11 @@ export default function LatestCommit(props: { owner: string; repo: string; gitRe
             </a>{' '}
             · <RelativeTime datetime={c().committedDate} relative />
           </span>
+          <Show when={feature('previous-version') && props.path && props.route}>
+            <Loading>
+              <PreviousVersion owner={props.owner} repo={props.repo} gitRef={props.gitRef} path={props.path!} route={props.route!} />
+            </Loading>
+          </Show>
           <a class="btn btn-sm btn-invisible text-fg! font-semibold" href={historyHref()}>
             <Octicon icon={historyIcon} />
             {formatNumber(c().historyCount)} Commits
@@ -89,3 +104,22 @@ export default function LatestCommit(props: { owner: string; repo: string; gitRe
   );
 }
 
+
+/** previous-version: the same file / folder at the commit before its latest change. */
+function PreviousVersion(props: { owner: string; repo: string; gitRef: string; path: string; route: 'tree' | 'blob' | 'blame' }) {
+  const prev = createMemo(() => getPreviousFileCommit(props.owner, props.repo, props.gitRef, props.path));
+  return (
+    <Show when={prev()}>
+      {(oid) => (
+        <a
+          class="btn btn-sm btn-invisible text-fg! font-semibold -mr-2"
+          href={`/${props.owner}/${props.repo}/${props.route}/${oid()}/${encodePath(props.path)}`}
+          title="View the previous version of this file"
+        >
+          <Octicon icon={versionsIcon} />
+          Previous
+        </a>
+      )}
+    </Show>
+  );
+}

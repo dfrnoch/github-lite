@@ -1,8 +1,10 @@
 import { For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, IssueLabel, itemState, RelativeTime, StateIcon } from '../../../components/ui';
-import { commentIcon, gitPullRequestIcon, milestoneIcon } from '../../../icons/octicons';
+import { alertIcon, checkIcon, commentIcon, fileDiffIcon, gitPullRequestIcon, lockIcon, milestoneIcon, pinIcon } from '../../../icons/octicons';
 import CommitStatusIcon from '../../repo/components/CommitStatusIcon';
+import { feature } from '../../refined';
+import { isBot } from '../refined';
 import type { ListItem } from '../types';
 import { userHref } from './Comment';
 
@@ -10,11 +12,14 @@ import { userHref } from './Comment';
 export const TITLE_CODE =
   '[&_code]:font-mono [&_code]:text-[85%] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-[var(--bgColor-neutral-muted)]';
 
-const REVIEW_TEXT: Record<string, { text: string; class: string }> = {
-  APPROVED: { text: 'Approved', class: 'text-fg-success' },
-  CHANGES_REQUESTED: { text: 'Changes requested', class: 'text-fg-danger' },
-  REVIEW_REQUIRED: { text: 'Review required', class: '' },
+const REVIEW_TEXT: Record<string, { text: string; class: string; filter: string }> = {
+  APPROVED: { text: 'Approved', class: 'text-fg-success', filter: 'review:approved' },
+  CHANGES_REQUESTED: { text: 'Changes requested', class: 'text-fg-danger', filter: 'review:changes_requested' },
+  REVIEW_REQUIRED: { text: 'Review required', class: '', filter: 'review:required' },
 };
+
+/** Collaborator associations highlighted by conversation-authors. */
+const COLLABORATOR = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
 /** "7/8" passing checks for a PR row. */
 function checkCounts(item: ListItem) {
@@ -25,40 +30,101 @@ function checkCounts(item: ListItem) {
   return { state: rollup.state, text: `${ok}/${rollup.contexts.totalCount}` };
 }
 
-/** One row of an issue / PR list. `showRepo` prefixes the number with owner/repo (global lists). */
-export default function IssueRow(props: { item: ListItem; showRepo?: boolean; labelHref?: (name: string) => string }) {
+export interface IssueRowProps {
+  item: ListItem;
+  /** Prefix the number with owner/repo (global lists). */
+  showRepo?: boolean;
+  labelHref?: (name: string) => string;
+  /** The current list with one more qualifier (linkify-pr-review-state), e.g. filterHref('review:approved'). */
+  filterHref?: (qualifier: string) => string;
+  /** Logged-in user (conversation-authors). */
+  viewerLogin?: string;
+}
+
+/** One row of an issue / PR list. */
+export default function IssueRow(props: IssueRowProps) {
   const isPull = () => props.item.__typename === 'PullRequest';
   const path = () => `/${props.item.repository.nameWithOwner}/${isPull() ? 'pull' : 'issues'}/${props.item.number}`;
   const author = () => props.item.author?.login ?? 'ghost';
   const checks = () => checkCounts(props.item);
+  const draft = () => isPull() && !!props.item.isDraft;
+  /** conversation-authors: own conversations, and (repo lists) collaborators'. */
+  const authorClass = () => {
+    if (!feature('conversation-authors')) return null;
+    if (props.viewerLogin && author() === props.viewerLogin) return 'rgh-own-conversation';
+    if (!props.showRepo && COLLABORATOR.has(props.item.authorAssociation)) return 'rgh-collaborator';
+    return null;
+  };
+  const reviews = () => {
+    const nodes = props.item.latestOpinionatedReviews?.nodes ?? [];
+    return {
+      approved: nodes.filter((r) => r.state === 'APPROVED').length,
+      changes: nodes.filter((r) => r.state === 'CHANGES_REQUESTED').length,
+    };
+  };
+  const nonDefaultBase = () => {
+    const base = props.item.baseRefName;
+    const def = props.item.repository.defaultBranchRef?.name;
+    return isPull() && base && def && base !== def ? base : null;
+  };
+  const commentsHref = () => {
+    const last = props.item.lastComment?.nodes[0]?.databaseId;
+    return feature('open-issue-to-latest-comment') && last ? `${path()}#issuecomment-${last}` : path();
+  };
+  const filterLink = (qualifier: string, text: string, cls?: string) => (
+    <Show when={feature('linkify-pr-review-state') && props.filterHref} fallback={<span class={cls}>{text}</span>}>
+      <a class={['link-muted rgh-linkify-pr-review-state', cls]} href={props.filterHref!(qualifier)} title={`Show only PRs with ${qualifier}`}>
+        {text}
+      </a>
+    </Show>
+  );
+  const labels = () => (
+    <For each={props.item.labels.nodes}>
+      {(l) => <IssueLabel class="mr-1 align-middle" name={l.name} color={l.color} title={l.description} href={props.labelHref?.(l.name)} />}
+    </For>
+  );
+
   return (
-    <div class="Box-row Box-row--hover flex items-start gap-3 py-2! px-4!">
+    <div class={['Box-row Box-row--hover flex items-start gap-3 py-2! px-4!', { 'rgh-dim-bot': feature('dim-bots') && isBot(props.item.author) }]}>
       <StateIcon
         class="mt-1 shrink-0"
         state={itemState({ isPull: isPull(), state: props.item.state, stateReason: props.item.stateReason, draft: props.item.isDraft })}
       />
       <div class="flex-1 min-w-0">
         <div class="leading-snug">
-          {/* oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub */}
-          <a class={`link-plain font-semibold text-base mr-1 break-words ${TITLE_CODE}`} href={path()} innerHTML={props.item.titleHTML || props.item.title} />
-          <For each={props.item.labels.nodes}>
-            {(l) => (
-              <IssueLabel
-                class="mr-1 align-middle"
-                name={l.name}
-                color={l.color}
-                title={l.description}
-                href={props.labelHref?.(l.name)}
-              />
-            )}
-          </For>
+          <Show when={draft() && feature('emphasize-draft-pr-label')}>
+            <span class="Label Label--secondary mr-1 align-middle rgh-draft-label">Draft</span>
+          </Show>
+          <a
+            class={['link-plain font-semibold text-base mr-1 break-words', TITLE_CODE, { 'text-fg-muted!': draft() && feature('emphasize-draft-pr-label') }]}
+            href={path()}
+            // oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub
+            innerHTML={props.item.titleHTML || props.item.title}
+          />
+          <Show when={props.item.isPinned && feature('mark-pinned')}>
+            <span class="text-fg-muted mr-1 align-middle rgh-pinned" title="Pinned issue" aria-label="Pinned issue">
+              <Octicon icon={pinIcon} size={14} />
+            </span>
+          </Show>
+          <Show when={props.item.locked && feature('mark-locked')}>
+            <span class="text-fg-muted mr-1 align-middle rgh-locked" title="Locked conversation" aria-label="Locked conversation">
+              <Octicon icon={lockIcon} size={14} />
+            </span>
+          </Show>
+          <Show when={!feature('align-issue-labels')}>{labels()}</Show>
         </div>
+        <Show when={feature('align-issue-labels') && props.item.labels.nodes.length}>
+          <div class="mt-1 flex flex-wrap gap-y-1 rgh-align-issue-labels">{labels()}</div>
+        </Show>
         <div class="mt-1 text-xs text-fg-muted flex flex-wrap items-center gap-x-1">
           <span>
             {props.showRepo ? props.item.repository.nameWithOwner : ''}#{props.item.number}
           </span>
           <span>·</span>
-          <a class="link-muted" href={userHref(author())}>
+          <a class={['link-muted inline-flex items-center gap-1', authorClass()]} href={userHref(author())}>
+            <Show when={feature('small-user-avatars')}>
+              <Avatar src={props.item.author?.avatarUrl} login={author()} size={14} class="rgh-small-user-avatars" />
+            </Show>
             {author()}
           </a>
           <Show
@@ -73,15 +139,11 @@ export default function IssueRow(props: { item: ListItem; showRepo?: boolean; la
               opened <RelativeTime datetime={props.item.createdAt} />
             </span>
           </Show>
-          <Show when={isPull() && props.item.isDraft}>
-            <span>· Draft</span>
+          <Show when={draft() && !feature('emphasize-draft-pr-label')}>
+            <span>· {filterLink('draft:true', 'Draft')}</span>
           </Show>
           <Show when={isPull() && !props.item.isDraft && props.item.state === 'OPEN' && props.item.reviewDecision}>
-            {(d) => (
-              <span>
-                · <span class={REVIEW_TEXT[d()]?.class}>{REVIEW_TEXT[d()]?.text}</span>
-              </span>
-            )}
+            {(d) => <span>· {filterLink(REVIEW_TEXT[d()]?.filter ?? '', REVIEW_TEXT[d()]?.text ?? '', REVIEW_TEXT[d()]?.class)}</span>}
           </Show>
           <Show when={checks()}>
             {(c) => (
@@ -89,6 +151,20 @@ export default function IssueRow(props: { item: ListItem; showRepo?: boolean; la
                 · <CommitStatusIcon state={c().state} href={`${path()}/checks`} />
                 <a class="link-muted" href={`${path()}/checks`}>
                   {c().text}
+                </a>
+              </span>
+            )}
+          </Show>
+          <Show when={feature('highlight-non-default-base-branch') && nonDefaultBase()}>
+            {(base) => (
+              <span class="inline-flex items-center gap-1">
+                ·
+                <a
+                  class="font-mono text-xs px-1.5 rounded-md bg-accent-muted text-fg-accent hover:underline rgh-base-branch"
+                  href={`/${props.item.repository.nameWithOwner}/tree/${base()}`}
+                  title="Base branch (not the default branch)"
+                >
+                  {base()}
                 </a>
               </span>
             )}
@@ -110,6 +186,27 @@ export default function IssueRow(props: { item: ListItem; showRepo?: boolean; la
         </div>
       </div>
       <div class="hidden sm:flex items-center gap-4 shrink-0 text-xs text-fg-muted pt-1">
+        <Show when={feature('conflict-marker') && isPull() && props.item.state === 'OPEN' && props.item.mergeable === 'CONFLICTING'}>
+          <a class="inline-flex items-center text-fg-danger! rgh-conflict-marker" href={path()} title="This PR has conflicts that must be resolved">
+            <Octicon icon={alertIcon} />
+          </a>
+        </Show>
+        <Show when={feature('pr-approvals-count') && isPull() && (reviews().approved || reviews().changes)}>
+          <span class="inline-flex items-center gap-2 rgh-pr-approvals-count">
+            <Show when={reviews().approved}>
+              <span class="inline-flex items-center gap-0.5 text-fg-success" title={`${reviews().approved} approval${reviews().approved === 1 ? '' : 's'}`}>
+                <Octicon icon={checkIcon} />
+                {reviews().approved}
+              </span>
+            </Show>
+            <Show when={reviews().changes}>
+              <span class="inline-flex items-center gap-0.5 text-fg-danger" title={`${reviews().changes} change request${reviews().changes === 1 ? '' : 's'}`}>
+                <Octicon icon={fileDiffIcon} />
+                {reviews().changes}
+              </span>
+            </Show>
+          </span>
+        </Show>
         <Show when={(props.item.closedByPullRequestsReferences?.totalCount ?? 0) > 0}>
           <span class="inline-flex items-center gap-1" title="Linked pull requests">
             <Octicon icon={gitPullRequestIcon} />
@@ -128,7 +225,7 @@ export default function IssueRow(props: { item: ListItem; showRepo?: boolean; la
           </span>
         </Show>
         <Show when={props.item.comments.totalCount > 0}>
-          <a class="link-muted inline-flex items-center gap-1" href={path()} aria-label={`${props.item.comments.totalCount} comments`}>
+          <a class="link-muted inline-flex items-center gap-1" href={commentsHref()} aria-label={`${props.item.comments.totalCount} comments`}>
             <Octicon icon={commentIcon} />
             {props.item.comments.totalCount}
           </a>

@@ -1,4 +1,5 @@
 import type { JSX } from '@solidjs/web';
+import { ChangelogLink } from './RefinedReleases';
 
 /** "Releases | Tags" switch above both lists, with optional right-side actions. */
 export default function ReleasesSubnav(props: { base: string; active: 'releases' | 'tags'; children?: JSX.Element }) {
@@ -11,6 +12,7 @@ export default function ReleasesSubnav(props: { base: string; active: 'releases'
         <a class="subnav-item" href={`${props.base}/tags`} aria-current={props.active === 'tags' ? 'page' : undefined}>
           Tags
         </a>
+        <ChangelogLink owner={props.base.split('/')[1]!} repo={props.base.split('/')[2]!} />
       </nav>
       <div class="flex-1" />
       {props.children}

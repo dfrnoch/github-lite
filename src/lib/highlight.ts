@@ -136,7 +136,11 @@ export async function languageFor(filename: string): Promise<string | undefined>
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+/** github-light's color for the `comment` scope (and only that scope). */
+const COMMENT_COLOR = '#6a737d';
+
 function tokenHtml(token: ThemedToken) {
+  const light = (token.htmlStyle?.color ?? token.color ?? '').toLowerCase();
   const style = token.htmlStyle
     ? Object.entries(token.htmlStyle)
         .map(([k, v]) => `${k}:${v}`)
@@ -144,7 +148,9 @@ function tokenHtml(token: ThemedToken) {
     : token.color
       ? `color:${token.color}`
       : '';
-  return style ? `<span style="${style}">${escapeHtml(token.content)}</span>` : escapeHtml(token.content);
+  // `pl-c` marks comments like github.com's own highlighter (used by linkify-code).
+  const cls = light === COMMENT_COLOR ? ' class="pl-c"' : '';
+  return style ? `<span${cls} style="${style}">${escapeHtml(token.content)}</span>` : escapeHtml(token.content);
 }
 
 /** Files bigger than this render as plain text (highlighting would stall the page). */

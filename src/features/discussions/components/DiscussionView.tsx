@@ -31,6 +31,7 @@ import {
 } from '../api';
 import DiscussionComment, { AuthorLine, commentAnchor } from './DiscussionComment';
 import Reactions, { UpvoteButton } from './Reactions';
+import { stickySidebar } from '../../../features/repo/refined/sticky';
 
 /** /discussions/:number — post, threaded comments, answer, reactions, comment box, sidebar. */
 export default function DiscussionView(props: { number: number }) {
@@ -178,7 +179,7 @@ function DiscussionBody(props: { discussion: Discussion; comments: CommentsPage 
           <NewComment discussion={d()} canComment={canComment()} />
         </div>
 
-        <aside class="md:w-[280px] shrink-0 text-sm">
+        <aside class="md:w-[280px] shrink-0 text-sm" ref={stickySidebar()}>
           <SidebarSection title="Category">
             <a class="flex items-center gap-2 font-semibold link-plain" href={`${ctx.base()}/discussions/categories/${d().category.slug}`}>
               <span class="w-8 h-8 flex items-center justify-center rounded-md bg-canvas-muted text-base">{categoryEmoji(d().category.emojiHTML)}</span>

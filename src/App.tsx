@@ -9,6 +9,8 @@ import './styles/primer.css';
 import 'virtual:uno.css';
 import AppHeader from './components/layout/AppHeader';
 import Footer from './components/layout/Footer';
+import NavigationProgress from './components/layout/NavigationProgress';
+import GlobalHotkeys from './components/layout/GlobalHotkeys';
 import ShortcutsDialog from './components/layout/ShortcutsDialog';
 import { ErrorView, PageSpinner, Toasts } from './components/ui';
 import { isSignedIn } from './lib/auth';
@@ -24,6 +26,7 @@ export default function App() {
         return (
           <>
             <Title>GitHub</Title>
+            <NavigationProgress />
             <Show
               when={isSignedIn() || isAuthRoute()}
               // Signed out: show the login form in place, at the requested URL —
@@ -40,6 +43,7 @@ export default function App() {
               </main>
               <Footer />
               <ShortcutsDialog />
+              <GlobalHotkeys />
             </Show>
             <Toasts />
           </>

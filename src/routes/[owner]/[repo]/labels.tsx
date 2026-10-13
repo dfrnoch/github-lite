@@ -1,3 +1,4 @@
+import { RichText } from '../../../features/issues/refined';
 import { Title } from '@solidjs/meta';
 import { useAction, useSearchParams } from '@solidjs/router';
 import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
@@ -172,7 +173,9 @@ function LabelRow(props: { label: RepoLabel; canEdit: boolean }) {
           <div class="w-full md:w-1/4 min-w-0">
             <IssueLabel name={props.label.name} color={props.label.color} title={props.label.description} href={query('issues')} />
           </div>
-          <div class="flex-1 min-w-0 text-xs text-fg-muted">{props.label.description}</div>
+          <div class="flex-1 min-w-0 text-xs text-fg-muted">
+            <RichText text={props.label.description} repo={ctx.fullName()} />
+          </div>
           <div class="w-40 text-xs text-fg-muted flex items-center gap-3">
             <Show when={props.label.openIssues}>
               <a class="link-muted inline-flex items-center gap-1" href={query('issues')} title={`${props.label.openIssues} open issues`}>

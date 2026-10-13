@@ -11,6 +11,8 @@ import {
   getTemplateRepos,
 } from '../features/repo-settings/api';
 import OwnerName, { normalizeRepoName, type OwnerOption } from '../features/repo-settings/components/OwnerName';
+import { feature } from '../features/refined';
+import { DisableProjectsAndWikis } from '../features/repo-settings/components/ui';
 import { getViewer } from '../features/user/api';
 import { checkIcon, lockIcon, organizationIcon, repoIcon, repoTemplateIcon, triangleDownIcon } from '../icons/octicons';
 
@@ -47,6 +49,7 @@ export default function NewRepository() {
   const [gitignore, setGitignore] = createSignal('');
   const [license, setLicense] = createSignal('');
   const [busy, setBusy] = createSignal(false);
+  const [noProjects, setNoProjects] = createSignal(true);
 
   const isViewer = () => owner() === viewer().login;
   const canSubmit = () => !busy() && !!name().trim() && available() === `${owner()}/${normalizeRepoName(name())}`;
@@ -67,6 +70,7 @@ export default function NewRepository() {
         autoInit: readme(),
         gitignore: gitignore(),
         license: license(),
+        disableProjectsAndWiki: feature('new-repo-disable-projects-and-wikis') && noProjects(),
       });
       toast(`Created ${repo.full_name}`, 'success');
       navigate(`/${repo.full_name}`);
@@ -247,6 +251,9 @@ export default function NewRepository() {
         </Show>
 
         <div class="border-t border-line-muted pt-4 mt-4">
+          <Show when={feature('new-repo-disable-projects-and-wikis')}>
+            <DisableProjectsAndWikis checked={noProjects()} onChange={setNoProjects} />
+          </Show>
           <p class="text-sm text-fg-muted mb-4">
             You are creating a {visibility()} repository in {isViewer() ? 'your personal account' : `the ${owner()} organization`}.
           </p>

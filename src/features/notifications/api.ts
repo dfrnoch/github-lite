@@ -41,6 +41,8 @@ export interface SubjectState {
   stateReason?: string | null;
   merged?: boolean;
   isDraft?: boolean;
+  /** Opened by a bot (GitHub App) — `select-notifications`' "Bots" filter. */
+  isBot?: boolean;
 }
 
 /**
@@ -55,8 +57,8 @@ export const getSubjectStates = query(async (keys: string[]): Promise<Record<str
       const [repo, num] = key.split('#');
       const [owner, name] = repo!.split('/');
       return `s${i}:repository(owner:${JSON.stringify(owner)},name:${JSON.stringify(name)}){issueOrPullRequest(number:${Number(num)}){
-        ... on Issue{state stateReason}
-        ... on PullRequest{state merged isDraft}
+        ... on Issue{state stateReason author{__typename}}
+        ... on PullRequest{state merged isDraft author{__typename}}
       }}`;
     })
     .join('\n');
@@ -65,7 +67,7 @@ export const getSubjectStates = query(async (keys: string[]): Promise<Record<str
     const out: Record<string, SubjectState> = {};
     keys.forEach((key, i) => {
       const s = data?.[`s${i}`]?.issueOrPullRequest;
-      if (s) out[key] = s;
+      if (s) out[key] = { state: s.state, stateReason: s.stateReason, merged: s.merged, isDraft: s.isDraft, isBot: s.author?.__typename === 'Bot' };
     });
     return out;
   } catch {

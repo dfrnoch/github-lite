@@ -1,12 +1,29 @@
 import { useAction } from '@solidjs/router';
-import { createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, Markdown, RelativeTime } from '../../../components/ui';
-import { fileZipIcon, gitBranchIcon, packageIcon, pencilIcon, tagIcon, trashIcon } from '../../../icons/octicons';
-import { formatBytes, formatNumber, pluralize } from '../../../lib/format';
+import { codeIcon, downloadIcon, fileZipIcon, gitBranchIcon, packageIcon, pencilIcon, tagIcon, trashIcon } from '../../../icons/octicons';
+import { compactNumber, formatBytes, formatNumber, pluralize } from '../../../lib/format';
+import { feature } from '../../refined';
 import { ConfirmDialog } from '../../repo-settings/components/ui';
 import type { Release } from '../api';
 import { removeRelease } from '../api';
+import { TagChangesLink } from './RefinedReleases';
+
+/**
+ * GitHub's 10-step heat scale (1 = hottest) over a list of values
+ * (release-download-count colors the most downloaded assets).
+ */
+export function heatIndex(values: number[]) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return (value: number) => {
+    const t = max === min ? 0 : Math.max(0, Math.min(1, (value - min) / (max - min)));
+    return Math.max(1, 10 - Math.floor(t * 10));
+  };
+}
+/** Heat 1 → full "severe" orange, 10 → muted text. */
+export const heatColor = (heat: number) => `color-mix(in srgb, var(--fgColor-severe) ${Math.round(((10 - heat) / 9) * 100)}%, var(--fgColor-muted))`;
 
 const REACTIONS: [key: string, emoji: string][] = [
   ['+1', '👍'],
@@ -19,7 +36,9 @@ const REACTIONS: [key: string, emoji: string][] = [
   ['eyes', '👀'],
 ];
 
-export const tagHref = (base: string, tag: string) => `${base}/releases/tag/${tag.split('/').map(encodeURIComponent).join('/')}`;
+import { tagHref } from '../versions';
+
+export { tagHref };
 
 /** Label row: Draft / Pre-release / Latest. */
 export function ReleaseBadges(props: { release: Release; latest: boolean }) {
@@ -60,6 +79,7 @@ export default function ReleaseCard(props: {
   const r = () => props.release;
   const archive = (ext: 'zip' | 'tar.gz') => `https://github.com/${props.owner}/${props.repo}/archive/refs/tags/${r().tag_name}.${ext}`;
   const reactions = () => REACTIONS.filter(([k]) => (r().reactions as any)?.[k] > 0);
+  const heat = createMemo(() => heatIndex(r().assets.map((a) => a.download_count)));
 
   return (
     <div class="Box">
@@ -95,10 +115,14 @@ export default function ReleaseCard(props: {
               released this <RelativeTime datetime={r().published_at} />
             </Show>
           </span>
-          <a class="flex items-center gap-1 link-muted" href={`${props.base}/tree/${r().tag_name}`}>
-            <Octicon icon={tagIcon} />
+          <a class="flex items-center gap-1 link-muted" href={`${props.base}/tree/${r().tag_name}`} title={`Browse the code at ${r().tag_name}`}>
+            {/* visit-tag: this link opens the code, so say so. */}
+            <Octicon icon={feature('visit-tag') ? codeIcon : tagIcon} />
             <span class="truncate max-w-[220px]">{r().tag_name}</span>
           </a>
+          <Show when={!r().draft}>
+            <TagChangesLink owner={props.owner} repo={props.repo} tag={r().tag_name} />
+          </Show>
           <Show when={r().draft || r().target_commitish !== r().tag_name}>
             <span class="flex items-center gap-1">
               <Octicon icon={gitBranchIcon} />
@@ -124,9 +148,23 @@ export default function ReleaseCard(props: {
                     {a.name}
                   </a>
                   <span class="text-xs text-fg-muted w-20 text-right">{formatBytes(a.size)}</span>
-                  <span class="text-xs text-fg-muted w-32 text-right" title={`${formatNumber(a.download_count)} downloads`}>
-                    {pluralize(a.download_count, 'download')}
-                  </span>
+                  <Show
+                    when={feature('release-download-count')}
+                    fallback={
+                      <span class="text-xs text-fg-muted w-32 text-right" title={`${formatNumber(a.download_count)} downloads`}>
+                        {pluralize(a.download_count, 'download')}
+                      </span>
+                    }
+                  >
+                    {/* Heat-colored count; kept invisible at 0 so the columns stay aligned. */}
+                    <span
+                      class={['text-xs w-20 text-right inline-flex items-center justify-end gap-1', { invisible: !a.download_count }]}
+                      title={`${formatNumber(a.download_count)} downloads`}
+                      style={{ color: heatColor(heat()(a.download_count)) }}
+                    >
+                      {compactNumber(a.download_count)} <Octicon icon={downloadIcon} />
+                    </span>
+                  </Show>
                   <span class="text-xs text-fg-muted w-28 text-right">
                     <RelativeTime datetime={a.updated_at} />
                   </span>

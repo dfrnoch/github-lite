@@ -1,9 +1,10 @@
 import { Title } from '@solidjs/meta';
 import { useNavigate, useParams } from '@solidjs/router';
-import { createMemo, Show } from 'solid-js';
+import { createMemo, createSignal, Show } from 'solid-js';
 import Octicon from '../../../../../components/Octicon';
-import { Blankslate, toast } from '../../../../../components/ui';
-import { deleteRelease, getLatestReleaseId, getReleaseByTag } from '../../../../../features/releases/api';
+import { Blankslate, toast, toastError } from '../../../../../components/ui';
+import { feature } from '../../../../../features/refined';
+import { convertReleaseToDraft, deleteRelease, getLatestReleaseId, getReleaseByTag } from '../../../../../features/releases/api';
 import ReleaseCard from '../../../../../features/releases/components/ReleaseCard';
 import { useRepo } from '../../../../../features/repo/context';
 import { chevronLeftIcon, tagIcon } from '../../../../../icons/octicons';
@@ -16,6 +17,7 @@ export default function ReleasePage() {
   const tag = () => decodeURIComponent(params.tag ?? '');
   const release = createMemo(() => getReleaseByTag(ctx.owner(), ctx.name(), tag()));
   const latestId = createMemo(() => getLatestReleaseId(ctx.owner(), ctx.name()));
+  const [converting, setConverting] = createSignal(false);
 
   return (
     <div class="container-lg px-4 md:px-6 py-6">
@@ -25,7 +27,35 @@ export default function ReleasePage() {
           <Octicon icon={chevronLeftIcon} /> Releases
         </a>
         <span class="text-fg-muted">/</span>
-        <span class="font-semibold truncate">{tag()}</span>
+        <span class="font-semibold truncate flex-1">{tag()}</span>
+        <Show when={feature('convert-release-to-draft') && ctx.repo().permissions?.push && release() && !release()!.draft ? release() : null}>
+          {(r) => (
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={converting()}
+              onClick={async () => {
+                const message = ['The release will be effectively deleted and a new draft will be created.'];
+                if (r().reactions?.total_count) message.push('Existing user reactions will be lost.');
+                message.push('Continue?');
+                if (!confirm(message.join(' '))) return;
+                setConverting(true);
+                try {
+                  toast('Converting…');
+                  const draft = await convertReleaseToDraft(ctx.owner(), ctx.name(), r().id);
+                  // Drafts are addressed by their untagged-… URL.
+                  navigate(`${ctx.base()}/releases/edit/${draft.html_url.split('/releases/tag/')[1] ?? encodeURIComponent(draft.tag_name)}`);
+                } catch (e) {
+                  toastError(e);
+                } finally {
+                  setConverting(false);
+                }
+              }}
+            >
+              {converting() ? 'Converting…' : 'Convert to draft'}
+            </button>
+          )}
+        </Show>
       </div>
       <Show
         when={release()}

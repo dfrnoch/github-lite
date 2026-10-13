@@ -101,8 +101,10 @@ export function ConfirmDialog(props: {
   confirmText?: string;
   button: string;
   onConfirm: () => Promise<unknown>;
+  /** Pre-fill the confirmation box (each time the dialog opens). */
+  prefill?: string;
 }) {
-  const [typed, setTyped] = createSignal('');
+  const [typed, setTyped] = createSignal(() => (props.open && props.prefill) || '');
   const [busy, setBusy] = createSignal(false);
   const ok = () => !props.confirmText || typed() === props.confirmText;
   return (
@@ -157,3 +159,27 @@ export const ROLES = [
 export const roleValue = (role: string) =>
   ({ read: 'pull', write: 'push', pull: 'pull', push: 'push', triage: 'triage', maintain: 'maintain', admin: 'admin' })[role] ?? role;
 export const roleLabel = (role: string) => ROLES.find((r) => r.value === roleValue(role))?.label ?? role;
+
+/** new-repo-disable-projects-and-wikis: the opt-out checkbox on /new and /fork. */
+export function DisableProjectsAndWikis(props: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div class="flash flash-warn py-2! mb-4">
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" class="mt-1" checked={props.checked} onChange={(e) => props.onChange(e.currentTarget.checked)} />
+        <span>
+          <strong>Disable Projects and Wikis</strong>
+          <span class="note mt-0!">
+            After creating the repository disable the projects and wiki.{' '}
+            <a
+              href="https://github.com/refined-github/refined-github/wiki/Extended-feature-descriptions#new-repo-disable-projects-and-wikis"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Suggestion by Refined GitHub.
+            </a>
+          </span>
+        </span>
+      </label>
+    </div>
+  );
+}

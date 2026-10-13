@@ -13,7 +13,7 @@ const ORG_TYPES: FilterOption[] = [
   { value: '', label: 'All' },
   { value: 'public', label: 'Public' },
   { value: 'private', label: 'Private' },
-  { value: 'sources', label: 'Sources' },
+  { value: 'source', label: 'Sources' },
   { value: 'forks', label: 'Forks' },
   { value: 'archived', label: 'Archived' },
   { value: 'mirror', label: 'Mirrors' },

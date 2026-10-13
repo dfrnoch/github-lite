@@ -1,11 +1,15 @@
 import { useLocation, useNavigate, useSearchParams } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
-import { createMemo, createSignal, For, isPending, Loading, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, isPending, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, Blankslate, Pagination, Spinner } from '../../../components/ui';
+import { Avatar, Blankslate, itemState, Pagination, RelativeTime, Spinner, StateIcon } from '../../../components/ui';
 import {
   checkIcon,
+  commentIcon,
+  gitMergeIcon,
   gitPullRequestIcon,
+  linkExternalIcon,
+  pinIcon,
   issueClosedIcon,
   issueOpenedIcon,
   searchIcon,
@@ -14,8 +18,11 @@ import {
   xCircleFillIcon,
 } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
-import { getAssignableUsers, getMilestones, getRepoLabels, PER_PAGE, searchIssues } from '../api';
-import { qualifier, qualifiers, setQualifier, SORTS, stateOf, tokenize, withState } from '../query';
+import { feature } from '../../refined';
+import { getViewer } from '../../user/api';
+import { getAssignableUsers, getListCounts, getMilestones, getPinnedIssues, getRepoLabels, type PinnedIssue, PER_PAGE, searchIssues } from '../api';
+import { qualifier, qualifiers, setQualifier, SORTS, stateOf, tokenize, withoutState, withState } from '../query';
+import { TITLE_CODE } from './IssueRow';
 import IssueRow from './IssueRow';
 import SelectPanel from './SelectPanel';
 
@@ -32,6 +39,16 @@ export interface IssueListProps {
   /** Buttons / heading row above the search box. */
   header?: JSX.Element;
 }
+
+const CHECK_FILTERS = [
+  { key: 'success', label: 'Success' },
+  { key: 'failure', label: 'Failure' },
+  { key: 'pending', label: 'Pending' },
+];
+const DRAFT_FILTERS = [
+  { key: 'false', label: 'Ready for review' },
+  { key: 'true', label: 'Not ready for review (Draft PR)' },
+];
 
 const REVIEW_FILTERS = [
   { key: 'review:none', label: 'No reviews' },
@@ -65,15 +82,52 @@ export default function IssueList(props: IssueListProps) {
     return s;
   };
   const result = createMemo(() => searchIssues(fullQuery(), page()));
+  const viewer = createMemo(() => getViewer());
+  // Shared (deduped) with ListHeader's buttons; clean-conversation-filters hides empty filters.
+  const counts = createMemo(() => (repoScoped() ? getListCounts(props.owner!, props.repo!) : null));
+  // Pinned issues above the default repo issue list (like github.com).
+  const showPinned = () => repoScoped() && props.kind === 'issue' && params.q == null && page() === 1;
+  const pinned = createMemo(() => (showPinned() ? getPinnedIssues(props.owner!, props.repo!) : []));
+
+  // fix-no-pr-search: an issue search on the PR list belongs on the issue list.
+  createEffect(
+    () => {
+      if (props.kind !== 'pr' || !repoScoped() || !feature('fix-no-pr-search')) return null;
+      const types = tokenize(q()).filter((t) => (t.key === 'is' || t.key === 'type') && !t.negated).map((t) => t.value!.toLowerCase());
+      return types.includes('issue') && !types.some((t) => t === 'pr' || t === 'pull-request') ? `/${props.owner}/${props.repo}/issues?q=${encodeURIComponent(q())}` : null;
+    },
+    (to) => {
+      if (to) navigate(to, { replace: true });
+    },
+  );
 
   const hrefFor = (query: string) => `${location.pathname}?q=${encodeURIComponent(query)}`;
   const go = (query: string) => navigate(hrefFor(query));
   const [input, setInput] = createSignal(() => q());
 
   const labelHref = (name: string) => hrefFor(setQualifier(withState(q(), 'open'), 'label', name));
+  /** The current query with `key:value` replacing any `key:` qualifier. */
+  const filterHref = (qual: string) => {
+    const [key, value] = qual.split(':') as [string, string];
+    return hrefFor(setQualifier(q(), key, value));
+  };
   const state = () => stateOf(q());
+  /** extend-conversation-status-filters: clicking the selected state shows every state. */
+  const stateHref = (s: 'open' | 'closed') =>
+    feature('extend-conversation-status-filters') && state() === s ? hrefFor(withoutState(q())) : hrefFor(withState(q(), s));
+  const openAll = () => {
+    for (const item of result().items) window.open(`/${item.repository.nameWithOwner}/${item.__typename === 'PullRequest' ? 'pull' : 'issues'}/${item.number}`, '_blank');
+  };
   const lastPage = () => Math.max(1, Math.ceil(Math.min(result().total, 1000) / PER_PAGE));
 
+  /** A repo count once loaded (undefined while loading, so filters stay visible). */
+  const latestCount = (key: 'labels' | 'milestones') => {
+    try {
+      return counts()?.[key];
+    } catch {
+      return undefined;
+    }
+  };
   const filterClass = 'btn-invisible btn-sm text-fg-muted! font-normal! px-2!';
   const caret = (label: string) => (
     <>
@@ -114,22 +168,55 @@ export default function IssueList(props: IssueListProps) {
         </button>
       </form>
 
+      <Show when={showPinned()}>
+        <Loading>
+          <PinnedIssues items={pinned()} base={`/${props.owner}/${props.repo}`} />
+        </Loading>
+      </Show>
       <div class="Box">
-        <div class="Box-header flex flex-wrap items-center gap-x-4 gap-y-2 py-2! px-4!">
+        <div
+          class={[
+            'Box-header flex flex-wrap items-center gap-x-4 gap-y-2 py-2! px-4!',
+            { 'rgh-sticky-list-toolbar sticky top-0 z-10 rounded-t-md': feature('sticky-conversation-list-toolbar') },
+          ]}
+        >
           <div class="flex items-center gap-4 text-sm">
             <Loading fallback={<span class="text-fg-muted">Loading…</span>}>
-              <a class={['flex items-center gap-1.5', state() === 'open' ? 'link-plain font-semibold' : 'link-muted']} href={hrefFor(withState(q(), 'open'))}>
-                <Octicon icon={props.kind === 'pr' ? gitPullRequestIcon : issueOpenedIcon} />
+              <a class={['flex items-center gap-1.5', state() === 'open' ? 'link-plain font-semibold' : 'link-muted']} href={stateHref('open')}>
+                <Octicon icon={feature('extend-conversation-status-filters') && state() === 'open' ? checkIcon : props.kind === 'pr' ? gitPullRequestIcon : issueOpenedIcon} />
                 Open <span class="Counter">{formatNumber(result().open)}</span>
               </a>
-              <a class={['flex items-center gap-1.5', state() === 'closed' ? 'link-plain font-semibold' : 'link-muted']} href={hrefFor(withState(q(), 'closed'))}>
-                <Octicon icon={props.kind === 'pr' ? checkIcon : issueClosedIcon} />
+              <a class={['flex items-center gap-1.5', state() === 'closed' ? 'link-plain font-semibold' : 'link-muted']} href={stateHref('closed')}>
+                <Octicon icon={feature('extend-conversation-status-filters') && state() === 'closed' ? checkIcon : props.kind === 'pr' ? checkIcon : issueClosedIcon} />
                 Closed <span class="Counter">{formatNumber(result().closed)}</span>
               </a>
+              <Show when={props.kind === 'pr' && feature('extend-conversation-status-filters')}>
+                <a
+                  class={['flex items-center gap-1.5 rgh-merged-filter', state() === 'merged' ? 'link-plain font-semibold' : 'link-muted']}
+                  href={state() === 'merged' ? hrefFor(withoutState(q())) : hrefFor(`${withoutState(q())} is:merged`.trim())}
+                >
+                  <Octicon icon={state() === 'merged' ? checkIcon : gitMergeIcon} />
+                  Merged
+                </a>
+              </Show>
             </Loading>
           </div>
           <div class="flex-1" />
           <div class="flex flex-wrap items-center gap-1">
+            <Show when={feature('open-all-conversations')}>
+              <Loading>
+                <Show when={result().items.length}>
+                  <button
+                    type="button"
+                    class={`${filterClass} rgh-open-all-conversations`}
+                    title="Open every item on this page in a new tab"
+                    onClick={openAll}
+                  >
+                    <Octicon icon={linkExternalIcon} /> Open all
+                  </button>
+                </Show>
+              </Loading>
+            </Show>
             <Show when={repoScoped()}>
               <SelectPanel
                 triggerClass={filterClass}
@@ -145,6 +232,7 @@ export default function IssueList(props: IssueListProps) {
                 selected={qualifiers(q(), 'author')}
                 onApply={(keys) => go(setQualifier(q(), 'author', keys[0] ?? null))}
               />
+              <Show when={!feature('clean-conversation-filters') || latestCount('labels') !== 0}>
               <SelectPanel
                 triggerClass={filterClass}
                 trigger={caret('Labels')}
@@ -169,6 +257,8 @@ export default function IssueList(props: IssueListProps) {
                 selected={qualifiers(q(), 'label')}
                 onApply={(keys) => go(setQualifier(q(), 'label', keys))}
               />
+              </Show>
+              <Show when={!feature('clean-conversation-filters') || latestCount('milestones') !== 0}>
               <SelectPanel
                 triggerClass={filterClass}
                 trigger={caret('Milestones')}
@@ -182,6 +272,7 @@ export default function IssueList(props: IssueListProps) {
                 selected={qualifiers(q(), 'milestone')}
                 onApply={(keys) => go(setQualifier(q(), 'milestone', keys[0] ?? null))}
               />
+              </Show>
               <Show when={props.kind === 'pr'}>
                 <SelectPanel
                   triggerClass={filterClass}
@@ -211,6 +302,32 @@ export default function IssueList(props: IssueListProps) {
                 render={(u) => <UserOption login={u.login} avatarUrl={u.avatarUrl} name={u.name} />}
                 selected={qualifiers(q(), 'assignee')}
                 onApply={(keys) => go(setQualifier(q(), 'assignee', keys[0] ?? null))}
+              />
+            </Show>
+            <Show when={props.kind === 'pr' && feature('pr-filters')}>
+              <SelectPanel
+                triggerClass={filterClass}
+                trigger={caret('Checks')}
+                title="Filter by checks status"
+                align="right"
+                load={() => CHECK_FILTERS}
+                key={(r) => r.key}
+                text={(r) => r.label}
+                render={(r) => <span>{r.label}</span>}
+                selected={qualifiers(q(), 'status')}
+                onApply={(keys) => go(setQualifier(q(), 'status', keys[0] ?? null))}
+              />
+              <SelectPanel
+                triggerClass={filterClass}
+                trigger={caret('Draft')}
+                title="Filter by draft pull requests"
+                align="right"
+                load={() => DRAFT_FILTERS}
+                key={(r) => r.key}
+                text={(r) => r.label}
+                render={(r) => <span>{r.label}</span>}
+                selected={qualifiers(q(), 'draft')}
+                onApply={(keys) => go(setQualifier(q(), 'draft', keys[0] ?? null))}
               />
             </Show>
             <SelectPanel
@@ -250,7 +367,15 @@ export default function IssueList(props: IssueListProps) {
                 </Blankslate>
               }
             >
-              {(item) => <IssueRow item={item} showRepo={!repoScoped()} labelHref={repoScoped() ? labelHref : undefined} />}
+              {(item) => (
+                <IssueRow
+                  item={item}
+                  showRepo={!repoScoped()}
+                  labelHref={repoScoped() ? labelHref : undefined}
+                  filterHref={filterHref}
+                  viewerLogin={viewer().login}
+                />
+              )}
             </For>
           </div>
         </Loading>
@@ -280,5 +405,79 @@ function UserOption(props: { login: string; avatarUrl: string; name: string | nu
       <span class="font-semibold">{props.login}</span>
       <span class="text-fg-muted truncate font-normal">{props.name}</span>
     </span>
+  );
+}
+
+/**
+ * Pinned issues: cards side by side like github.com, or (clean-pinned-issues)
+ * a standard list. pinned-issues-update-time shows when they were last updated.
+ */
+function PinnedIssues(props: { items: PinnedIssue[]; base: string }) {
+  const time = (i: PinnedIssue) =>
+    feature('pinned-issues-update-time') ? (
+      <>
+        updated <RelativeTime datetime={i.updatedAt} />
+      </>
+    ) : (
+      <>
+        opened <RelativeTime datetime={i.createdAt} />
+      </>
+    );
+  const meta = (i: PinnedIssue) => (
+    <>
+      #{i.number} · {i.author?.login ?? 'ghost'} {time(i)}
+    </>
+  );
+  return (
+    <Show when={props.items.length}>
+      <Show
+        when={feature('clean-pinned-issues')}
+        fallback={
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 rgh-pinned-cards">
+            <For each={props.items}>
+              {(i) => (
+                <div class="Box p-3 flex flex-col gap-2">
+                  <div class="flex items-center gap-2 text-xs text-fg-muted">
+                    <StateIcon state={itemState({ isPull: false, state: i.state, stateReason: i.stateReason })} />
+                    <span class="flex-1">{meta(i)}</span>
+                    <Octicon icon={pinIcon} />
+                  </div>
+                  {/* oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub */}
+                  <a class={['link-plain font-semibold break-words', TITLE_CODE]} href={`${props.base}/issues/${i.number}`} innerHTML={i.titleHTML || i.title} />
+                  <Show when={i.comments.totalCount}>
+                    <span class="text-xs text-fg-muted inline-flex items-center gap-1">
+                      <Octicon icon={commentIcon} size={12} /> {i.comments.totalCount}
+                    </span>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        }
+      >
+        <div class="Box mb-4 rgh-clean-pinned-issues">
+          <div class="Box-header py-2! px-4! text-sm font-semibold flex items-center gap-2">
+            <Octicon icon={pinIcon} /> Pinned issues
+          </div>
+          <For each={props.items}>
+            {(i) => (
+              <div class="Box-row Box-row--hover flex items-start gap-3 py-2! px-4!">
+                <StateIcon class="mt-1 shrink-0" state={itemState({ isPull: false, state: i.state, stateReason: i.stateReason })} />
+                <div class="flex-1 min-w-0">
+                  {/* oxlint-disable-next-line solid/no-innerhtml -- titleHTML is rendered + sanitized by GitHub */}
+                  <a class={['link-plain font-semibold text-base break-words', TITLE_CODE]} href={`${props.base}/issues/${i.number}`} innerHTML={i.titleHTML || i.title} />
+                  <div class="mt-1 text-xs text-fg-muted">{meta(i)}</div>
+                </div>
+                <Show when={i.comments.totalCount}>
+                  <a class="link-muted text-xs inline-flex items-center gap-1 pt-1" href={`${props.base}/issues/${i.number}`}>
+                    <Octicon icon={commentIcon} /> {i.comments.totalCount}
+                  </a>
+                </Show>
+              </div>
+            )}
+          </For>
+        </div>
+      </Show>
+    </Show>
   );
 }

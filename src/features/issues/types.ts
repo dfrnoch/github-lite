@@ -36,6 +36,7 @@ export interface GqlComment {
   viewerDidAuthor: boolean;
   viewerCanUpdate?: boolean;
   viewerCanDelete?: boolean;
+  viewerCanMinimize?: boolean;
   isMinimized?: boolean;
   minimizedReason?: string | null;
   reactionGroups: ReactionGroup[] | null;
@@ -126,6 +127,7 @@ export interface IssueBase extends GqlComment {
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   locked: boolean;
   activeLockReason: string | null;
+  closedAt: string | null;
   viewerCanReact: boolean;
   viewerSubscription: 'SUBSCRIBED' | 'UNSUBSCRIBED' | 'IGNORED' | null;
   viewerCanSubscribe: boolean;
@@ -298,7 +300,7 @@ export interface ListItem {
   closedAt: string | null;
   author: GqlActor | null;
   authorAssociation: string;
-  repository: { nameWithOwner: string };
+  repository: { nameWithOwner: string; defaultBranchRef?: { name: string } | null };
   labels: { nodes: GqlLabel[] };
   assignees: { nodes: GqlActor[] };
   milestone: { number: number; title: string } | null;
@@ -311,6 +313,12 @@ export interface ListItem {
     nodes: { commit: { statusCheckRollup: { state: string; contexts: { totalCount: number; checkRunCountsByState: { state: string; count: number }[] | null; statusContextCountsByState: { state: string; count: number }[] | null } } | null } }[];
   };
   closingIssuesReferences?: { totalCount: number };
+  locked?: boolean;
+  isPinned?: boolean;
+  lastComment?: { nodes: { databaseId: number }[] };
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  baseRefName?: string;
+  latestOpinionatedReviews?: { nodes: { state: string }[] };
 }
 
 export const canTriage = (p: ViewerPermission) => p === 'ADMIN' || p === 'MAINTAIN' || p === 'WRITE' || p === 'TRIAGE';

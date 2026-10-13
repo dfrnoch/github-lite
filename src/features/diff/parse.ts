@@ -281,3 +281,70 @@ export function sha256Hex(text: string): string {
 
 /** github.com's anchor for a file in a diff. */
 export const diffAnchor = (path: string) => `diff-${sha256Hex(path)}`;
+
+// ---------------------------------------------------------------------------
+// Hide whitespace (`git diff -w`, github.com's `?w=1`)
+
+const squash = (s: string) => s.replace(/\s+/g, '');
+/** Blocks bigger than this keep their raw diff (LCS is quadratic). */
+const MAX_WS_BLOCK = 400;
+
+/**
+ * Approximate `git diff --ignore-all-space` on an already-parsed patch: inside
+ * each run of deletions + additions, lines that only differ in whitespace are
+ * aligned (LCS) and shown once as context. Returns new line objects; the input
+ * is left untouched.
+ */
+export function ignoreWhitespaceChanges(lines: DiffLine[]): DiffLine[] {
+  const out: DiffLine[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (line.type !== 'del' && line.type !== 'add') {
+      out.push({ ...line, word: undefined });
+      i++;
+      continue;
+    }
+    const dels: DiffLine[] = [];
+    const adds: DiffLine[] = [];
+    while (i < lines.length && (lines[i]!.type === 'del' || lines[i]!.type === 'add')) {
+      const l = lines[i++]!;
+      (l.type === 'del' ? dels : adds).push(l);
+    }
+    if (!dels.length || !adds.length || dels.length * adds.length > MAX_WS_BLOCK * MAX_WS_BLOCK) {
+      for (const l of [...dels, ...adds]) out.push({ ...l, word: undefined });
+      continue;
+    }
+    const a = dels.map((l) => squash(l.text));
+    const b = adds.map((l) => squash(l.text));
+    // LCS table (suffix form) for an in-order alignment.
+    const n = a.length;
+    const m = b.length;
+    const dp: Uint16Array[] = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let x = n - 1; x >= 0; x--)
+      for (let y = m - 1; y >= 0; y--) dp[x]![y] = a[x] === b[y] ? dp[x + 1]![y + 1]! + 1 : Math.max(dp[x + 1]![y]!, dp[x]![y + 1]!);
+    let x = 0;
+    let y = 0;
+    const pendingDel: DiffLine[] = [];
+    const pendingAdd: DiffLine[] = [];
+    const flush = () => {
+      for (const l of pendingDel) out.push({ ...l, word: undefined });
+      for (const l of pendingAdd) out.push({ ...l, word: undefined });
+      pendingDel.length = 0;
+      pendingAdd.length = 0;
+    };
+    while (x < n || y < m) {
+      if (x < n && y < m && a[x] === b[y]) {
+        flush();
+        const add = adds[y]!;
+        out.push({ type: 'ctx', text: add.text, oldNo: dels[x]!.oldNo, newNo: add.newNo, hunkIndex: add.hunkIndex, noNewline: add.noNewline });
+        x++;
+        y++;
+      } else if (y >= m || (x < n && dp[x + 1]![y]! >= dp[x]![y + 1]!)) pendingDel.push(dels[x++]!);
+      else pendingAdd.push(adds[y++]!);
+    }
+    flush();
+  }
+  markWordChanges(out);
+  return out;
+}

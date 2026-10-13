@@ -1,7 +1,12 @@
 import { useLocation, useNavigate } from '@solidjs/router';
-import { createMemo, createSignal, For, Loading, Match, onSettled, Show, Switch } from 'solid-js';
+import { createMemo, createSignal, For, Loading, Match, Show, Switch } from 'solid-js';
+import { openUnreadNotifications } from '../../features/notifications/openTabs';
+import { userReposHref } from '../../features/profile/links';
+import { feature } from '../../features/refined';
+import { RepoHeaderAvatar, RepoHeaderInfo } from '../../features/repo/refined/HeaderInfo';
 import { getTopRepos, getUnreadNotifications, getViewer } from '../../features/user/api';
 import {
+  arrowUpRightIcon,
   bookIcon,
   codeIcon,
   gearIcon,
@@ -24,6 +29,7 @@ import {
   triangleDownIcon,
 } from '../../icons/octicons';
 import { signOut } from '../../lib/auth';
+import { useHotkey } from '../../lib/hotkeys';
 import { colorMode, setColorMode } from '../../lib/theme';
 import Octicon from '../Octicon';
 import { Avatar, Dropdown } from '../ui';
@@ -81,6 +87,7 @@ export default function AppHeader() {
             <Match when={ctx().kind === 'repo' && (ctx() as { owner: string; repo: string })}>
               {(c) => (
                 <>
+                  <RepoHeaderAvatar owner={c().owner} repo={c().repo} />
                   <a class="AppHeader-context-item truncate" href={`/${c().owner}`}>
                     {c().owner}
                   </a>
@@ -88,6 +95,7 @@ export default function AppHeader() {
                   <a class="AppHeader-context-item font-semibold truncate" href={`/${c().owner}/${c().repo}`}>
                     {c().repo}
                   </a>
+                  <RepoHeaderInfo owner={c().owner} repo={c().repo} />
                 </>
               )}
             </Match>
@@ -131,14 +139,24 @@ export default function AppHeader() {
         <a class="AppHeader-button hidden md:inline-flex" href="/pulls" title="Your pull requests" aria-label="Your pull requests">
           <Octicon icon={gitPullRequestIcon} />
         </a>
-        <a class="AppHeader-button" href="/notifications" title="Notifications" aria-label="Notifications">
-          <Octicon icon={inboxIcon} />
-          <Loading>
-            <Show when={hasUnread()}>
-              <span class="unread-dot" />
-            </Show>
-          </Loading>
-        </a>
+        <div class="flex">
+          <a
+            class={['AppHeader-button', { 'rgh-unread-anywhere-inbox': feature('unread-anywhere') }]}
+            href="/notifications"
+            title="Notifications"
+            aria-label="Notifications"
+          >
+            <Octicon icon={inboxIcon} />
+            <Loading>
+              <Show when={hasUnread()}>
+                <span class="unread-dot" />
+              </Show>
+            </Loading>
+          </a>
+          <Show when={feature('unread-anywhere')}>
+            <UnreadAnywhereButton />
+          </Show>
+        </div>
         <button type="button" class="ml-1 rounded-full" aria-label="Open user navigation menu" onClick={() => setUserOpen(true)}>
           <Loading fallback={<span class="inline-block w-8 h-8 rounded-full bg-canvas-muted" />}>
             <Avatar src={viewer().avatar_url} login={viewer().login} size={32} />
@@ -205,7 +223,7 @@ export default function AppHeader() {
               </a>
             </li>
             <li>
-              <a class="NavList-item" href={`/${viewer().login}?tab=repositories`}>
+              <a class="NavList-item" href={userReposHref(viewer().login)}>
                 <Octicon icon={repoIcon} /> Your repositories
               </a>
             </li>
@@ -290,16 +308,9 @@ function SearchBox(props: { repo?: string }) {
   const location = useLocation();
   let input!: HTMLInputElement;
 
-  onSettled(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (e.key !== '/' || e.metaKey || e.ctrlKey || t.closest('input, textarea, select, [contenteditable]')) return;
-      e.preventDefault();
-      input.focus();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  });
+  const focus = () => input.focus();
+  useHotkey({ keys: '/', description: 'Focus the search bar', group: 'Site-wide', handler: focus });
+  useHotkey({ keys: 's', description: 'Focus the search bar', group: 'Site-wide', handler: focus });
 
   return (
     <form
@@ -329,5 +340,33 @@ function SearchBox(props: { repo?: string }) {
       />
       <kbd>/</kbd>
     </form>
+  );
+}
+
+/**
+ * Refined GitHub's `unread-anywhere`: a narrow button joined to the inbox
+ * icon that opens the newest unread notifications in new tabs (also `g u`).
+ */
+function UnreadAnywhereButton() {
+  const [busy, setBusy] = createSignal(false);
+  return (
+    <button
+      type="button"
+      class="AppHeader-button rgh-unread-anywhere"
+      title="Open unread notifications (g u)"
+      aria-label="Open unread notifications"
+      disabled={busy()}
+      onClick={async (e) => {
+        e.currentTarget.blur();
+        setBusy(true);
+        try {
+          await openUnreadNotifications();
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <Octicon icon={arrowUpRightIcon} size={12} />
+    </button>
   );
 }

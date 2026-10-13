@@ -1,6 +1,7 @@
 import { Title } from '@solidjs/meta';
 import IssueList from '../../../../features/issues/components/IssueList';
 import ListHeader from '../../../../features/issues/components/ListHeader';
+import { feature } from '../../../../features/refined';
 import { useRepo } from '../../../../features/repo/context';
 
 /** /:owner/:repo/issues */
@@ -13,7 +14,7 @@ export default function IssuesPage() {
         kind="issue"
         owner={ctx.owner()}
         repo={ctx.name()}
-        defaultQuery="is:issue state:open"
+        defaultQuery={feature('last-update-sort') ? 'is:issue state:open sort:updated-desc' : 'is:issue state:open'}
         header={<ListHeader owner={ctx.owner()} repo={ctx.name()} title="Issues" newHref={`${ctx.base()}/issues/new`} newLabel="New issue" />}
       />
     </div>

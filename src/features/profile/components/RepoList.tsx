@@ -26,7 +26,13 @@ export const REPO_SORTS: FilterOption[] = [
 ];
 
 /** List body shared by the Repositories / Stars tabs. */
-export function RepoList(props: { result: RepoListResult; showOwner?: boolean; empty: string }) {
+export function RepoList(props: {
+  result: RepoListResult;
+  showOwner?: boolean;
+  /** Issues / pull requests links on each row (`conversation-links-on-repo-lists`). */
+  conversationLinks?: boolean;
+  empty: string;
+}) {
   const location = useLocation();
   return (
     <>
@@ -35,7 +41,7 @@ export function RepoList(props: { result: RepoListResult; showOwner?: boolean; e
         fallback={<Blankslate icon={repoIcon} title={props.empty} class="border-b border-line-muted" />}
       >
         <ul>
-          <For each={props.result.items}>{(repo) => <RepoListItem repo={repo} showOwner={props.showOwner} />}</For>
+          <For each={props.result.items}>{(repo) => <RepoListItem repo={repo} showOwner={props.showOwner} conversationLinks={props.conversationLinks} />}</For>
         </ul>
       </Show>
       <div class="mt-4">

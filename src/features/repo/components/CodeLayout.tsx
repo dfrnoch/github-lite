@@ -1,4 +1,4 @@
-import { useNavigate } from '@solidjs/router';
+import { useLocation, useNavigate } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
 import { createContext, createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack, useContext } from 'solid-js';
 import Octicon from '../../../components/Octicon';
@@ -10,12 +10,16 @@ import {
   fileIcon,
   fileSubmoduleIcon,
   fileSymlinkFileIcon,
+  pencilIcon,
   searchIcon,
   sidebarCollapseIcon,
   sidebarExpandIcon,
 } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
+import { useHotkey } from '../../../lib/hotkeys';
 import type { Repository } from '../../../lib/types';
+import { usePermalinkHotkey } from '../../code/refined';
+import { feature } from '../../refined';
 import { getTree, type TreeEntry } from '../api';
 import RefPicker from './RefPicker';
 
@@ -33,20 +37,18 @@ export const useFileTreeOpen = () => useContext(FileTreeContext);
 
 const SYMLINK_MODE = 0o120000;
 
+/** Pages currently providing their own `t` (so the repo-wide one stands down). */
+let codeFinders = 0;
+export const hasCodeFinderHotkey = () => codeFinders > 0;
+
 /** `t` opens the file finder (github.com's hotkey). */
 export function useFinderHotkey(href: () => string) {
   const navigate = useNavigate();
   onSettled(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 't' || e.metaKey || e.ctrlKey || e.altKey) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
-      e.preventDefault();
-      navigate(href());
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    codeFinders++;
+    return () => codeFinders--;
   });
+  useHotkey({ keys: 't', description: 'Open the file finder', group: 'Source code browsing', handler: () => navigate(href()) });
 }
 
 /**
@@ -77,6 +79,14 @@ export default function CodeLayout(props: {
   );
   const findHref = () => `${base()}/find/${encodePath(props.gitRef)}`;
   useFinderHotkey(findHref);
+  const location = useLocation();
+  usePermalinkHotkey(() => ({
+    owner: props.repo.owner.login,
+    repo: props.repo.name,
+    gitRef: props.gitRef,
+    route: location.pathname.split('/')[3] ?? 'tree',
+    path: props.path,
+  }));
   return (
     <FileTreeContext value={treeOpen}>
       <div class="flex items-start">
@@ -162,12 +172,23 @@ function TreeItem(props: { entry: TreeEntry; repo: Repository; gitRef: string; c
   const href = () =>
     `${base()}/${isDir() ? 'tree' : 'blob'}/${encodePath(props.gitRef)}/${encodePath(props.entry.path)}`;
   const pad = () => ({ 'padding-left': `${props.depth * 16 + 8}px` });
+  const quickEdit = () =>
+    feature('quick-file-edit') && !props.repo.archived && !/^[0-9a-f]{40}$/i.test(props.gitRef) && props.entry.mode !== SYMLINK_MODE;
+  let row!: HTMLDivElement;
+  // sidebar-focus-file: bring the current file / folder into view in the tree.
+  createEffect(
+    () => isCurrent() && feature('sidebar-focus-file'),
+    (focus) => {
+      if (focus) requestAnimationFrame(() => row?.scrollIntoView({ block: 'nearest' }));
+    },
+  );
 
   return (
     <li>
       <div
+        ref={row}
         class={[
-          'relative flex items-center gap-1 rounded-md pr-2 h-8 text-sm hover:bg-canvas-muted',
+          'rgh-tree-row relative flex items-center gap-1 rounded-md pr-2 h-8 text-sm hover:bg-canvas-muted',
           { 'bg-canvas-muted font-semibold': isCurrent() },
         ]}
         style={pad()}
@@ -183,10 +204,25 @@ function TreeItem(props: { entry: TreeEntry; repo: Repository; gitRef: string; c
               <Show
                 when={props.entry.type === 'commit'}
                 fallback={
-                  <Octicon
-                    icon={props.entry.mode === SYMLINK_MODE ? fileSymlinkFileIcon : fileIcon}
-                    class="text-fg-muted shrink-0"
-                  />
+                  <Show
+                    when={quickEdit()}
+                    fallback={
+                      <Octicon
+                        icon={props.entry.mode === SYMLINK_MODE ? fileSymlinkFileIcon : fileIcon}
+                        class="text-fg-muted shrink-0"
+                      />
+                    }
+                  >
+                    <a
+                      class="rgh-quick-file-edit text-fg-muted hover:text-fg-accent inline-flex shrink-0"
+                      href={`${base()}/edit/${encodePath(props.gitRef)}/${encodePath(props.entry.path)}`}
+                      aria-label={`Edit ${props.entry.name}`}
+                      title="Edit this file"
+                    >
+                      <Octicon icon={fileIcon} />
+                      <Octicon icon={pencilIcon} />
+                    </a>
+                  </Show>
                 }
               >
                 <Octicon icon={fileSubmoduleIcon} class="text-fg-muted shrink-0" />

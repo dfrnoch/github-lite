@@ -14,11 +14,16 @@ import {
   type CompareResult,
 } from '../../../../features/code/api';
 import CommitList from '../../../../features/code/components/CommitList';
+import { TitleLengthHint, titleTooLong } from '../../../../features/code/refined';
+import { feature } from '../../../../features/refined';
+import { getRepo } from '../../../../features/repo/api';
 import DiffView from '../../../../features/diff/DiffView';
 import RefPicker from '../../../../features/repo/components/RefPicker';
 import { useRepo } from '../../../../features/repo/context';
 import {
+  alertIcon,
   arrowLeftIcon,
+  arrowSwitchIcon,
   checkIcon,
   fileDiffIcon,
   gitCommitIcon,
@@ -75,7 +80,21 @@ export default function ComparePage() {
           defaultBranch={ctx.repo().default_branch}
           hrefFor={(ref) => hrefFor(ref, range()?.head ?? ctx.repo().default_branch)}
         />
-        <Octicon icon={arrowLeftIcon} class="text-fg-muted" />
+        <Show
+          when={feature('swap-branches-on-compare') && range()}
+          fallback={<Octicon icon={arrowLeftIcon} class="text-fg-muted" />}
+        >
+          {(r) => (
+            <a
+              class="btn-octicon rgh-swap-branches"
+              href={hrefFor(r().head, r().base)}
+              title="Swap the base and compare branches"
+              aria-label="Swap the base and compare branches"
+            >
+              <Octicon icon={arrowSwitchIcon} />
+            </a>
+          )}
+        </Show>
         <HeadPicker
           base={range()?.base ?? ctx.repo().default_branch}
           head={range()?.head ?? ctx.repo().default_branch}
@@ -321,17 +340,31 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
   const ctx = useRepo();
   const navigate = useNavigate();
   const create = useAction(createPull);
-  const single = () => (props.cmp.commits.length === 1 ? props.cmp.commits[0]!.commit.message.split('\n') : null);
-  const [title, setTitle] = createSignal(() => props.defaultTitle ?? (single() ? single()![0]! : titleFromBranch(props.head)));
-  // Prefilled from ?body=, the single commit's message body, or the repo's PR template.
-  const [body, setBody] = createSignal(() => props.defaultBody ?? (single() ? single()!.slice(1).join('\n').trim() : props.template));
+  // github.com prefills a single commit's message; pr-first-commit-title does the same with the first of several commits.
+  const firstCommit = () =>
+    props.cmp.commits.length === 1 || (props.cmp.commits.length > 1 && feature('pr-first-commit-title'))
+      ? props.cmp.commits[0]!.commit.message.split('\n')
+      : null;
+  const [title, setTitle] = createSignal(() => props.defaultTitle ?? (firstCommit() ? firstCommit()![0]! : titleFromBranch(props.head)));
+  // Prefilled from ?body=, the commit's message body, or the repo's PR template.
+  const [body, setBody] = createSignal(
+    () => props.defaultBody ?? (firstCommit()?.slice(1).join('\n').trim() || (props.cmp.commits.length === 1 ? '' : props.template)),
+  );
   const [draft, setDraft] = createSignal(false);
   const [maintainerEdits, setMaintainerEdits] = createSignal(true);
   const [busy, setBusy] = createOptimistic(false);
+  /** prevent-duplicate-pr-submission: stays set once a submission went out (until it fails). */
+  const [submitted, setSubmitted] = createSignal(false);
   const crossRepo = () => props.head.includes(':');
+  const headOwner = () => (crossRepo() ? props.head.split(':')[0]! : ctx.owner());
+  const headBranch = () => (crossRepo() ? props.head.split(':').slice(1).join(':') : props.head);
 
-  const submit = async () => {
+  const submit = async (asDraft = draft()) => {
     if (!title().trim()) return;
+    if (feature('prevent-duplicate-pr-submission')) {
+      if (submitted()) return;
+      setSubmitted(true);
+    }
     setBusy(true);
     try {
       const pr = await create(ctx.owner(), ctx.name(), {
@@ -339,14 +372,16 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
         body: body(),
         base: props.base,
         head: props.head,
-        draft: draft(),
+        draft: asDraft,
         ...(crossRepo() ? { maintainer_can_modify: maintainerEdits() } : {}),
       });
       navigate(`${ctx.base()}/pull/${pr.number}`);
     } catch (e) {
+      setSubmitted(false);
       toastError(e);
     }
   };
+  const disabled = () => busy() || submitted() || !title().trim();
   return (
     <div class="flex gap-4 mb-6">
       <div class="flex-1 min-w-0 Box p-4">
@@ -359,11 +394,13 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
         </label>
         <input
           id="pr-title"
-          class="form-control w-full mb-3"
+          class={['form-control w-full', { 'rgh-title-too-long': titleTooLong(title()) }]}
           value={title()}
           required
           onInput={(e) => setTitle(e.currentTarget.value)}
         />
+        <TitleLengthHint value={title()} />
+        <div class="mb-3" />
         <label class="form-label" for="pr-body">
           Add a description
         </label>
@@ -378,6 +415,20 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
             onSubmit={() => void submit()}
           />
         </Loading>
+        <Show when={feature('warn-pr-from-master') && crossRepo()}>
+          <Loading>
+            <DefaultBranchWarning owner={headOwner()} repo={ctx.name()} branch={headBranch()} />
+          </Loading>
+        </Show>
+        <Show when={feature('warning-for-disallow-edits') && crossRepo() && !maintainerEdits()}>
+          <div class="flash flash-warn mt-3 text-sm rgh-warning-for-disallow-edits">
+            <Octicon icon={alertIcon} />
+            <span>
+              Disallowing edits by maintainers makes it harder for them to help, for example by fixing merge conflicts or small issues
+              themselves. Leave it checked unless you have a reason not to.
+            </span>
+          </div>
+        </Show>
         <div class="flex flex-wrap items-center gap-3 mt-3">
           <Show when={crossRepo()}>
             <label class="text-sm flex items-center gap-2">
@@ -386,8 +437,18 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
             </label>
           </Show>
           <div class="flex-1" />
+          <Show when={feature('one-click-pr-or-gist')}>
+            {/* one-click-pr-or-gist: both PR types as plain buttons instead of a split button. */}
+            <button type="button" class="btn" disabled={disabled()} onClick={() => void submit(true)}>
+              Create draft PR
+            </button>
+            <button type="button" class="btn btn-primary" disabled={disabled()} onClick={() => void submit(false)}>
+              {busy() ? 'Creating…' : 'Create pull request'}
+            </button>
+          </Show>
+          <Show when={!feature('one-click-pr-or-gist')}>
           <div class="BtnGroup">
-            <button type="button" class="btn btn-primary" disabled={busy() || !title().trim()} onClick={() => void submit()}>
+            <button type="button" class="btn btn-primary" disabled={disabled()} onClick={() => void submit()}>
               {busy() ? 'Creating…' : draft() ? 'Draft pull request' : 'Create pull request'}
             </button>
             <Dropdown class="btn btn-primary px-2!" align="right" menuClass="w-80" title="Select type of pull request" button={<Octicon icon={triangleDownIcon} />}>
@@ -433,8 +494,27 @@ function PullForm(props: { template: string; base: string; head: string; cmp: Co
               )}
             </Dropdown>
           </div>
+          </Show>
         </div>
       </div>
     </div>
+  );
+}
+
+/** warn-pr-from-master: the head is the fork's default branch. */
+function DefaultBranchWarning(props: { owner: string; repo: string; branch: string }) {
+  const fork = createMemo(() => getRepo(props.owner, props.repo).catch(() => null));
+  return (
+    <Show when={fork()?.default_branch === props.branch}>
+      <div class="flash flash-error mt-3 text-sm rgh-warn-pr-from-master">
+        <span>
+          <strong>Note:</strong> Creating a PR from the default branch is an{' '}
+          <a href="https://jmeridth.com/posts/do-not-issue-pull-requests-from-your-master-branch/" target="_blank" rel="noreferrer">
+            anti-pattern
+          </a>
+          .
+        </span>
+      </div>
+    </Show>
   );
 }

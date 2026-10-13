@@ -14,6 +14,8 @@ import { useRepo } from '../../../../features/repo/context';
 import { getViewer } from '../../../../features/user/api';
 import { pluralize } from '../../../../lib/format';
 import type { Viewer } from '../../../../lib/types';
+import { stickySidebar } from '../../../../features/repo/refined/sticky';
+import { noSelfReference } from '../../../../features/refined/editor';
 
 /** /:owner/:repo/issues/:number */
 export default function IssuePage() {
@@ -68,6 +70,7 @@ function IssueView(props: { issue: IssueDetail; repo: RepoMeta; projects: Projec
         title={props.issue.title}
         number={props.issue.number}
         canEdit={props.issue.viewerCanUpdate ?? false}
+        locked={props.issue.locked}
         onSave={(title) => update(ctx.owner(), ctx.name(), props.issue.number, { title })}
         actions={
           <a class="btn btn-sm btn-primary" href={`${ctx.base()}/issues/new`}>
@@ -84,7 +87,7 @@ function IssueView(props: { issue: IssueDetail; repo: RepoMeta; projects: Projec
         </span>
       </IssueHeader>
 
-      <div class="flex flex-col md:flex-row gap-6 lg:gap-8">
+      <div class="flex flex-col md:flex-row gap-6 lg:gap-8" ref={noSelfReference}>
         <div class="flex-1 min-w-0">
           <div class="relative">
             <div class="absolute top-0 bottom-0 left-[72px] w-0.5" style={{ 'background-color': 'var(--borderColor-muted)' }} />
@@ -124,10 +127,17 @@ function IssueView(props: { issue: IssueDetail; repo: RepoMeta; projects: Projec
               viewerAvatar={props.viewer.avatar_url}
               value={draft()}
               onInput={setDraft}
+              netiquette={{
+                closedAt: props.issue.closedAt,
+                own: props.issue.viewerDidAuthor,
+                moderator: canTriage(props.repo.viewerPermission),
+                comments: props.issue.comments.totalCount,
+                participants: props.issue.participants.totalCount,
+              }}
             />
           </Loading>
         </div>
-        <aside class="w-full md:w-[256px] lg:w-[296px] shrink-0">
+        <aside class="w-full md:w-[256px] lg:w-[296px] shrink-0" ref={stickySidebar()}>
           <IssueSidebar
             owner={ctx.owner()}
             repo={ctx.name()}

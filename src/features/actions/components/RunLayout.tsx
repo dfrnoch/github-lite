@@ -8,6 +8,7 @@ import {
   arrowLeftIcon,
   checkIcon,
   fileIcon,
+  gitPullRequestIcon,
   homeIcon,
   kebabHorizontalIcon,
   syncIcon,
@@ -16,6 +17,8 @@ import {
   xIcon,
 } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
+import { useHotkey } from '../../../lib/hotkeys';
+import { feature } from '../../refined';
 import { useRepo } from '../../repo/context';
 import { cancelRun, deleteRunLogs, getRun, getRunJobs, getWorkflows, rerunRun } from '../api';
 import { RunContext, type RunContextValue } from '../context';
@@ -152,13 +155,37 @@ function RunHeader(props: { run: WorkflowRun; attempt: number; attempts: number 
   // `run.name` is the run-name when the workflow sets one; the back link names the workflow.
   const workflows = createMemo(() => getWorkflows(ctx.owner(), ctx.name()));
   const workflowName = () => workflows().find((w) => w.id === props.run.workflow_id)?.name ?? props.run.name;
+  const location = useLocation();
+  // action-pr-link: the PR this run was opened from (?pr=), else the run's own PR.
+  const pullNumber = () =>
+    feature('action-pr-link') ? Number(location.query.pr) || props.run.pull_requests[0]?.number || null : null;
+  const canRerunFailed = () => canWrite() && latest() && isDone(props.run.status) && failed();
+  // rerun-workflow
+  useHotkey({
+    keys: 'r f',
+    description: 'Re-run failed jobs',
+    group: 'Actions',
+    feature: 'rerun-workflow',
+    when: canRerunFailed,
+    handler: () => setRerun('failed'),
+  });
 
   return (
     <div class="px-4 md:px-6 lg:px-8 pt-4 pb-6">
-      <a class="link-muted text-sm inline-flex items-center gap-1 mb-1" href={workflowHref()}>
-        <Octicon icon={arrowLeftIcon} />
-        <Loading fallback={props.run.name}>{workflowName()}</Loading>
-      </a>
+      <div class="flex flex-wrap items-center gap-x-3 mb-1 text-sm">
+        <a class="link-muted inline-flex items-center gap-1" href={workflowHref()}>
+          <Octicon icon={arrowLeftIcon} />
+          <Loading fallback={props.run.name}>{workflowName()}</Loading>
+        </a>
+        <Show when={pullNumber()}>
+          {(n) => (
+            <a class="link-muted inline-flex items-center gap-1" href={`${ctx.base()}/pull/${n()}`} title="Pull request that ran this workflow">
+              <Octicon icon={gitPullRequestIcon} />
+              Pull request #{n()}
+            </a>
+          )}
+        </Show>
+      </div>
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="flex-1 min-w-0 flex items-center gap-2 text-xl md:text-2xl break-words">
           <StatusIcon state={state()} size={24} />
@@ -204,6 +231,20 @@ function RunHeader(props: { run: WorkflowRun; attempt: number; attempts: number 
                   </button>
                 }
               >
+                <Show
+                  when={!feature('rerun-workflow')}
+                  fallback={
+                    <>
+                      <button type="button" class="btn btn-sm" onClick={() => setRerun('failed')} title="Re-run failed jobs (r f)">
+                        <Octicon icon={syncIcon} />
+                        Re-run failed jobs
+                      </button>
+                      <button type="button" class="btn btn-sm" onClick={() => setRerun('all')}>
+                        Re-run all jobs
+                      </button>
+                    </>
+                  }
+                >
                 <Dropdown
                   class="btn btn-sm"
                   align="right"
@@ -227,6 +268,7 @@ function RunHeader(props: { run: WorkflowRun; attempt: number; attempts: number 
                     </>
                   )}
                 </Dropdown>
+                </Show>
               </Show>
             </Show>
           </Show>

@@ -1,7 +1,22 @@
-import { createMemo, Loading, Show, untrack } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
+import { createMemo, createSignal, Loading, Show, untrack } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Dropdown, PageSpinner } from '../../../components/ui';
-import { gitBranchIcon, plusIcon, searchIcon, tagIcon, triangleDownIcon, uploadIcon } from '../../../icons/octicons';
+import { Dropdown, PageSpinner, toast, toastError } from '../../../components/ui';
+import {
+  downloadIcon,
+  gitBranchIcon,
+  gitPullRequestIcon,
+  plusIcon,
+  searchIcon,
+  tagIcon,
+  trashIcon,
+  triangleDownIcon,
+  uploadIcon,
+} from '../../../icons/octicons';
+import { deleteBranch } from '../../code/api';
+import { DefaultBranchButton } from '../../code/refined';
+import { getBranchStatus } from '../../code/refinedApi';
+import { feature } from '../../refined';
 import { formatNumber } from '../../../lib/format';
 import { encodePath, GitHubError } from '../../../lib/github';
 import type { Repository } from '../../../lib/types';
@@ -14,6 +29,7 @@ import LatestCommit from './LatestCommit';
 import ReadmeBox from './ReadmeBox';
 import { readmePathFromHtml } from '../../../lib/markdown';
 import RefPicker from './RefPicker';
+import RefPickerExtras from '../refined/RefExtras';
 
 /** File list + README for a directory at a ref (repo root or any sub-folder). */
 export default function DirectoryView(props: { repo: Repository; gitRef: string; path: string }) {
@@ -38,6 +54,11 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
   return (
     <>
       <div class="flex flex-wrap items-center gap-2 mb-4">
+        <DefaultBranchButton
+          gitRef={props.gitRef}
+          defaultBranch={props.repo.default_branch}
+          href={props.path ? `${base()}/tree/${encodePath(props.repo.default_branch)}/${encodePath(props.path)}` : base()}
+        />
         <div class={{ 'lg:hidden': inTree() }}>
           <RefPicker
           owner={owner()}
@@ -47,6 +68,7 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
             hrefFor={(ref) => (props.path ? `${base()}/tree/${encodePath(ref)}/${encodePath(props.path)}` : `${base()}/tree/${encodePath(ref)}`)}
           />
         </div>
+        <RefPickerExtras repo={props.repo} gitRef={props.gitRef} path={props.path} />
         <Show
           when={isRoot()}
           fallback={
@@ -72,6 +94,18 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
             <Octicon icon={searchIcon} />
             <span class="flex-1">Go to file</span>
             <kbd class="text-xs border border-line rounded px-1">t</kbd>
+          </a>
+        </Show>
+        <Show when={feature('download-folder-button') && !isRoot()}>
+          <a
+            class="btn btn-sm"
+            href={`https://download-directory.github.io/?url=${encodeURIComponent(`https://github.com/${props.repo.full_name}/tree/${props.gitRef}/${props.path}`)}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Download this directory as a ZIP file (via download-directory.github.io)"
+          >
+            <Octicon icon={downloadIcon} />
+            <span class="hidden md:inline">Download</span>
           </a>
         </Show>
         <Show when={canPush()}>
@@ -109,12 +143,18 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
         </Show>
       </div>
 
+      <Show when={isRoot() && props.gitRef !== props.repo.default_branch}>
+        <Loading>
+          <BranchInfoBar repo={props.repo} branch={props.gitRef} />
+        </Loading>
+      </Show>
+
       <div class="Box">
         <Loading fallback={<div class="Box-header h-[49px]" />}>
-          <LatestCommit owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} />
+          <LatestCommit owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} route="tree" />
         </Loading>
         <Loading fallback={<PageSpinner />}>
-          <FileTable owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} entries={entries()} />
+          <FileTable owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} entries={entries()} archived={props.repo.archived} />
         </Loading>
       </div>
 
@@ -135,5 +175,122 @@ export default function DirectoryView(props: { repo: Repository; gitRef: string;
         </Show>
       </Loading>
     </>
+  );
+}
+
+/**
+ * github.com's bar above a branch's file list: "This branch is 3 commits ahead
+ * of, 1 commit behind main." With `pr-from-branch` the "Contribute" menu
+ * becomes a plain "Open pull request" button; `delete-branch` adds a delete
+ * button for branches without an open PR.
+ */
+function BranchInfoBar(props: { repo: Repository; branch: string }) {
+  const navigate = useNavigate();
+  const status = createMemo(() => getBranchStatus(props.repo.owner.login, props.repo.name, props.branch, props.repo.default_branch));
+  const base = () => `/${props.repo.full_name}`;
+  const compareHref = () => `${base()}/compare/${encodePath(props.repo.default_branch)}...${encodePath(props.branch)}`;
+  const [deleting, setDeleting] = createSignal(false);
+  const openPull = () => (status()?.pull?.state === 'OPEN' ? status()!.pull : null);
+  const remove = async () => {
+    if (!confirm(`\`${props.branch}\` will be deleted. Are you sure?`)) return;
+    setDeleting(true);
+    try {
+      await deleteBranch(props.repo.owner.login, props.repo.name, props.branch);
+      toast('Branch deleted. Redirecting…', 'success');
+      navigate(`${base()}/activity?activity_type=branch_deletion`);
+    } catch (e) {
+      toastError(e);
+      setDeleting(false);
+    }
+  };
+  const Count = (p: { n: number; what: string; href: string }) => (
+    <a href={p.href}>
+      {p.n} commit{p.n === 1 ? '' : 's'} {p.what}
+    </a>
+  );
+  return (
+    <Show when={status()}>
+      {(s) => (
+        <div class="Box bg-canvas-muted! px-4 py-2 mb-4 flex flex-wrap items-center gap-2 text-sm" data-testid="branch-info-bar">
+          <span class="flex-1 min-w-0">
+            This branch is{' '}
+            <Show
+              when={s().ahead || s().behind}
+              fallback={
+                <>
+                  up to date with <span class="font-mono text-xs px-1.5 py-0.5 rounded-md bg-accent-muted text-fg-accent">{props.repo.default_branch}</span>.
+                </>
+              }
+            >
+              <Show when={s().ahead}>
+                <Count n={s().ahead} what="ahead of" href={compareHref()} />
+              </Show>
+              <Show when={s().ahead && s().behind}>, </Show>
+              <Show when={s().behind}>
+                <Count n={s().behind} what="behind" href={`${base()}/compare/${encodePath(props.branch)}...${encodePath(props.repo.default_branch)}`} />
+              </Show>{' '}
+              <span class="font-mono text-xs px-1.5 py-0.5 rounded-md bg-accent-muted text-fg-accent">{props.repo.default_branch}</span>.
+            </Show>
+          </span>
+          <Show when={feature('delete-branch') && props.repo.permissions?.push && !openPull()}>
+            <button
+              type="button"
+              class="btn btn-sm btn-danger rgh-delete-branch"
+              aria-label="Delete branch"
+              title="Delete branch"
+              disabled={deleting()}
+              onClick={() => void remove()}
+            >
+              <Octicon icon={trashIcon} />
+            </button>
+          </Show>
+          <Show
+            when={openPull()}
+            fallback={
+              <Show when={s().ahead}>
+                <Show
+                  when={feature('pr-from-branch')}
+                  fallback={
+                    <Dropdown
+                      class="btn btn-sm"
+                      align="right"
+                      menuClass="w-80"
+                      button={
+                        <>
+                          <Octicon icon={gitPullRequestIcon} /> Contribute <Octicon icon={triangleDownIcon} />
+                        </>
+                      }
+                    >
+                      {(close) => (
+                        <div class="p-3 text-sm">
+                          <p class="mb-2">
+                            This branch is {s().ahead} commit{s().ahead === 1 ? '' : 's'} ahead of{' '}
+                            <span class="font-mono text-xs">{props.repo.default_branch}</span>.
+                          </p>
+                          <p class="text-fg-muted mb-3">Open a pull request to contribute your changes upstream.</p>
+                          <a class="btn btn-sm btn-primary w-full justify-center" href={`${compareHref()}?expand=1`} onClick={close}>
+                            Open pull request
+                          </a>
+                        </div>
+                      )}
+                    </Dropdown>
+                  }
+                >
+                  <a class="btn btn-sm" href={`${compareHref()}?expand=1`}>
+                    <Octicon icon={gitPullRequestIcon} /> Open pull request
+                  </a>
+                </Show>
+              </Show>
+            }
+          >
+            {(pr) => (
+              <a class="btn btn-sm" href={`/${pr().repo}/pull/${pr().number}`} title={pr().title}>
+                <Octicon icon={gitPullRequestIcon} class="text-fg-open" /> #{pr().number}
+              </a>
+            )}
+          </Show>
+        </div>
+      )}
+    </Show>
   );
 }

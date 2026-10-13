@@ -1,6 +1,6 @@
 import { Title } from '@solidjs/meta';
 import { useAction, useNavigate } from '@solidjs/router';
-import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
+import { createMemo, createSignal, For, Loading, onSettled, Show } from 'solid-js';
 import Octicon from '../../../../components/Octicon';
 import { Dialog, Spinner, toast, toastError } from '../../../../components/ui';
 import type { RepoSettings } from '../../../../features/repo-settings/api';
@@ -13,6 +13,8 @@ import {
 } from '../../../../features/repo-settings/api';
 import { CheckboxSetting, ConfirmDialog, DangerRow, SectionHeading, Subhead } from '../../../../features/repo-settings/components/ui';
 import { useRepo } from '../../../../features/repo/context';
+import { DELETE_HASH, ForkPullsDeleteWarning, QUICK_DELETE_TITLE, useInstantDelete } from '../../../../features/repo/refined/ForkTools';
+import { feature } from '../../../../features/refined';
 import { arrowSwitchIcon, gitBranchIcon, pencilIcon } from '../../../../icons/octicons';
 
 /** /:owner/:repo/settings — General. */
@@ -320,6 +322,15 @@ function DangerZone(props: { save: (patch: Partial<RepoSettings>) => Promise<unk
   const ctx = useRepo();
   const navigate = useNavigate();
   const [dialog, setDialog] = createSignal<null | 'visibility' | 'transfer' | 'archive' | 'delete'>(null);
+  const instantDelete = useInstantDelete();
+  // quick-repo-deletion: "Delete fork" links here with a hash that opens the dialog, name pre-filled.
+  const [prefillDelete, setPrefillDelete] = createSignal(false);
+  onSettled(() => {
+    if (location.hash !== DELETE_HASH || !feature('quick-repo-deletion')) return;
+    history.replaceState(history.state, '', location.pathname + location.search);
+    setPrefillDelete(true);
+    setDialog('delete');
+  });
   const close = () => setDialog(null);
   const isPublic = () => !ctx.repo().private;
   const [newOwner, setNewOwner] = createSignal('');
@@ -371,7 +382,16 @@ function DangerZone(props: { save: (patch: Partial<RepoSettings>) => Promise<unk
           title="Delete this repository"
           description="Once you delete a repository, there is no going back. Please be certain."
           button={
-            <button type="button" class="btn btn-danger" onClick={() => setDialog('delete')}>
+            <button
+              type="button"
+              class="btn btn-danger"
+              title={feature('quick-repo-deletion') ? QUICK_DELETE_TITLE : undefined}
+              onClick={async (e) => {
+                if (await instantDelete(e, ctx.repo())) return;
+                setPrefillDelete(false);
+                setDialog('delete');
+              }}
+            >
               Delete this repository
             </button>
           }
@@ -436,13 +456,17 @@ function DangerZone(props: { save: (patch: Partial<RepoSettings>) => Promise<unk
         onClose={close}
         title={`Delete ${ctx.fullName()}`}
         confirmText={ctx.fullName()}
+        prefill={prefillDelete() ? ctx.fullName() : undefined}
         button="Delete this repository"
         onConfirm={remove}
       >
         <p class="flash flash-warn">
-          This will permanently delete the <strong>{ctx.fullName()}</strong> repository, wiki, issues, comments, packages,
-          secrets, workflow runs, and remove all collaborator associations.
+          <span>
+            This will permanently delete the <strong>{ctx.fullName()}</strong> repository, wiki, issues, comments, packages,
+            secrets, workflow runs, and remove all collaborator associations.
+          </span>
         </p>
+        <ForkPullsDeleteWarning repo={ctx.repo()} />
       </ConfirmDialog>
     </>
   );

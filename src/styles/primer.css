@@ -1402,3 +1402,464 @@ dialog.Drawer::backdrop {
 .markdown-body .task-list-item {
   list-style: none;
 }
+
+/* refined: pulls */
+/* fit-textareas (gated by <html data-rgh-fit-textareas>, see src/features/refined/editor.ts) */
+:root[data-rgh-fit-textareas] textarea.rgh-fit-textarea {
+  field-sizing: content;
+  min-height: 4.5lh;
+  max-height: none !important;
+}
+/* monospace-textareas */
+:root[data-rgh-monospace-textareas] .rgh-monospace-field {
+  font-family: var(--fontStack-monospace, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace) !important;
+}
+/* table-input: 5×5 size picker */
+.rgh-table-input {
+  display: grid;
+  grid-template: repeat(5, 20px) / repeat(5, 20px);
+  padding: 3px;
+}
+.rgh-tic {
+  display: grid;
+  padding: 1px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.rgh-tic::before {
+  content: '';
+  border: 2px solid var(--borderColor-default);
+  border-radius: 2px;
+}
+.rgh-tic--on::before {
+  border-color: var(--borderColor-accent-muted, var(--borderColor-accent-emphasis));
+  background-color: var(--bgColor-accent-muted);
+}
+/* no-self-reference */
+.markdown-body a.rgh-self-reference {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--fgColor-danger);
+  cursor: help;
+}
+/* cross-deleted-pr-branches */
+.rgh-deleted-branch,
+.rgh-deleted-branch * {
+  text-decoration: line-through !important;
+  color: var(--fgColor-muted) !important;
+}
+/* clean-checks-list: dim passing checks while something fails or runs */
+.rgh-checks-list.rgh-checks-dim:not(:hover) .rgh-check-done {
+  opacity: 0.5;
+}
+/* mobile-tabs-pr: icon + counter above the label so all four tabs fit */
+@media (max-width: 767px) {
+  .rgh-mobile-tabs-pr .UnderlineNav-body {
+    flex: 1;
+    overflow: visible !important;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-body ~ * {
+    display: none;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-wrap: wrap;
+    place-content: center;
+    gap: 2px 5px;
+    height: auto;
+    padding: 4px 2px;
+    font-size: 13px;
+    line-height: 16px;
+    white-space: normal;
+    text-align: center;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-item > .octicon {
+    order: -2;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-item .Counter {
+    order: -1;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-item > span:not(.Counter) {
+    flex-basis: 100%;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-item.selected::after {
+    bottom: -5px;
+  }
+}
+@media (max-width: 500px) {
+  .rgh-mobile-tabs-pr .UnderlineNav-item {
+    font-size: 11px;
+  }
+  .rgh-mobile-tabs-pr .UnderlineNav-item .Counter {
+    padding: 0;
+    min-width: 0;
+    background: none;
+  }
+}
+
+/* refined: code */
+/* tab-size: GitHub's default is 8; the feature sets --tab-size on code containers. */
+.blob-code {
+  tab-size: var(--tab-size, 8);
+}
+/* show-whitespace */
+[data-rgh-whitespace] {
+  background-clip: border-box;
+  background-repeat: repeat-x;
+  background-position: left center;
+}
+[data-rgh-whitespace='tab'] {
+  background-image: url('data:image/svg+xml,%3Csvg preserveAspectRatio="xMinYMid meet" viewBox="0 0 12 24" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M9.5 10.44L6.62 8.12L7.32 7.26L12.04 11V11.44L7.28 14.9L6.62 13.9L9.48 11.78H0V10.44H9.5Z" fill="rgba(128, 128, 128, 50%25)"/%3E%3C/svg%3E');
+  background-size: calc(var(--tab-size, 8) * 1ch) 1.25em;
+  background-position: 2px center;
+}
+[data-rgh-whitespace='space'] {
+  background-image: url('data:image/svg+xml,%3Csvg preserveAspectRatio="xMinYMid meet" viewBox="0 0 12 24" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M4.5 11C4.5 10.1716 5.17157 9.5 6 9.5C6.82843 9.5 7.5 10.1716 7.5 11C7.5 11.8284 6.82843 12.5 6 12.5C5.17157 12.5 4.5 11.8284 4.5 11Z" fill="rgba(128, 128, 128, 50%25)"/%3E%3C/svg%3E');
+  background-size: 1ch 1.25em;
+}
+/* linkify-code */
+.rgh-linkified-code {
+  color: inherit !important;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+}
+.rgh-linkified-code:hover {
+  text-decoration-color: currentColor;
+}
+/* hide-diff-signs */
+.rgh-hide-diff-signs .blob-code-marker::before {
+  visibility: hidden;
+}
+/* extend-diff-expander */
+.rgh-extend-diff-expander {
+  cursor: pointer;
+}
+.rgh-extend-diff-expander:hover .blob-code-hunk {
+  color: var(--fgColor-default);
+  background-color: var(--diffBlob-hunkNum-bgColor-hover, var(--bgColor-accent-muted));
+}
+/* quick-file-edit: the file icon turns into an edit pencil on hover */
+.rgh-quick-file-edit > :last-child {
+  display: none;
+}
+:is(tr, .rgh-tree-row):hover .rgh-quick-file-edit > :first-child {
+  display: none;
+}
+:is(tr, .rgh-tree-row):hover .rgh-quick-file-edit > :last-child {
+  display: inline-block;
+}
+/* file-age-color */
+[data-rgh-heat] {
+  --rgh-code-heat: var(--fgColor-severe);
+}
+[data-rgh-heat='1'] { color: var(--rgh-code-heat); }
+[data-rgh-heat='2'] { color: color-mix(in srgb, var(--rgh-code-heat) 90%, var(--fgColor-muted)); }
+[data-rgh-heat='3'] { color: color-mix(in srgb, var(--rgh-code-heat) 80%, var(--fgColor-muted)); }
+[data-rgh-heat='4'] { color: color-mix(in srgb, var(--rgh-code-heat) 70%, var(--fgColor-muted)); }
+[data-rgh-heat='5'] { color: color-mix(in srgb, var(--rgh-code-heat) 60%, var(--fgColor-muted)); }
+[data-rgh-heat='6'] { color: color-mix(in srgb, var(--rgh-code-heat) 50%, var(--fgColor-muted)); }
+[data-rgh-heat='7'] { color: color-mix(in srgb, var(--rgh-code-heat) 40%, var(--fgColor-muted)); }
+[data-rgh-heat='8'] { color: color-mix(in srgb, var(--rgh-code-heat) 30%, var(--fgColor-muted)); }
+[data-rgh-heat='9'] { color: color-mix(in srgb, var(--rgh-code-heat) 20%, var(--fgColor-muted)); }
+[data-rgh-heat='10'] { color: var(--fgColor-muted); }
+/* mark-merge-commits-in-list */
+.rgh-merge-commit > div > * {
+  transition: 100ms opacity;
+}
+.rgh-merge-commit:not(:hover) > div > * {
+  opacity: 50%;
+}
+/* suggest-commit-title-limit */
+.rgh-title-too-long,
+.rgh-title-too-long:focus {
+  border-color: var(--borderColor-danger-emphasis) !important;
+}
+/* conventional-commits: label colors from GitHub's default labels */
+[data-rgh-conventional-commits] {
+  --label-r: 255; --label-g: 255; --label-b: 255; --label-h: 0; --label-s: 0; --label-l: 100;
+  font-size: 12px;
+  line-height: 1.5;
+}
+[data-rgh-conventional-commits='feat'] { --label-r: 162; --label-g: 238; --label-b: 239; --label-h: 180; --label-s: 70; --label-l: 78; }
+[data-rgh-conventional-commits='fix'] { --label-r: 215; --label-g: 58; --label-b: 74; --label-h: 353; --label-s: 66; --label-l: 53; }
+[data-rgh-conventional-commits='docs'] { --label-r: 0; --label-g: 117; --label-b: 202; --label-h: 205; --label-s: 100; --label-l: 39; }
+[data-rgh-conventional-commits='build'] { --label-r: 217; --label-g: 63; --label-b: 11; --label-h: 15; --label-s: 90; --label-l: 44; }
+[data-rgh-conventional-commits='refactor'] { --label-r: 0; --label-g: 107; --label-b: 117; --label-h: 185; --label-s: 100; --label-l: 22; }
+[data-rgh-conventional-commits='test'] { --label-r: 251; --label-g: 202; --label-b: 4; --label-h: 48; --label-s: 96; --label-l: 50; }
+[data-rgh-conventional-commits='ci'] { --label-r: 197; --label-g: 222; --label-b: 245; --label-h: 208; --label-s: 70; --label-l: 86; }
+[data-rgh-conventional-commits='perf'] { --label-r: 83; --label-g: 25; --label-b: 231; --label-h: 256; --label-s: 81; --label-l: 50; }
+/* CSV/TSV previews (+ sticky-csv-header) */
+.markdown-body table.csv-data {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.markdown-body .csv-data td,
+.markdown-body .csv-data th {
+  white-space: nowrap;
+  border-top: 0;
+  border-left: 0;
+}
+.markdown-body .csv-data .blob-num {
+  padding: 6px 10px;
+  border-right: 1px solid var(--borderColor-muted);
+}
+.markdown-body .csv-data thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--bgColor-muted);
+}
+.markdown-body .rgh-sticky-csv :is(td, th):first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--bgColor-default);
+  background-clip: padding-box;
+}
+.markdown-body .rgh-sticky-csv thead th:first-child {
+  z-index: 3;
+  background-color: var(--bgColor-muted);
+}
+/* end refined: code */
+
+/* refined: repo */
+
+/* sticky-sidebar (toggled by stickySidebar() when the sidebar fits the viewport) */
+.rgh-sticky-sidebar {
+  position: sticky;
+  top: var(--rgh-sticky-offset, 16px);
+  align-self: flex-start;
+}
+
+/* clean-repo-filelist-actions: icon-only "Code" button, narrower "Go to file" box */
+.rgh-clean-filelist .btn-primary[aria-haspopup='menu'] {
+  gap: 2px;
+  padding-inline: 8px 6px;
+  font-size: 0;
+}
+.rgh-clean-filelist a.form-control.w-56:not(:focus-within) {
+  width: 130px;
+  min-width: 130px;
+}
+
+/* mobile-tabs: compact icon + counter over a tiny label on narrow screens */
+@media (width <= 767px) {
+  .rgh-mobile-tabs .UnderlineNav {
+    padding-block: 5px 8px;
+    min-height: auto;
+  }
+  .rgh-mobile-tabs .UnderlineNav-body {
+    align-items: stretch;
+    gap: 6px;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item {
+    display: grid;
+    min-width: 50px;
+    height: auto;
+    grid-template-areas: 'icon counter' 'title title';
+    gap: 0 5px;
+    padding: 6px 10px;
+    line-height: 1;
+    background: var(--control-transparent-bgColor-hover, var(--bgColor-neutral-muted));
+  }
+  .rgh-mobile-tabs .UnderlineNav-item:not(:has(.Counter)) {
+    grid-template-areas: 'icon icon' 'title title';
+  }
+  .rgh-mobile-tabs .UnderlineNav-item:not(:has(.Counter)) .octicon {
+    justify-self: center;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item.selected::after {
+    bottom: -9px;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item .octicon {
+    grid-area: icon;
+    justify-self: end;
+    margin: 0;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item .Counter {
+    grid-area: counter;
+    justify-self: start;
+    min-width: min-content;
+    padding: 0;
+    background: none;
+    border: none;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item [data-content] {
+    grid-area: title;
+    margin-top: 5px;
+    font-size: 0;
+    text-align: center;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item [data-content]::before {
+    content: attr(data-content);
+    font-size: 10px;
+  }
+  .rgh-mobile-tabs .UnderlineNav-item [data-content='Pull requests']::before {
+    content: 'Pulls';
+  }
+}
+/* end refined: repo */
+
+/* refined: conversations */
+/* scrollable-areas: tall code blocks and quotes in comments scroll (click to expand). */
+.rgh-scrollable :is(pre, blockquote):not(.rgh-scrollable-expanded, pre *, blockquote *) {
+  position: relative;
+  max-height: 30.5em;
+  overflow-y: auto;
+}
+.rgh-scrollable blockquote {
+  padding-bottom: 0.2em;
+}
+/* small-user-avatars: avatar inside @mentions. */
+.markdown-body .user-mention .rgh-mention-avatar {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 0 2px 0 1px;
+  vertical-align: text-bottom;
+  border-radius: 50%;
+}
+/* comments-time-machine-links */
+.markdown-body .rgh-time-machine {
+  display: inline-flex;
+  margin-left: 2px;
+  vertical-align: middle;
+  color: var(--fgColor-muted);
+}
+.markdown-body .rgh-time-machine:hover {
+  color: var(--fgColor-accent);
+}
+/* embed-gist-inline */
+.markdown-body .rgh-gist .rgh-gist-code {
+  max-height: 16em;
+  overflow: auto;
+  margin: 0;
+  border-radius: 0 0 6px 6px;
+}
+/* dim-bots */
+.rgh-dim-bot {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.rgh-dim-bot:hover {
+  opacity: 1;
+}
+/* conversation-authors */
+.rgh-own-conversation,
+.rgh-own-conversation:hover {
+  color: var(--fgColor-default) !important;
+  background-color: var(--bgColor-attention-muted);
+  border-radius: 2em;
+  padding: 0 5px;
+}
+.rgh-collaborator {
+  border: 1px solid var(--borderColor-default);
+  border-radius: 2em;
+  padding: 0 5px;
+}
+/* keyboard-navigation */
+.rgh-keyboard-target > .timeline-comment {
+  outline: 2px solid var(--borderColor-accent-emphasis, var(--fgColor-accent));
+  outline-offset: -1px;
+}
+/* jump-to-conversation-close-event */
+.rgh-jump-to-close-event :is(.State--closed, .State--merged, .State--done, .State:not([class*='State--'])) {
+  cursor: pointer;
+}
+@keyframes rgh-flash {
+  from {
+    background-color: var(--bgColor-attention-muted);
+  }
+}
+.rgh-flash {
+  animation: rgh-flash 2s ease-out;
+}
+/* parse-backticks */
+code.rgh-backticks {
+  font-family: var(--fontStack-monospace, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 85%;
+  padding: 0.1em 0.3em;
+  border-radius: 6px;
+  background-color: var(--bgColor-neutral-muted);
+}
+/* end refined: conversations */
+
+/* refined: people */
+/* unread-anywhere: a narrow button joined to the inbox icon */
+.AppHeader-button.rgh-unread-anywhere-inbox {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.AppHeader-button.rgh-unread-anywhere {
+  width: 18px;
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+/* mark-private-orgs: eye-closed badge on an org avatar */
+.rgh-private-org {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  padding: 1px;
+  color: var(--fgColor-default);
+  background-color: var(--bgColor-default);
+  border: 1px solid var(--borderColor-default);
+  border-radius: 50%;
+  pointer-events: none;
+}
+/* mark-private-repos */
+.Label.rgh-private-repo {
+  color: var(--fgColor-attention);
+  border-color: var(--borderColor-attention-emphasis);
+}
+/* sticky-notifications-actions */
+@media (min-height: 500px) {
+  .Box-header.rgh-sticky-notifications {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+}
+/* j/k selection in lists (GitHub's .navigation-focus) */
+.Box-row.navigation-focus {
+  background-color: var(--bgColor-accent-muted);
+  box-shadow: 2px 0 0 var(--borderColor-accent-emphasis) inset;
+}
+/* end refined: people */
+
+/* Navigation progress bar (shown after a short delay so fast navigations don't flash). */
+.NavigationProgress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  height: 3px;
+  width: 0;
+  background-color: var(--bgColor-accent-emphasis);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    width 200ms ease-out,
+    opacity 300ms ease 200ms;
+}
+.NavigationProgress.is-active {
+  opacity: 1;
+  animation: nav-progress 8s cubic-bezier(0.1, 0.8, 0.3, 1) 150ms forwards;
+  transition: opacity 0ms 150ms;
+}
+@keyframes nav-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 90%;
+  }
+}

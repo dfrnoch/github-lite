@@ -23,17 +23,165 @@ export const getPull = query(async (owner: string, repo: string, number: number)
   }
 }, 'pull');
 
-/** Number of checks on the head commit (Checks tab counter). */
+/**
+ * Number of checks on the head commit (Checks tab counter), plus whether the
+ * head branch is gone (Refined GitHub cross-deleted-pr-branches).
+ */
 export const getPullChecksCount = query(async (owner: string, repo: string, number: number) => {
   const data = await gql<any>(
     `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){
+      headRef{id} headRepository{id}
       commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:0){totalCount}}}}}
     }}}`,
     { owner, name: repo, number },
   );
-  const rollup = data.repository.pullRequest?.commits.nodes[0]?.commit.statusCheckRollup;
-  return { count: (rollup?.contexts.totalCount ?? 0) as number, state: (rollup?.state ?? null) as string | null };
+  const pr = data.repository.pullRequest;
+  const rollup = pr?.commits.nodes[0]?.commit.statusCheckRollup;
+  return {
+    count: (rollup?.contexts.totalCount ?? 0) as number,
+    state: (rollup?.state ?? null) as string | null,
+    headDeleted: !!pr && (!pr.headRef || !pr.headRepository),
+  };
 }, 'pull-checks-count');
+
+// ---------------------------------------------------------------------------
+// Refined GitHub (pulls area)
+// ---------------------------------------------------------------------------
+
+export interface PullDeployment {
+  createdAt: string;
+  environment: string | null;
+  /** ACTIVE | INACTIVE | FAILURE | ERROR | PENDING | … */
+  state: string;
+  url: string | null;
+}
+
+/** Key matching a timeline DeployedEvent node to its deployment (the timeline query has no ids). */
+export const deploymentKey = (createdAt: string | undefined, environment: string | null | undefined) => `${createdAt}|${environment ?? ''}`;
+
+/** The PR's deployments, oldest first (hide-inactive-deployments, view-last-pr-deployment). */
+export const getPullDeployments = query(async (owner: string, repo: string, number: number): Promise<PullDeployment[]> => {
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){
+      timelineItems(last:100,itemTypes:[DEPLOYED_EVENT]){nodes{... on DeployedEvent{createdAt deployment{state environment latestStatus{state environmentUrl}}}}}
+    }}}`,
+    { owner, name: repo, number },
+  );
+  return (data.repository.pullRequest?.timelineItems.nodes ?? [])
+    .filter((n: any) => n.deployment)
+    .map((n: any) => ({
+      createdAt: n.createdAt,
+      environment: n.deployment.environment,
+      state: n.deployment.state,
+      url: n.deployment.latestStatus?.environmentUrl ?? null,
+    }));
+}, 'pull-deployments');
+
+/** Versioned tags (v1.2.3, 1.2) are preferred over e.g. "nightly". */
+const isVersionTag = (name: string) => !name.includes('nightly') && /\d[.]\d/.test(name);
+
+/**
+ * closing-remarks: for a merged PR, the first tag that contains its merge
+ * commit and whether the repo has any tags at all (null when not merged).
+ * Walks tags newest → oldest down to the merge date (the first page comes
+ * with the PR in one request), then checks containment with the compare API.
+ */
+export const getFirstTag = query(async (owner: string, repo: string, number: number): Promise<{ tag: string | null; hasTags: boolean; sha: string } | null> => {
+  const TAGS = `refs(refPrefix:"refs/tags/",first:100,after:$after,orderBy:{field:TAG_COMMIT_DATE,direction:DESC}){
+    totalCount pageInfo{hasNextPage endCursor}
+    nodes{name target{__typename ... on Commit{committedDate} ... on Tag{target{... on Commit{committedDate}}}}}
+  }`;
+  const first: any = await gql<any>(
+    `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){
+      pullRequest(number:$number){merged mergedAt mergeCommit{oid}} ${TAGS}
+    }}`,
+    { owner, name: repo, number, after: null },
+  );
+  const pr = first.repository.pullRequest;
+  if (!pr?.merged || !pr.mergeCommit) return null;
+  const sha: string = pr.mergeCommit.oid;
+  const since = Date.parse(pr.mergedAt) - 60_000;
+  const hasTags = first.repository.refs.totalCount > 0;
+  const candidates: { name: string; date: number }[] = [];
+  let refs = first.repository.refs;
+  for (let page = 0; page < 5; page++) {
+    // The order follows tag dates, which can differ from commit dates — keep
+    // walking a month past the merge before giving up on older pages.
+    let reachedMerge = false;
+    for (const n of refs.nodes) {
+      const date = Date.parse(n.target?.committedDate ?? n.target?.target?.committedDate ?? '');
+      if (Number.isNaN(date)) continue;
+      if (date >= since) candidates.push({ name: n.name, date });
+      else if (date < since - 30 * 86_400_000) reachedMerge = true;
+    }
+    if (reachedMerge || !refs.pageInfo.hasNextPage) break;
+    const next: any = await gql<any>(`query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){${TAGS}}}`, {
+      owner,
+      name: repo,
+      after: refs.pageInfo.endCursor,
+    });
+    refs = next.repository.refs;
+  }
+  candidates.sort((a, b) => a.date - b.date);
+  const contains = async (tag: string) => {
+    try {
+      const cmp = await gh<{ status: string }>(`/repos/${owner}/${repo}/compare/${sha}...${encodeURIComponent(tag)}`, { query: { per_page: 1 } });
+      return cmp.status === 'ahead' || cmp.status === 'identical';
+    } catch {
+      return false;
+    }
+  };
+  for (const list of [candidates.filter((c) => isVersionTag(c.name)).slice(0, 5), candidates.filter((c) => !isVersionTag(c.name)).slice(0, 2)]) {
+    for (const c of list) if (await contains(c.name)) return { tag: c.name, hasTags, sha };
+  }
+  return { tag: null, hasTags, sha };
+}, 'pull-first-tag');
+
+/**
+ * update-pr-from-base-branch: whether the head branch is behind its base
+ * (and still ahead, i.e. diverged) and the viewer may push to it.
+ */
+export const getPullBranchUpdatable = query(async (owner: string, repo: string, number: number, base: string): Promise<boolean> => {
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!,$number:Int!,$base:String!){repository(owner:$owner,name:$name){pullRequest(number:$number){
+      mergeable viewerCanUpdate viewerCanEditFiles
+      headRef{compare(headRef:$base){status aheadBy}}
+      headRepository{viewerPermission}
+    }}}`,
+    { owner, name: repo, number, base },
+  );
+  const pr = data.repository.pullRequest;
+  if (!pr?.headRef) return false;
+  const canPushHead = pr.viewerCanUpdate || pr.viewerCanEditFiles || ['ADMIN', 'MAINTAIN', 'WRITE'].includes(pr.headRepository?.viewerPermission);
+  // compare() runs head → base, so "DIVERGED" means the head is behind (and ahead).
+  return canPushHead && pr.mergeable !== 'CONFLICTING' && pr.headRef.compare?.status === 'DIVERGED';
+}, 'pull-branch-updatable');
+
+export interface SquashCommit {
+  message: string;
+  authors: { name: string | null; email: string | null; login: string | null }[];
+}
+
+/** Commit messages and authors (clear-pr-merge-commit-message builds the squash message from them). */
+export const getPullCommitMessages = query(async (owner: string, repo: string, number: number): Promise<SquashCommit[]> => {
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){
+      commits(first:250){nodes{commit{message authors(first:10){nodes{name email user{login}}}}}}
+    }}}`,
+    { owner, name: repo, number },
+  );
+  return (data.repository.pullRequest?.commits.nodes ?? []).map((n: any) => ({
+    message: n.commit.message,
+    authors: n.commit.authors.nodes.map((a: any) => ({ name: a.name, email: a.email, login: a.user?.login ?? null })),
+  }));
+}, 'pull-commit-messages');
+
+/** pr-branch-auto-delete: open PRs that use `branch` as their base (deleting it would close them). */
+export const countPullsBasedOn = (owner: string, repo: string, branch: string) =>
+  gql<any>(
+    `query($owner:String!,$name:String!,$base:String!){repository(owner:$owner,name:$name){pullRequests(baseRefName:$base,states:OPEN){totalCount}}}`,
+    { owner, name: repo, base: branch },
+  ).then((d) => d.repository.pullRequests.totalCount as number);
 
 export interface PullPageData {
   repo: PullRepoMeta;
@@ -78,6 +226,19 @@ export const updatePullBranch = action(async (owner: string, repo: string, numbe
     body: { expected_head_sha: headSha },
   });
 }, 'update-pull-branch');
+
+/** update-pr-from-base-branch: merge or rebase the base branch into the head branch (GraphQL supports both). */
+export const updatePullBranchWith = action(async (pullId: string, headOid: string, method: 'MERGE' | 'REBASE') => {
+  await gql(
+    `mutation($input:UpdatePullRequestBranchInput!){updatePullRequestBranch(input:$input){clientMutationId}}`,
+    { input: { pullRequestId: pullId, expectedHeadOid: headOid, updateMethod: method } },
+  );
+}, 'update-pull-branch-with');
+
+/** quick-review: approve right away (POST /pulls/{n}/reviews, event APPROVE). */
+export const approvePull = action(async (owner: string, repo: string, number: number, body: string) => {
+  await gh(`/repos/${owner}/${repo}/pulls/${number}/reviews`, { method: 'POST', body: { event: 'APPROVE', body } });
+}, 'approve-pull');
 
 /** Delete the head branch (`repo` is the head repository's "owner/name"). */
 export const deleteBranch = action(async (headRepo: string, branch: string) => {

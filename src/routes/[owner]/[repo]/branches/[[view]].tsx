@@ -19,6 +19,7 @@ import {
 import { ChecksBadge } from '../../../../features/code/components/CommitList';
 import { getRefNames } from '../../../../features/repo/api';
 import { useRepo } from '../../../../features/repo/context';
+import { feature } from '../../../../features/refined';
 import { getViewer } from '../../../../features/user/api';
 import {
   chevronRightIcon,
@@ -28,6 +29,7 @@ import {
   gitPullRequestDraftIcon,
   gitPullRequestIcon,
   kebabHorizontalIcon,
+  repoForkedIcon,
   searchIcon,
   shieldLockIcon,
   trashIcon,
@@ -252,6 +254,7 @@ function BranchTable(props: { title: string; branches: BranchRow[]; moreHref?: s
 
 function PullBadge(props: { pull: NonNullable<BranchExtra['pull']> }) {
   const ctx = useRepo();
+  const upstream = () => props.pull.repo.toLowerCase() !== ctx.fullName().toLowerCase();
   const look = () =>
     props.pull.state === 'MERGED'
       ? { icon: gitMergeIcon, cls: 'text-fg-done' }
@@ -263,12 +266,17 @@ function PullBadge(props: { pull: NonNullable<BranchExtra['pull']> }) {
   return (
     <a
       class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-line text-xs link-plain hover:bg-canvas-muted"
-      href={`${ctx.base()}/pull/${props.pull.number}`}
-      title={props.pull.title}
+      href={`/${props.pull.repo}/pull/${props.pull.number}`}
+      title={upstream() ? `${props.pull.title} (${props.pull.repo})` : props.pull.title}
     >
       <span class={['inline-flex', look().cls]}>
         <Octicon icon={look().icon} size={12} />
       </span>
+      <Show when={upstream()}>
+        <span class={['inline-flex', look().cls]}>
+          <Octicon icon={repoForkedIcon} size={12} />
+        </span>
+      </Show>
       #{props.pull.number}
     </a>
   );
@@ -341,7 +349,11 @@ function BranchTableRow(props: {
       </Cell>
       <Cell class="hidden md:table-cell">
         <Loading>
-          <Show when={props.extra?.pull}>{(pr) => <PullBadge pull={pr()} />}</Show>
+          <Show
+            when={feature('show-associated-branch-prs-on-fork') && ctx.repo().fork ? props.extra?.anyPull : props.extra?.pull}
+          >
+            {(pr) => <PullBadge pull={pr()} />}
+          </Show>
         </Loading>
       </Cell>
       <td class="pr-3 py-2 align-middle text-right whitespace-nowrap">

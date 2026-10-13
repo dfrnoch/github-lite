@@ -4,6 +4,7 @@ import { getViewer } from '../../user/api';
 import Octicon from '../../../components/Octicon';
 import { Avatar, MarkdownEditor, toastError } from '../../../components/ui';
 import { checkIcon, chevronDownIcon, chevronRightIcon, fileIcon } from '../../../icons/octicons';
+import LineNumberLink from '../../code/components/LineNumberLink';
 import Comment from '../../issues/components/Comment';
 import type { ReviewThread as Thread } from '../../issues/types';
 import { replyToThread, setThreadResolved } from '../api';
@@ -35,7 +36,7 @@ export function parseHunk(hunk: string): HunkLine[] {
 }
 
 /** The few diff lines a review comment points at (GitHub shows the last 4). */
-export function DiffHunk(props: { hunk: string; lines?: number }) {
+export function DiffHunk(props: { hunk: string; lines?: number; path?: string; filesHref?: string }) {
   const rows = createMemo(() => {
     const all = parseHunk(props.hunk);
     const body = all.filter((l) => l.kind !== 'hunk');
@@ -51,10 +52,10 @@ export function DiffHunk(props: { hunk: string; lines?: number }) {
             {(l) => (
               <tr>
                 <td class={['blob-num', { 'blob-num-addition': l.kind === 'add', 'blob-num-deletion': l.kind === 'del', 'blob-num-hunk': l.kind === 'hunk' }]}>
-                  {l.old ?? ''}
+                  <LineNumberLink n={l.old} side="L" path={props.path} filesHref={props.filesHref} />
                 </td>
                 <td class={['blob-num', { 'blob-num-addition': l.kind === 'add', 'blob-num-deletion': l.kind === 'del', 'blob-num-hunk': l.kind === 'hunk' }]}>
-                  {l.new ?? ''}
+                  <LineNumberLink n={l.new} side="R" path={props.path} filesHref={props.filesHref} />
                 </td>
                 <td
                   class={[
@@ -120,7 +121,7 @@ export default function ReviewThread(props: {
       <Show when={expanded()}>
         <Show when={props.thread.subjectType !== 'FILE' && first()?.diffHunk}>
           <div class="border-b border-line">
-            <DiffHunk hunk={first()!.diffHunk} />
+            <DiffHunk hunk={first()!.diffHunk} path={props.thread.path} filesHref={filesHref()} />
           </div>
         </Show>
         <div class="divide-y divide-[var(--borderColor-muted)]">

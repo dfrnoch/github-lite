@@ -1,6 +1,7 @@
+import { useNavigate } from '@solidjs/router';
 import { createMemo, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, PageSpinner, RelativeTime } from '../../../components/ui';
+import { Avatar, PageSpinner, RelativeTime, toast, toastError } from '../../../components/ui';
 import { versionsIcon } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
 import { escapeLines, highlightLines } from '../../../lib/highlight';
@@ -10,7 +11,10 @@ import Breadcrumbs from '../../repo/components/Breadcrumbs';
 import { useFileTreeOpen } from '../../repo/components/CodeLayout';
 import LatestCommit from '../../repo/components/LatestCommit';
 import RefPicker from '../../repo/components/RefPicker';
+import { feature } from '../../refined';
 import { getBlame, type BlameRange } from '../api';
+import { codeTransformOptions, DefaultBranchButton, tabSizeStyle, transformCodeLine } from '../refined';
+import { getPullBlameCommit } from '../refinedApi';
 
 /** GraphQL `age` runs 1 (newest) … 10 (oldest); newer changes get a darker swatch. */
 const ageColor = (age: number) => `var(--display-orange-scale-${Math.min(9, Math.max(0, 10 - age))})`;
@@ -26,15 +30,26 @@ export default function BlameView(props: { repo: Repository; gitRef: string; pat
   const raw = createMemo(() => getRawFile(owner(), name(), props.gitRef, props.path));
   // Equality-gated: a revalidated but identical file doesn't re-highlight.
   const code = createMemo(() => raw().replace(/\n$/, ''));
-  const lines = createMemo(async () => {
+  // Equality-gated: a re-resolved route (same path) doesn't re-highlight.
+  const path = createMemo(() => props.path);
+  const highlighted = createMemo(async () => {
     const text = code();
-    return (await highlightLines(text, props.path)) ?? escapeLines(text);
+    return (await highlightLines(text, path())) ?? escapeLines(text);
+  });
+  const lines = createMemo(() => {
+    const opts = codeTransformOptions(base());
+    return highlighted().map((html) => transformCodeLine(html, opts));
   });
   const lineCount = () => raw().split('\n').length - (raw().endsWith('\n') ? 1 : 0);
 
   return (
     <>
       <div class="flex flex-wrap items-center gap-2 mb-4">
+        <DefaultBranchButton
+          gitRef={props.gitRef}
+          defaultBranch={props.repo.default_branch}
+          href={`${base()}/blame/${encodePath(props.repo.default_branch)}/${encodePath(props.path)}`}
+        />
         <div class={{ 'lg:hidden': inTree() }}>
           <RefPicker
             owner={owner()}
@@ -50,7 +65,7 @@ export default function BlameView(props: { repo: Repository; gitRef: string; pat
       </div>
       <div class="Box mb-4">
         <Loading fallback={<div class="Box-header h-[49px] border-0!" />}>
-          <LatestCommit owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} />
+          <LatestCommit owner={owner()} repo={name()} gitRef={props.gitRef} path={props.path} route="blame" />
         </Loading>
       </div>
       <div class="Box">
@@ -74,11 +89,11 @@ export default function BlameView(props: { repo: Repository; gitRef: string; pat
           </span>
         </div>
         <Loading fallback={<PageSpinner />}>
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto" style={tabSizeStyle()}>
             <table class="w-full border-collapse">
               <tbody>
                 <For each={ranges()}>
-                  {(range) => <BlameHunk range={range} lines={lines()} base={base()} path={props.path} />}
+                  {(range) => <BlameHunk range={range} lines={lines()} base={base()} owner={owner()} repo={name()} path={props.path} />}
                 </For>
               </tbody>
             </table>
@@ -89,7 +104,23 @@ export default function BlameView(props: { repo: Repository; gitRef: string; pat
   );
 }
 
-function BlameHunk(props: { range: BlameRange; lines: string[]; base: string; path: string }) {
+function BlameHunk(props: { range: BlameRange; lines: string[]; base: string; owner: string; repo: string; path: string }) {
+  const navigate = useNavigate();
+  /** deep-reblame applies to commits whose title links a PR ("… (#123)"), i.e. squash merges. */
+  const deep = () => feature('deep-reblame') && /\(#\d+\)/.test(c().messageHeadline);
+  const reblameTitle = () =>
+    deep() ? 'View blame prior to this change. Hold Alt to extract commits from this PR first' : 'View blame prior to this change';
+  const deepReblame = async (e: MouseEvent) => {
+    if (!deep() || (!e.altKey && parent())) return;
+    e.preventDefault();
+    toast('Fetching pull request…');
+    try {
+      const oid = await getPullBlameCommit(props.owner, props.repo, c().oid, props.path);
+      navigate(`${props.base}/blame/${oid}/${encodePath(props.path)}#L${props.range.startingLine}`);
+    } catch (err) {
+      toastError(err);
+    }
+  };
   const numbers = createMemo(() => {
     const out: number[] = [];
     for (let n = props.range.startingLine; n <= props.range.endingLine; n++) out.push(n);
@@ -123,12 +154,28 @@ function BlameHunk(props: { range: BlameRange; lines: string[]; base: string; pa
                 >
                   {c().messageHeadline}
                 </a>
-                <Show when={parent()}>
+                <Show
+                  when={parent()}
+                  fallback={
+                    <Show when={deep()}>
+                      <button
+                        type="button"
+                        class="btn-octicon w-6 h-6 shrink-0 rgh-deep-reblame"
+                        title="View blame prior to this change (extracts commits from this PR first)"
+                        aria-label="View blame prior to this change (extracts commits from this PR first)"
+                        onClick={(e) => void deepReblame(e)}
+                      >
+                        <Octicon icon={versionsIcon} />
+                      </button>
+                    </Show>
+                  }
+                >
                   <a
-                    class="btn-octicon w-6 h-6 shrink-0"
+                    class={['btn-octicon w-6 h-6 shrink-0', { 'rgh-deep-reblame': deep() }]}
                     href={`${props.base}/blame/${parent()}/${encodePath(props.path)}`}
-                    title="View blame prior to this change"
-                    aria-label="View blame prior to this change"
+                    title={reblameTitle()}
+                    aria-label={reblameTitle()}
+                    onClick={(e) => void deepReblame(e)}
                   >
                     <Octicon icon={versionsIcon} />
                   </a>

@@ -101,8 +101,15 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [-] Gists live on gist.github.com (separate host) — out of scope for now
 - [-] Wiki (no API), Codespaces/Copilot (excluded on purpose)
 
+## Refined GitHub features
+
+- [x] Feature registry with per-feature toggles and options (`/settings/refined`, stored per browser, all on by default)
+- [x] `?` keyboard-shortcut dialog listing every active shortcut; GitHub's `g …` navigation shortcuts
+- [x] All 199 Refined GitHub features resolved: 173 implemented natively, 9 already built into this app, 17 not applicable (each with a reason on the settings page)
+- [x] Navigation progress bar (GitHub's top loading bar)
+
 ## Quality
 
-- [ ] Tests for lib helpers (format, markdown link rewriting, ref resolution) and key components
+- [~] Tests for lib helpers (format, markdown link rewriting, README URL resolution, Actions helpers); components untested
 - [ ] Mobile layout pass
 - [ ] Accessibility pass (focus handling in menus/dialogs, labels)

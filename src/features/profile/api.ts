@@ -118,6 +118,8 @@ const TYPE_QUALIFIERS: Record<string, string> = {
   public: 'is:public',
   private: 'is:private',
   sources: 'fork:false',
+  // github.com's `type=source` (what `hide-user-forks` links to): no forks, no archives.
+  source: 'fork:false archived:false',
   forks: 'fork:only',
   archived: 'archived:true',
   mirror: 'mirror:true',
@@ -229,6 +231,8 @@ export interface UserProfile extends OwnerBase {
   isViewer: boolean;
   viewerIsFollowing: boolean;
   viewerCanFollow: boolean;
+  /** Whether this user follows the signed-in viewer. */
+  isFollowingViewer: boolean;
   following: number;
   stars: number;
   organizations: { login: string; avatarUrl: string; name: string | null }[];
@@ -299,7 +303,7 @@ export const getOwnerProfile = query(async (login: string): Promise<OwnerProfile
       ... on User{
         id databaseId login name avatarUrl bio bioHTML company companyHTML location email websiteUrl twitterUsername pronouns isHireable createdAt
         status{emojiHTML message}
-        isViewer viewerIsFollowing viewerCanFollow
+        isViewer viewerIsFollowing viewerCanFollow isFollowingViewer
         followers{totalCount} following{totalCount}
         repositories(ownerAffiliations:OWNER){totalCount}
         starredRepositories{totalCount}
@@ -380,6 +384,7 @@ export const getOwnerProfile = query(async (login: string): Promise<OwnerProfile
     isViewer: o.isViewer,
     viewerIsFollowing: o.viewerIsFollowing,
     viewerCanFollow: o.viewerCanFollow,
+    isFollowingViewer: !!o.isFollowingViewer,
     followers: o.followers.totalCount,
     following: o.following.totalCount,
     stars: o.starredRepositories.totalCount,
@@ -388,6 +393,15 @@ export const getOwnerProfile = query(async (login: string): Promise<OwnerProfile
     createdAt: o.createdAt,
   };
 }, 'owner-profile');
+
+/**
+ * Logins of a user's *public* organization memberships (REST lists only
+ * those), so `mark-private-orgs` can flag the rest of the viewer's orgs.
+ */
+export const getPublicOrgs = query(async (login: string) => {
+  const orgs = await gh<{ login: string }[]>(`/users/${login}/orgs`, { query: { per_page: 100 } });
+  return orgs.map((o) => o.login.toLowerCase());
+}, 'public-orgs');
 
 /** Rendered profile README: `login/login` for users, `.github/profile/README.md` for orgs. Null when absent. */
 export const getProfileReadme = query(async (login: string, isOrg: boolean) => {
@@ -511,7 +525,7 @@ export const getStarred = query(async (login: string, f: RepoFilters, page = 1):
       (!f.type ||
         (f.type === 'public' && !r.private) ||
         (f.type === 'private' && r.private) ||
-        (f.type === 'sources' && !r.fork) ||
+        ((f.type === 'sources' || f.type === 'source') && !r.fork) ||
         (f.type === 'forks' && r.fork) ||
         (f.type === 'template' && r.is_template) ||
         (f.type === 'archived' && r.archived)),

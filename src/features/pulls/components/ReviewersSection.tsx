@@ -1,14 +1,15 @@
 import { useAction } from '@solidjs/router';
 import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, toastError } from '../../../components/ui';
+import { Avatar, toast, toastError } from '../../../components/ui';
+import { feature } from '../../refined';
 import { checkIcon, commentIcon, dotFillIcon, fileDiffIcon, gitPullRequestDraftIcon, peopleIcon } from '../../../icons/octicons';
 import { getAssignableUsers, type PickerUser } from '../../issues/api';
 import { userHref } from '../../issues/components/Comment';
 import { PICKER_TRIGGER_CLASS, pickerTrigger, SidebarSection } from '../../issues/components/IssueSidebar';
 import SelectPanel from '../../issues/components/SelectPanel';
 import type { PullDetail } from '../../issues/types';
-import { setDraft, setReviewers } from '../api';
+import { approvePull, setDraft, setReviewers } from '../api';
 
 const REVIEW_ICON: Record<string, { icon: typeof checkIcon; class: string; label: string }> = {
   APPROVED: { icon: checkIcon, class: 'text-fg-success', label: 'approved these changes' },
@@ -18,10 +19,27 @@ const REVIEW_ICON: Record<string, { icon: typeof checkIcon; class: string; label
 };
 
 /** Sidebar "Reviewers": requested reviewers + latest review per person, with the request picker. */
-export default function ReviewersSection(props: { owner: string; repo: string; pull: PullDetail; editable: boolean }) {
+export default function ReviewersSection(props: { owner: string; repo: string; pull: PullDetail; editable: boolean; viewerLogin?: string }) {
   const request = useAction(setReviewers);
   const draft = useAction(setDraft);
+  const approve = useAction(approvePull);
   const [busy, setBusy] = createSignal(false);
+
+  // quick-review: "review now" (Files tab with the review menu open, hotkey v) and "approve now".
+  const canApprove = () => props.pull.state === 'OPEN' && !!props.viewerLogin && props.viewerLogin !== props.pull.author?.login;
+  const quickApprove = async (e: MouseEvent) => {
+    const body = e.altKey ? '' : prompt('Approve instantly? You can add a custom message or leave empty');
+    if (body === null) return;
+    setBusy(true);
+    try {
+      await approve(props.owner, props.repo, props.pull.number, body);
+      toast('Approved', 'success');
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const requested = () =>
     props.pull.reviewRequests.nodes
@@ -83,6 +101,19 @@ export default function ReviewersSection(props: { owner: string; repo: string; p
         />
       }
     >
+      <Show when={feature('quick-review')}>
+        <p class="mb-2 text-fg-muted flex flex-wrap items-center gap-x-1">
+          <a class="link-muted" href={`/${props.owner}/${props.repo}/pull/${props.pull.number}/files#review-changes-modal`} title="Review now (v)">
+            Review now
+          </a>
+          <Show when={canApprove()}>
+            <span aria-hidden="true">–</span>
+            <button type="button" class="btn-link link-muted text-xs" disabled={busy()} title="Hold Alt to approve without confirmation" onClick={quickApprove}>
+              Approve now
+            </button>
+          </Show>
+        </p>
+      </Show>
       <Show when={requested().length || reviews().length} fallback={<span class="text-fg-muted">No reviews</span>}>
         <ul class="flex flex-col gap-2">
           <For each={reviews()}>

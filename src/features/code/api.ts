@@ -24,6 +24,8 @@ export interface HistoryCommit {
   verified: boolean;
   signatureState: string | null;
   checks: ChecksSummary | null;
+  /** Number of parents (2+ = merge commit). */
+  parentCount: number;
 }
 
 export interface HistoryPage {
@@ -39,6 +41,7 @@ export const COMMIT_NODE_FIELDS = `oid abbreviatedOid message committedDate auth
   authors(first:3){totalCount nodes{name email avatarUrl user{login}}}
   committer{name avatarUrl user{login}}
   signature{isValid state}
+  parentCount:parents{totalCount}
   statusCheckRollup{state contexts(first:1){checkRunCount checkRunCountsByState{state count} statusContextCount statusContextCountsByState{state count}}}`;
 
 const PASSING = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED']);
@@ -71,6 +74,7 @@ export function toHistoryCommit(c: any): HistoryCommit {
     checks: c.statusCheckRollup
       ? { state: c.statusCheckRollup.state, passed, total: (ctx?.checkRunCount ?? 0) + (ctx?.statusContextCount ?? 0) }
       : null,
+    parentCount: c.parentCount?.totalCount ?? 1,
   };
 }
 
@@ -274,6 +278,7 @@ export function restToHistoryCommit(c: Commit): HistoryCommit {
     verified: !!c.commit.verification?.verified,
     signatureState: null,
     checks: null,
+    parentCount: c.parents?.length ?? 1,
   };
 }
 
@@ -369,7 +374,10 @@ export const getDefaultBranch = query(async (owner: string, repo: string) => {
 export interface BranchExtra {
   ahead: number;
   behind: number;
-  pull: { number: number; state: 'OPEN' | 'CLOSED' | 'MERGED'; isDraft: boolean; title: string } | null;
+  /** The branch's PR in this repository. */
+  pull: { number: number; state: 'OPEN' | 'CLOSED' | 'MERGED'; isDraft: boolean; title: string; repo: string } | null;
+  /** The branch's PR in any repository (forks: also upstream) — show-associated-branch-prs-on-fork. */
+  anyPull: BranchExtra['pull'];
   checks: ChecksSummary | null;
 }
 
@@ -384,7 +392,7 @@ export const getBranchExtras = query(async (owner: string, repo: string, default
     .map(
       (n, i) => `b${i}:ref(qualifiedName:${JSON.stringify(`refs/heads/${n}`)}){
         compare(headRef:${JSON.stringify(defaultBranch)}){aheadBy behindBy}
-        associatedPullRequests(first:5,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number state isDraft title}}
+        associatedPullRequests(first:5,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number state isDraft title repository{nameWithOwner}}}
         target{... on Commit{statusCheckRollup{state contexts(first:1){checkRunCount checkRunCountsByState{state count} statusContextCount statusContextCountsByState{state count}}}}}
       }`,
     )
@@ -398,10 +406,13 @@ export const getBranchExtras = query(async (owner: string, repo: string, default
     const r = data.repository[`b${i}`];
     if (!r) return;
     // compare(base = this branch, head = default): the default's lead is this branch's lag.
+    const prs = (r.associatedPullRequests?.nodes ?? []).map((p: any) => ({ ...p, repo: p.repository?.nameWithOwner ?? `${owner}/${repo}` }));
+    const own = prs.filter((p: any) => p.repo.toLowerCase() === `${owner}/${repo}`.toLowerCase());
     out[n] = {
       behind: r.compare?.aheadBy ?? 0,
       ahead: r.compare?.behindBy ?? 0,
-      pull: n === defaultBranch ? null : pickPull(r.associatedPullRequests?.nodes ?? []),
+      pull: n === defaultBranch ? null : pickPull(own),
+      anyPull: n === defaultBranch ? null : pickPull(prs),
       checks: toHistoryCommit({ ...r.target, oid: '', authors: { nodes: [] } }).checks,
     };
   });

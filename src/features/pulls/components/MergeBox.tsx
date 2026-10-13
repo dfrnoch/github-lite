@@ -1,13 +1,18 @@
 import { useAction } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
-import { createMemo, createSignal, For, Match, Show, Switch } from 'solid-js';
+import { createMemo, createSignal, For, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, Dropdown, Spinner, toast, toastError } from '../../../components/ui';
+import PrBaseCommit from '../../code/components/PrBaseCommit';
+import { feature, featureOption } from '../../refined';
+import { avoidAccidentalSubmissions, fitTextarea, monospaceField, oneKeyFormatting, tabToIndent } from '../../refined/editor';
+import { useRepo } from '../../repo/context';
 import type { OcticonData } from '../../../icons/octicons';
 import {
   alertFillIcon,
   checkCircleFillIcon,
   checkIcon,
+  copilotIcon,
   dotFillIcon,
   gitBranchIcon,
   gitMergeIcon,
@@ -21,7 +26,20 @@ import {
 import { toAppUrl } from '../../../lib/markdown';
 import type { CheckContext, MergeMethod, PullDetail, PullRepoMeta } from '../../issues/types';
 import { canPush } from '../../issues/types';
-import { deleteBranch, mergePull, restoreBranch, setAutoMerge, setDraft, updatePullBranch } from '../api';
+import {
+  countPullsBasedOn,
+  deleteBranch,
+  getPullBranchUpdatable,
+  getPullCommitMessages,
+  mergePull,
+  restoreBranch,
+  setAutoMerge,
+  setDraft,
+  updatePull,
+  updatePullBranch,
+  updatePullBranchWith,
+} from '../api';
+import { cleanCommitMessage, cleanPrCommitTitle, DEFAULT_BRANCH_EXCEPTIONS, defaultSquashMessage, matchesBranchPattern } from '../refined';
 
 const FAIL = ['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'];
 const NEUTRAL = ['CANCELLED', 'SKIPPED', 'NEUTRAL', 'STALE'];
@@ -106,6 +124,9 @@ export interface MergeBoxProps {
   meta: PullRepoMeta;
   /** Signed-in user's avatar (shown on the merge form). */
   viewerAvatar?: string;
+  viewerLogin?: string;
+  /** Put text into the "Add a comment" box (quick-resolve-conflicts' Copilot button). */
+  onInsertComment?: (text: string) => void;
 }
 
 /** The merge box at the bottom of a PR conversation. */
@@ -175,7 +196,14 @@ function BranchFooter(props: MergeBoxProps & { headRepo: string; title: string; 
             when={props.pull.headRef}
             fallback={
               <>
-                The <code class="font-mono">{head()}</code> branch has been deleted.
+                The{' '}
+                <code
+                  class={['font-mono', { 'rgh-deleted-branch': feature('cross-deleted-pr-branches') }]}
+                  title={feature('cross-deleted-pr-branches') ? 'This branch has been deleted' : undefined}
+                >
+                  {head()}
+                </code>{' '}
+                branch has been deleted.
               </>
             }
           >
@@ -226,6 +254,11 @@ function ChecksSection(props: { pull: PullDetail; owner: string; repo: string })
     for (const ctx of contexts()) c[checkOutcome(ctx)]++;
     return c;
   });
+  // clean-checks-list: failing first, then running, then the rest (stable within each group).
+  const clean = () => feature('clean-checks-list');
+  const RANK = { failure: 0, pending: 1, success: 2, neutral: 2 } as const;
+  const shown = createMemo(() => (clean() ? [...contexts()].sort((a, b) => RANK[checkOutcome(a)] - RANK[checkOutcome(b)]) : contexts()));
+  const dim = () => clean() && (counts().failure > 0 || counts().pending > 0);
   const summary = () => {
     const c = counts();
     const parts = [
@@ -262,15 +295,27 @@ function ChecksSection(props: { pull: PullDetail; owner: string; repo: string })
         {summary()}
       </Section>
       <Show when={open()}>
-        <div class="max-h-[340px] overflow-auto border-b border-line bg-canvas-muted">
-          <For each={contexts()}>
+        <div
+          class={[
+            'border-b border-line bg-canvas-muted rgh-checks-list',
+            // unclip-checks: show every check instead of a scrolling box.
+            { 'max-h-[340px] overflow-auto': !feature('unclip-checks'), 'rgh-checks-dim': dim() },
+          ]}
+        >
+          <For each={shown()}>
             {(c) => (
-              <div class="flex items-center gap-2 px-4 py-2 text-xs border-b border-line-muted last:border-b-0">
+              <div
+                class={[
+                  'flex gap-2 px-4 py-2 text-xs border-b border-line-muted last:border-b-0',
+                  clean() ? 'items-start' : 'items-center',
+                  { 'rgh-check-done': ['success', 'neutral'].includes(checkOutcome(c)) },
+                ]}
+              >
                 <CheckIcon outcome={checkOutcome(c)} />
                 <Show when={c.checkSuite?.app?.logoUrl ?? c.avatarUrl}>
                   {(src) => <Avatar src={src()} size={20} square />}
                 </Show>
-                <span class="min-w-0 flex-1 truncate">
+                <span class={['min-w-0 flex-1', clean() ? 'break-words' : 'truncate']}>
                   <strong class="text-fg">
                     {c.__typename === 'CheckRun' ? (c.checkSuite?.workflowRun ? `${c.checkSuite.workflowRun.workflow.name} / ${c.name}` : c.name) : c.context}
                   </strong>
@@ -303,6 +348,7 @@ function ChecksSection(props: { pull: PullDetail; owner: string; repo: string })
 function OpenBox(props: MergeBoxProps & { push: boolean }) {
   const draft = useAction(setDraft);
   const update = useAction(updatePullBranch);
+  const updateWith = useAction(updatePullBranchWith);
   const [busy, setBusy] = createSignal(false);
   const run = async (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -317,6 +363,46 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
   };
   const state = () => props.pull.mergeStateStatus;
   const reviewCount = (s: string) => props.pull.latestOpinionatedReviews.nodes.filter((r) => r.state === s).length;
+
+  // update-pr-from-base-branch: "Update branch | Rebase" whenever the branch is behind its base and you
+  // can push to it — GitHub (and viewerCanUpdateBranch) only offer it when branch protection requires it.
+  const updatable = createMemo(() =>
+    feature('update-pr-from-base-branch') && props.pull.state === 'OPEN' && props.pull.headRef
+      ? getPullBranchUpdatable(
+          props.owner,
+          props.repo,
+          props.pull.number,
+          props.pull.isCrossRepository ? `${props.owner}:${props.pull.baseRefName}` : props.pull.baseRefName,
+        ).catch(() => false)
+      : false,
+  );
+  const updateAction = () => (
+    <Loading>
+      <Show when={updatable()}>{updateButtons()}</Show>
+    </Loading>
+  );
+  const updateButtons = () => (
+    <div class="BtnGroup">
+      <button
+        type="button"
+        class="btn btn-sm"
+        title="Update branch with a merge commit"
+        disabled={busy()}
+        onClick={() => run(() => updateWith(props.pull.id, props.pull.headRefOid, 'MERGE'), 'Updating branch…')}
+      >
+        Update branch
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm"
+        title="Update branch by rebasing it on the base branch"
+        disabled={busy()}
+        onClick={() => run(() => updateWith(props.pull.id, props.pull.headRefOid, 'REBASE'), 'Rebasing branch…')}
+      >
+        Rebase
+      </button>
+    </div>
+  );
 
   return (
     <>
@@ -366,8 +452,41 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
       >
         <Switch>
           <Match when={props.pull.mergeable === 'CONFLICTING' || state() === 'DIRTY'}>
-            <Section icon={alertFillIcon} iconClass="text-fg-danger" title="This branch has conflicts that must be resolved">
-              Use the command line to resolve conflicts before continuing.
+            <Section
+              icon={alertFillIcon}
+              iconClass="text-fg-danger"
+              title="This branch has conflicts that must be resolved"
+              action={
+                // quick-resolve-conflicts: plain buttons instead of GitHub's "Resolve conflicts ▾" menu.
+                <Show when={feature('quick-resolve-conflicts')}>
+                  <div class="BtnGroup">
+                    <Show when={props.pull.viewerCanUpdate}>
+                      <a
+                        class="btn btn-sm"
+                        href={`https://github.com/${props.owner}/${props.repo}/pull/${props.pull.number}/conflicts`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Resolve conflicts in GitHub’s web editor"
+                      >
+                        Resolve conflicts
+                      </a>
+                    </Show>
+                    <Show when={props.onInsertComment}>
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        title="Ask Copilot to resolve conflicts"
+                        aria-label="Ask Copilot to resolve conflicts"
+                        onClick={() => props.onInsertComment!('@copilot resolve the merge conflicts in this pull request')}
+                      >
+                        <Octicon icon={copilotIcon} />
+                      </button>
+                    </Show>
+                  </div>
+                </Show>
+              }
+            >
+              {feature('quick-resolve-conflicts') ? 'Use the web editor or the command line' : 'Use the command line'} to resolve conflicts before continuing.
             </Section>
           </Match>
           <Match when={state() === 'UNKNOWN' || props.pull.mergeable === 'UNKNOWN'}>
@@ -382,14 +501,21 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
               title="This branch is out-of-date with the base branch"
               action={
                 <Show when={props.pull.viewerCanUpdateBranch}>
-                  <button
-                    type="button"
-                    class="btn btn-sm"
-                    disabled={busy()}
-                    onClick={() => run(() => update(props.owner, props.repo, props.pull.number, props.pull.headRefOid), 'Updating branch…')}
+                  <Show
+                    when={feature('update-pr-from-base-branch')}
+                    fallback={
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        disabled={busy()}
+                        onClick={() => run(() => update(props.owner, props.repo, props.pull.number, props.pull.headRefOid), 'Updating branch…')}
+                      >
+                        Update branch
+                      </button>
+                    }
                   >
-                    Update branch
-                  </button>
+                    {updateButtons()}
+                  </Show>
                 </Show>
               }
             >
@@ -397,12 +523,23 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
             </Section>
           </Match>
           <Match when={state() === 'BLOCKED'}>
-            <Section icon={xCircleFillIcon} iconClass="text-fg-danger" title="Merging is blocked">
+            <Section
+              icon={xCircleFillIcon}
+              iconClass="text-fg-danger"
+              title="Merging is blocked"
+              action={updateAction()}
+            >
               The base branch requires all requirements to be met before merging.
             </Section>
           </Match>
           <Match when={true}>
-            <Section icon={checkCircleFillIcon} iconClass="text-fg-success" title="No conflicts with base branch">
+            <Section
+              icon={checkCircleFillIcon}
+              iconClass="text-fg-success"
+              title="No conflicts with base branch"
+              action={updateAction()}
+            >
+              <PrBaseCommit owner={props.owner} repo={props.repo} baseRef={props.pull.baseRefName} baseRefOid={props.pull.baseRefOid} headSha={props.pull.headRefOid} />
               Merging can be performed automatically.
             </Section>
           </Match>
@@ -424,8 +561,11 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
 }
 
 function MergeControls(props: MergeBoxProps) {
+  const repoCtx = useRepo();
   const merge = useAction(mergePull);
   const auto = useAction(setAutoMerge);
+  const renamePull = useAction(updatePull);
+  const del = useAction(deleteBranch);
   const allowed = () =>
     (['MERGE', 'SQUASH', 'REBASE'] as MergeMethod[]).filter((m) =>
       m === 'MERGE' ? props.meta.mergeCommitAllowed : m === 'SQUASH' ? props.meta.squashMergeAllowed : props.meta.rebaseMergeAllowed,
@@ -452,6 +592,47 @@ function MergeControls(props: MergeBoxProps) {
   const [title, setTitle] = createSignal<string | null>(null);
   const [message, setMessage] = createSignal<string | null>(null);
 
+  // clear-pr-merge-commit-message: squash messages keep only co-author / sign-off trailers
+  // (not for 1-commit PRs, whose message is usually meaningful).
+  const clearMessage = () => method() === 'SQUASH' && feature('clear-pr-merge-commit-message') && props.pull.commits.totalCount > 1;
+  const squashMessages = () => {
+    // Read reactive values before the await so a memo tracks them.
+    const opts = { setting: props.meta.squashMergeCommitMessage, body: props.pull.body, title: props.pull.title, prAuthor: props.pull.author?.login ?? null };
+    const closingKeywords = props.pull.baseRefName !== repoCtx.repo().default_branch;
+    return getPullCommitMessages(props.owner, props.repo, props.pull.number).then((commits) => {
+      const original = defaultSquashMessage(commits, opts);
+      const cleaned = cleanCommitMessage(original, closingKeywords, opts.prAuthor ? [opts.prAuthor] : []);
+      return { original, cleaned: cleaned ? `${cleaned}\n` : '' };
+    });
+  };
+  const squash = createMemo(() => (confirming() && clearMessage() ? squashMessages() : null));
+
+  // sync-pr-commit-title: an edited squash title also becomes the PR title.
+  const [syncCancelled, setSyncCancelled] = createSignal(false);
+  const syncTitle = () => {
+    const t = title()?.trim();
+    return method() === 'SQUASH' && feature('sync-pr-commit-title') && !syncCancelled() && !!t && t !== defaultTitle();
+  };
+
+  /** pr-branch-auto-delete: delete the head branch right after merging, like the repo setting would. */
+  const autoDeleteBranch = async () => {
+    const branch = props.pull.headRefName;
+    const headRepo = props.pull.headRepository?.nameWithOwner;
+    if (!headRepo || props.meta.deleteBranchOnMerge) return;
+    if (matchesBranchPattern(branch, featureOption<string>('pr-branch-auto-delete', 'exceptions') ?? DEFAULT_BRANCH_EXCEPTIONS)) return;
+    const mayDelete = props.pull.isCrossRepository ? props.pull.headRepositoryOwner?.login === props.viewerLogin : canPush(props.meta.viewerPermission);
+    if (!mayDelete) return;
+    const [headOwner, headName] = headRepo.split('/') as [string, string];
+    try {
+      // Deleting a branch that other open PRs are based on would close them.
+      if ((await countPullsBasedOn(headOwner, headName, branch)) > 0) return;
+      await del(headRepo, branch);
+      toast(`Deleted branch ${branch} (pr-branch-auto-delete)`, 'success');
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
   const state = () => props.pull.mergeStateStatus;
   const blocked = () => state() === 'BLOCKED' || state() === 'DIRTY' || props.pull.mergeable === 'CONFLICTING' || state() === 'UNKNOWN';
   const canMerge = () => !blocked() || (bypass() && state() === 'BLOCKED');
@@ -461,14 +642,18 @@ function MergeControls(props: MergeBoxProps) {
     e.preventDefault();
     setBusy(true);
     try {
+      let msg = method() === 'REBASE' ? undefined : (message() ?? undefined);
+      if (msg === undefined && clearMessage()) msg = (await squashMessages()).cleaned;
+      if (syncTitle()) await renamePull(props.owner, props.repo, props.pull.number, { title: cleanPrCommitTitle(title()!.trim(), props.pull.number) });
       await merge(props.owner, props.repo, props.pull.number, {
         method: method(),
         sha: props.pull.headRefOid,
         title: method() === 'REBASE' ? undefined : (title() ?? undefined),
-        message: method() === 'REBASE' ? undefined : (message() ?? undefined),
+        message: msg,
       });
       setConfirming(false);
       toast('Pull request successfully merged', 'success');
+      if (feature('pr-branch-auto-delete')) void autoDeleteBranch();
     } catch (err) {
       toastError(err);
     } finally {
@@ -581,18 +766,48 @@ function MergeControls(props: MergeBoxProps) {
         <div class="flex-1 min-w-0">
           <Show when={method() !== 'REBASE'}>
             <input
+              ref={[oneKeyFormatting, monospaceField, avoidAccidentalSubmissions]}
               class="form-control w-full font-semibold mb-2"
               aria-label="Commit title"
               value={title() ?? defaultTitle()}
               onInput={(e) => setTitle(e.currentTarget.value)}
             />
-            <textarea
-              class="form-control w-full min-h-[120px]"
-              aria-label="Commit message"
-              placeholder={method() === 'SQUASH' && props.meta.squashMergeCommitMessage === 'COMMIT_MESSAGES' ? 'Defaults to the list of commit messages' : 'Add an optional extended description…'}
-              value={message() ?? defaultMessage()}
-              onInput={(e) => setMessage(e.currentTarget.value)}
-            />
+            <Show when={syncTitle()}>
+              <p class="note mt-0! mb-2">
+                The title of this PR will be updated to match this title.{' '}
+                <button type="button" class="btn-link text-xs underline" onClick={() => setSyncCancelled(true)}>
+                  Cancel
+                </button>
+              </p>
+            </Show>
+            <Loading fallback={<textarea class="form-control w-full min-h-[120px]" aria-label="Commit message" disabled />}>
+              <textarea
+                ref={[tabToIndent, oneKeyFormatting, fitTextarea, monospaceField]}
+                class="form-control w-full min-h-[120px]"
+                aria-label="Commit message"
+                placeholder={method() === 'SQUASH' && props.meta.squashMergeCommitMessage === 'COMMIT_MESSAGES' ? 'Defaults to the list of commit messages' : 'Add an optional extended description…'}
+                value={message() ?? squash()?.cleaned ?? defaultMessage()}
+                onInput={(e) => setMessage(e.currentTarget.value)}
+              />
+              <Show when={squash() && squash()!.cleaned.trim() !== squash()!.original.trim() && squash()}>
+                {(sq) => (
+                  <p class="note mt-1!">
+                    The description field was{' '}
+                    <a href="https://github.com/refined-github/refined-github/wiki/Extended-feature-descriptions#clear-pr-merge-commit-message" target="_blank" rel="noreferrer">
+                      cleared
+                    </a>{' '}
+                    by Refined GitHub.{' '}
+                    <button
+                      type="button"
+                      class="btn-link text-xs"
+                      onClick={() => setMessage(message() === sq().original ? sq().cleaned : sq().original)}
+                    >
+                      {message() === sq().original ? 'Redo' : 'Undo'}
+                    </button>
+                  </p>
+                )}
+              </Show>
+            </Loading>
           </Show>
           <div class="flex items-center gap-2 mt-2">
             <button type="submit" class="btn btn-primary" disabled={busy()}>

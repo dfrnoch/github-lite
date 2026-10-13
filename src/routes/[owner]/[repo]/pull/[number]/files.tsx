@@ -1,8 +1,9 @@
-import { useParams } from '@solidjs/router';
+import { revalidate, useParams } from '@solidjs/router';
 import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../../../components/Octicon';
 import { Dropdown, MarkdownEditor, PageSpinner, toast, toastError } from '../../../../../components/ui';
 import { fetchRaw } from '../../../../../features/code/api';
+import { restoreFile } from '../../../../../features/code/refinedApi';
 import { DraftCommentForm, ThreadView } from '../../../../../features/code/components/ReviewThreads';
 import {
   addReviewComment,
@@ -21,9 +22,11 @@ import {
 import DiffView, { lineKey, type LineRef, type Side } from '../../../../../features/diff/DiffView';
 import { getPull } from '../../../../../features/pulls/api';
 import { useRepo } from '../../../../../features/repo/context';
+import { feature } from '../../../../../features/refined';
 import { getViewer } from '../../../../../features/user/api';
 import { triangleDownIcon } from '../../../../../icons/octicons';
 import { encodePath } from '../../../../../lib/github';
+import type { DiffFile } from '../../../../../lib/types';
 
 /** /:owner/:repo/pull/:number/files — diff with review comments, viewed state and review submission. */
 export default function PullFilesTab() {
@@ -99,6 +102,35 @@ export default function PullFilesTab() {
     );
   };
 
+  /** restore-file: commit the base version of a file back onto the PR branch. */
+  const discard = async (f: DiffFile) => {
+    const pr = pull();
+    if (!pr?.head.repo) return;
+    const name = f.filename.split('/').pop();
+    if (!confirm(`Discard all the changes to ${f.filename} in this pull request? A new commit restoring the base version will be pushed to ${pr.head.ref}.`)) return;
+    toast(`Restoring ${name}…`);
+    try {
+      await restoreFile(
+        {
+          owner: ctx.owner(),
+          repo: ctx.name(),
+          number: number(),
+          headRepo: pr.head.repo.full_name,
+          headBranch: pr.head.ref,
+          headSha: pr.head.sha,
+          baseRef: pr.base.ref,
+          headLabel: pr.head.label,
+        },
+        f,
+        `Discard changes to ${f.filename}`,
+      );
+      toast(`Changes to ${name} discarded`, 'success');
+      revalidate([getPullFiles.keyFor(ctx.owner(), ctx.name(), number()), getPull.keyFor(ctx.owner(), ctx.name(), number())]);
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
   return (
     <Loading fallback={<PageSpinner />}>
       <Show when={outdated()}>
@@ -120,8 +152,34 @@ export default function PullFilesTab() {
         fileHref={(f) =>
           f.status === 'removed' || !pull()
             ? undefined
-            : `/${pull()!.head.repo?.full_name ?? ctx.fullName()}/blob/${pull()!.head.sha}/${encodePath(f.filename)}`
+            : `/${pull()!.head.repo?.full_name ?? ctx.fullName()}/blob/${
+                // actionable-pr-view-file: open PRs link the branch (editable) instead of the commit.
+                feature('actionable-pr-view-file') && pull()!.state === 'open' && pull()!.head.repo
+                  ? encodePath(pull()!.head.ref)
+                  : pull()!.head.sha
+              }/${encodePath(f.filename)}`
         }
+        fileMenu={(f, close) => (
+          <Show
+            when={
+              feature('restore-file') &&
+              pull()?.state === 'open' &&
+              pull()?.head.repo &&
+              (!!ctx.repo().permissions?.push || viewer()?.login === pull()?.user.login)
+            }
+          >
+            <button
+              type="button"
+              class="SelectMenu-item text-fg-danger!"
+              onClick={() => {
+                close();
+                void discard(f);
+              }}
+            >
+              Discard changes
+            </button>
+          </Show>
+        )}
         loadContent={(f) =>
           pull()?.head.repo
             ? fetchRaw(pull()!.head.repo!.owner.login, pull()!.head.repo!.name, pull()!.head.sha, f.filename)
@@ -152,6 +210,19 @@ function ReviewMenu(props: {
   const [body, setBody] = createSignal('');
   const [event, setEvent] = createSignal<ReviewEvent>('COMMENT');
   const [busy, setBusy] = createSignal(false);
+  const submit = async (ev: ReviewEvent, close: () => void) => {
+    setBusy(true);
+    try {
+      await props.onSubmit(ev, body().trim());
+      setBody('');
+      close();
+      toast('Review submitted', 'success');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
   const options: { value: ReviewEvent; title: string; desc: string }[] = [
     { value: 'COMMENT', title: 'Comment', desc: 'Submit general feedback without explicit approval.' },
     { value: 'APPROVE', title: 'Approve', desc: 'Give your approval to merge these changes.' },
@@ -176,6 +247,28 @@ function ReviewMenu(props: {
         <div class="text-left" role="dialog" aria-label="Submit review">
           <h3 class="font-semibold mb-2">Finish your review</h3>
           <MarkdownEditor value={body()} onInput={setBody} repo={ctx.fullName()} minHeight={100} placeholder="Leave a comment" />
+          <Show when={feature('one-click-review-submission')}>
+            {/* one-click-review-submission: one button per review type instead of radios + submit. */}
+            <div class="flex flex-wrap justify-end gap-2 mt-3">
+              <button type="button" class="btn btn-sm" onClick={close}>
+                Cancel
+              </button>
+              <For each={options}>
+                {(o) => (
+                  <button
+                    type="button"
+                    class={['btn btn-sm', { 'btn-primary': o.value === 'APPROVE', 'btn-danger': o.value === 'REQUEST_CHANGES' }]}
+                    title={props.isAuthor && o.value !== 'COMMENT' ? 'Pull request authors can’t approve or request changes on their own pull request' : o.desc}
+                    disabled={busy() || (props.isAuthor && o.value !== 'COMMENT') || (o.value !== 'APPROVE' && !body().trim() && !props.pendingCount)}
+                    onClick={() => void submit(o.value, close)}
+                  >
+                    {o.title}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={!feature('one-click-review-submission')}>
           <div class="flex flex-col gap-2 mt-3">
             <For each={options}>
               {(o) => (
@@ -207,23 +300,12 @@ function ReviewMenu(props: {
               type="button"
               class="btn btn-sm btn-primary"
               disabled={busy() || (event() !== 'APPROVE' && !body().trim() && !props.pendingCount)}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await props.onSubmit(event(), body().trim());
-                  setBody('');
-                  close();
-                  toast('Review submitted', 'success');
-                } catch (e) {
-                  toastError(e);
-                } finally {
-                  setBusy(false);
-                }
-              }}
+              onClick={() => void submit(event(), close)}
             >
               {busy() ? 'Submitting…' : 'Submit review'}
             </button>
           </div>
+          </Show>
         </div>
       )}
     </Dropdown>

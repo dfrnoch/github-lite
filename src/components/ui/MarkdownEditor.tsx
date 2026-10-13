@@ -1,17 +1,32 @@
-import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
+import { createMemo, createSignal, For, Loading, onSettled, Show, untrack } from 'solid-js';
+import { feature } from '../../features/refined';
 import {
+  fixLinkLoss,
+  insertText,
+  isVulnerableToLinkLoss,
+  oneKeyFormatting,
+  openPreviewLinksInNewTab,
+  smartBlockWrap,
+  tabToIndent,
+  trackUnfinishedComment,
+} from '../../features/refined/editor';
+import {
+  alertIcon,
   boldIcon,
   codeIcon,
+  foldDownIcon,
   italicIcon,
   linkIcon,
   listOrderedIcon,
   listUnorderedIcon,
   markdownIcon,
   quoteIcon,
+  tableIcon,
   tasklistIcon,
 } from '../../icons/octicons';
 import { renderMarkdown } from '../../lib/markdown';
 import Octicon from '../Octicon';
+import Dropdown from './Dropdown';
 import Markdown from './Markdown';
 import Spinner from './Spinner';
 
@@ -32,6 +47,11 @@ const FORMATS: { icon: typeof boldIcon; label: string; format: Format }[] = [
  * GitHub's comment box: Write / Preview tabs, a formatting toolbar, and a
  * preview rendered by the API (so it matches the final result exactly).
  * Ctrl/Cmd+Enter calls `onSubmit`.
+ *
+ * Refined GitHub writing features live here too (each behind its toggle):
+ * tab-to-indent, one-key-formatting, fit-textareas, collapsible-content-button,
+ * table-input, prevent-comment-loss, prevent-link-loss, unfinished-comments
+ * and (with `monospace`) monospace-textareas.
  */
 export default function MarkdownEditor(props: {
   value: string;
@@ -44,9 +64,47 @@ export default function MarkdownEditor(props: {
   autofocus?: boolean;
   id?: string;
   disabled?: boolean;
+  /** Code-like content (release notes, commit messages): monospace font with monospace-textareas on. */
+  monospace?: boolean;
 }) {
   const [tab, setTab] = createSignal<'write' | 'preview'>('write');
   let textarea: HTMLTextAreaElement | undefined;
+
+  // unfinished-comments: text typed here that hasn't been sent (edits start from the existing body).
+  const initial = untrack(() => props.value);
+  onSettled(() => trackUnfinishedComment(() => !!props.value.trim() && props.value !== initial));
+
+  const linkLoss = createMemo(() => feature('prevent-link-loss') && isVulnerableToLinkLoss(props.value, props.repo));
+  const fixLinks = () => {
+    if (!textarea) return;
+    const fixed = fixLinkLoss(textarea.value, props.repo);
+    textarea.select();
+    insertText(textarea, fixed);
+  };
+
+  /** collapsible-content-button: wrap the selection in <details>, selecting the body. */
+  const insertDetails = () => {
+    if (!textarea) return;
+    const el = textarea;
+    const selection = el.value.slice(el.selectionStart, el.selectionEnd);
+    el.focus();
+    insertText(el, smartBlockWrap(`<details>\n<summary>Details</summary>\n\n${selection}\n\n</details>`, el));
+    const caret = el.selectionStart;
+    const start = el.value.lastIndexOf('</summary>', caret) + '</summary>'.length + 2;
+    el.setSelectionRange(start, Math.max(start, el.value.lastIndexOf('</details>', caret) - 2));
+  };
+
+  /** table-input: insert a columns × rows HTML table and put the caret in the first cell. */
+  const insertTable = (columns: number, rows: number) => {
+    if (!textarea) return;
+    const el = textarea;
+    const cursor = el.selectionStart;
+    const row = columns === 1 ? '<tr><td>\n' : '<tr>\n' + ' <td>\n'.repeat(columns);
+    el.focus();
+    insertText(el, smartBlockWrap(`<table>\n${row.repeat(rows)}</table>`, el));
+    const first = el.value.indexOf('<td>', cursor) + '<td>'.length;
+    el.setSelectionRange(first, first);
+  };
 
   const preview = createMemo(() => (tab() === 'preview' ? renderMarkdown(props.value, props.repo) : ''));
 
@@ -115,6 +173,17 @@ export default function MarkdownEditor(props: {
                 <Octicon icon={f.icon} />
               </button>
             )}</For>
+            <Show when={feature('collapsible-content-button') || feature('table-input')}>
+              <span class="w-px h-4 mx-1 bg-[var(--borderColor-default)]" aria-hidden="true" />
+            </Show>
+            <Show when={feature('collapsible-content-button')}>
+              <button type="button" class="btn-octicon w-7 h-7" title="Add collapsible content" aria-label="Add collapsible content" onClick={insertDetails}>
+                <Octicon icon={foldDownIcon} />
+              </button>
+            </Show>
+            <Show when={feature('table-input')}>
+              <TableInput onPick={insertTable} />
+            </Show>
           </div>
         </Show>
       </div>
@@ -123,9 +192,12 @@ export default function MarkdownEditor(props: {
           when={tab() === 'preview'}
           fallback={
             <textarea
-              ref={(el) => (textarea = el)}
+              ref={[(el: HTMLTextAreaElement) => (textarea = el), tabToIndent, oneKeyFormatting]}
               id={props.id}
-              class="form-control border-none! shadow-none! bg-canvas"
+              class={[
+                'form-control border-none! shadow-none! bg-canvas',
+                { 'rgh-fit-textarea': feature('fit-textareas'), 'rgh-monospace-field': !!props.monospace },
+              ]}
               style={{ 'min-height': `${props.minHeight ?? 120}px` }}
               placeholder={props.placeholder ?? 'Add your comment here...'}
               value={props.value}
@@ -141,7 +213,8 @@ export default function MarkdownEditor(props: {
             />
           }
         >
-          <div class="px-2 py-1" style={{ 'min-height': `${props.minHeight ?? 120}px` }}>
+          {/* prevent-comment-loss: links open in a new tab instead of leaving the draft. */}
+          <div class="px-2 py-1" style={{ 'min-height': `${props.minHeight ?? 120}px` }} onClick={openPreviewLinksInNewTab}>
             <Loading fallback={<Spinner size={20} class="text-fg-muted" />}>
               <Show when={props.value.trim()} fallback={<p class="text-fg-muted">Nothing to preview</p>}>
                 <Markdown html={preview()} />
@@ -150,10 +223,55 @@ export default function MarkdownEditor(props: {
           </div>
         </Show>
       </div>
+      <Show when={linkLoss()}>
+        <div class="flash flash-warn mx-2 mb-2 flex items-center gap-2 text-sm">
+          <Octicon icon={alertIcon} />
+          <span class="flex-1">
+            Your link may be{' '}
+            <a href="https://github.com/refined-github/refined-github/wiki/Extended-feature-descriptions#prevent-link-loss" target="_blank" rel="noreferrer">
+              misinterpreted
+            </a>{' '}
+            by GitHub.
+          </span>
+          <button type="button" class="btn btn-sm" onClick={fixLinks}>
+            Fix link
+          </button>
+        </div>
+      </Show>
       <div class="flex items-center gap-1 px-3 pb-2 text-xs text-fg-muted">
         <Octicon icon={markdownIcon} />
         <span>Markdown is supported</span>
       </div>
     </div>
+  );
+}
+
+/** table-input: a 5×5 grid picker; hovering highlights the table size. */
+function TableInput(props: { onPick: (columns: number, rows: number) => void }) {
+  const [hover, setHover] = createSignal<[number, number]>([0, 0]);
+  const cells = Array.from({ length: 25 }, (_, i) => [(i % 5) + 1, Math.floor(i / 5) + 1] as const);
+  return (
+    <Dropdown class="btn-octicon w-7 h-7" align="right" menuClass="p-1! min-w-0!" title="Add a table" button={<Octicon icon={tableIcon} />}>
+      {(close) => (
+        <div class="rgh-table-input" role="group" aria-label="Table size" onMouseLeave={() => setHover([0, 0])}>
+          <For each={cells}>
+            {([x, y]) => (
+              <button
+                type="button"
+                class={['rgh-tic', { 'rgh-tic--on': x <= hover()[0] && y <= hover()[1] }]}
+                aria-label={`${x} × ${y} table`}
+                title={`${x} × ${y}`}
+                onMouseEnter={() => setHover([x, y])}
+                onFocus={() => setHover([x, y])}
+                onClick={() => {
+                  close();
+                  props.onPick(x, y);
+                }}
+              />
+            )}
+          </For>
+        </div>
+      )}
+    </Dropdown>
   );
 }

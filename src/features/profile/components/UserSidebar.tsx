@@ -1,10 +1,12 @@
 import { useAction } from '@solidjs/router';
-import { createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, toast, toastError } from '../../../components/ui';
-import { linkIcon, locationIcon, mailIcon, organizationIcon, peopleIcon } from '../../../icons/octicons';
+import { eyeClosedIcon, linkIcon, locationIcon, mailIcon, organizationIcon, peopleIcon } from '../../../icons/octicons';
 import { compactNumber } from '../../../lib/format';
-import { type SocialAccount, updateProfile, type UserProfile } from '../api';
+import { feature } from '../../refined';
+import { getPublicOrgs, type SocialAccount, updateProfile, type UserProfile } from '../api';
+import { locationMapHref } from '../links';
 import FollowButton from './FollowButton';
 
 const withProtocol = (url: string) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
@@ -31,6 +33,9 @@ function socialText(a: SocialAccount) {
 /** Left column of a user profile: avatar, names, bio, follow/edit, details, organizations. */
 export default function UserSidebar(props: { user: UserProfile }) {
   const [editing, setEditing] = createSignal(false);
+  // `mark-private-orgs`: on your own profile, flag orgs whose membership isn't public.
+  const markPrivate = () => feature('mark-private-orgs') && props.user.isViewer;
+  const publicOrgs = createMemo(() => (markPrivate() ? getPublicOrgs(props.user.login) : null));
   const Detail = (p: { icon: typeof linkIcon; label: string; children: any }) => (
     <li class="flex items-start gap-2 mt-1 text-sm" aria-label={p.label}>
       <Octicon icon={p.icon} class="text-fg-muted mt-0.5" />
@@ -97,6 +102,9 @@ export default function UserSidebar(props: { user: UserProfile }) {
           <a class="link-muted" href={`/${props.user.login}?tab=following`}>
             <span class="font-semibold text-fg">{compactNumber(props.user.following)}</span> following
           </a>
+          <Show when={feature('user-profile-follower-badge') && !props.user.isViewer && props.user.isFollowingViewer}>
+            <span class="text-fg-muted"> · Follows you</span>
+          </Show>
         </div>
         <ul class="mb-4">
           <Show when={props.user.companyHTML}>
@@ -110,7 +118,11 @@ export default function UserSidebar(props: { user: UserProfile }) {
           <Show when={props.user.location}>
             {(loc) => (
               <Detail icon={locationIcon} label="Home location">
-                {loc()}
+                <Show when={feature('linkify-user-location')} fallback={loc()}>
+                  <a class="link-plain" href={locationMapHref(loc())} target="_blank" rel="noreferrer">
+                    {loc()}
+                  </a>
+                </Show>
               </Detail>
             )}
           </Show>
@@ -150,8 +162,17 @@ export default function UserSidebar(props: { user: UserProfile }) {
           <div class="flex flex-wrap gap-1">
             <For each={props.user.organizations}>
               {(org) => (
-                <a href={`/${org.login}`} aria-label={org.login} title={org.name ?? org.login}>
+                <a href={`/${org.login}`} aria-label={org.login} title={org.name ?? org.login} class="relative">
                   <Avatar src={org.avatarUrl} size={32} square />
+                  <Show when={markPrivate()}>
+                    <Loading fallback={null}>
+                      <Show when={!publicOrgs()?.includes(org.login.toLowerCase())}>
+                        <span class="rgh-private-org" title="Private membership" aria-label="Private membership">
+                          <Octicon icon={eyeClosedIcon} size={12} />
+                        </span>
+                      </Show>
+                    </Loading>
+                  </Show>
                 </a>
               )}
             </For>

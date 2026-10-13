@@ -1,21 +1,23 @@
 import { Title } from '@solidjs/meta';
 import { useAction, useLocation, useNavigate, useParams } from '@solidjs/router';
 import type { ParentProps } from 'solid-js';
-import { createEffect, createMemo, For, Loading, Show } from 'solid-js';
+import { createEffect, createMemo, For, Loading, onSettled, Show } from 'solid-js';
 import Octicon from '../../../../components/Octicon';
 import { CopyButton, itemState, PageSpinner, RelativeTime, StateBadge, toastError } from '../../../../components/ui';
 import { updateIssue } from '../../../../features/issues/api';
 import { userHref } from '../../../../features/issues/components/Comment';
 import IssueHeader from '../../../../features/issues/components/IssueHeader';
-import { getPull, getPullChecksCount, updatePull } from '../../../../features/pulls/api';
+import { getFirstTag, getPull, getPullChecksCount, getPullDeployments, type PullDeployment, updatePull } from '../../../../features/pulls/api';
+import { feature } from '../../../../features/refined';
 import SelectPanel from '../../../../features/issues/components/SelectPanel';
 import { getRefNames } from '../../../../features/repo/api';
 import { PullContext, type PullContextValue } from '../../../../features/pulls/context';
 import { useRepo } from '../../../../features/repo/context';
 import { getViewer } from '../../../../features/user/api';
-import { checklistIcon, commentDiscussionIcon, fileDiffIcon, gitCommitIcon, triangleDownIcon } from '../../../../icons/octicons';
+import { checklistIcon, commentDiscussionIcon, fileDiffIcon, gitCommitIcon, rocketIcon, tagIcon, triangleDownIcon } from '../../../../icons/octicons';
 import type { OcticonData } from '../../../../icons/octicons';
 import { formatNumber } from '../../../../lib/format';
+import { useHotkey } from '../../../../lib/hotkeys';
 import type { PullRequest, PullRequestRef } from '../../../../lib/types';
 
 /**
@@ -28,6 +30,12 @@ export default function PullLayout(props: ParentProps) {
   const navigate = useNavigate();
   const number = () => Number(params.number);
   const pullOrNull = createMemo(() => getPull(ctx.owner(), ctx.name(), number()));
+  // Started together with the pull request (not after it) so they don't waterfall.
+  const checks = createMemo(() => getPullChecksCount(ctx.owner(), ctx.name(), number()));
+  const deployments = createMemo(() =>
+    feature('view-last-pr-deployment') ? getPullDeployments(ctx.owner(), ctx.name(), number()).catch((): PullDeployment[] => []) : [],
+  );
+  const firstTag = createMemo(() => (feature('closing-remarks') ? getFirstTag(ctx.owner(), ctx.name(), number()).catch(() => null) : null));
   // Not a pull request: github.com redirects to the issue.
   createEffect(
     () => (pullOrNull() === null ? `${ctx.base()}/issues/${params.number}` : null),
@@ -50,8 +58,8 @@ export default function PullLayout(props: ParentProps) {
           {(pull) => (
             <>
               <Title>{`${pull().title} by ${pull().user.login} · Pull Request #${pull().number} · ${ctx.fullName()}`}</Title>
-              <PullHeader pull={pull()} />
-              <PullTabs pull={pull()} />
+              <PullHeader pull={pull()} checks={checks()} deployments={deployments()} firstTag={firstTag()} />
+              <PullTabs pull={pull()} checks={checks()} />
             </>
           )}
         </Show>
@@ -62,23 +70,50 @@ export default function PullLayout(props: ParentProps) {
   );
 }
 
-function BranchLabel(props: { gitRef: PullRequestRef; base: PullRequestRef }) {
+function BranchLabel(props: { gitRef: PullRequestRef; base: PullRequestRef; deleted?: boolean }) {
   const repo = () => props.gitRef.repo?.full_name ?? props.base.repo?.full_name ?? '';
   const crossRepo = () => props.gitRef.repo?.full_name !== props.base.repo?.full_name;
   return (
     <a
-      class="font-mono text-xs px-1.5 py-0.5 rounded-md bg-accent-muted text-fg-accent hover:underline break-all"
-      href={props.gitRef.repo ? `/${repo()}/tree/${props.gitRef.ref}` : undefined}
-      title={props.gitRef.label}
+      class={['font-mono text-xs px-1.5 py-0.5 rounded-md bg-accent-muted text-fg-accent hover:underline break-all', { 'rgh-deleted-branch': props.deleted }]}
+      href={props.gitRef.repo && !props.deleted ? `/${repo()}/tree/${props.gitRef.ref}` : undefined}
+      title={props.deleted ? 'This branch has been deleted' : props.gitRef.label}
     >
       {crossRepo() ? props.gitRef.label : props.gitRef.ref}
     </a>
   );
 }
 
-function PullHeader(props: { pull: PullRequest }) {
+/** view-last-pr-deployment: rocket button opening the latest successful deployment. */
+function LastDeployment(props: { deployments: PullDeployment[] }) {
+  const url = () => {
+    const list = props.deployments.filter((d) => d.url);
+    return (list.findLast((d) => d.state === 'ACTIVE') ?? list.at(-1))?.url;
+  };
+  return (
+    <Show when={url()}>
+      {(href) => (
+        <a class="btn btn-sm hidden! md:inline-flex! items-center" href={href()} target="_blank" rel="noopener noreferrer" title="View last deployment" aria-label="View last deployment">
+          <Octicon icon={rocketIcon} />
+        </a>
+      )}
+    </Show>
+  );
+}
+
+type ChecksInfo = { count: number; state: string | null; headDeleted: boolean };
+
+function PullHeader(props: {
+  pull: PullRequest;
+  checks: ChecksInfo;
+  deployments: PullDeployment[];
+  firstTag: { tag: string | null } | null;
+}) {
   const ctx = useRepo();
   const viewer = createMemo(() => getViewer());
+  // cross-deleted-pr-branches (only closed PRs wait for this; forks with a deleted repo are known right away).
+  const headDeleted = () =>
+    feature('cross-deleted-pr-branches') && (!props.pull.head.repo || (props.pull.state === 'closed' && props.checks.headDeleted));
   const update = useAction(updateIssue);
   const changeBase = useAction(updatePull);
   const state = () => itemState({ isPull: true, state: props.pull.state, merged: props.pull.merged, draft: props.pull.draft });
@@ -90,7 +125,15 @@ function PullHeader(props: { pull: PullRequest }) {
         number={props.pull.number}
         canEdit={!!ctx.repo().permissions?.push || viewer().login === props.pull.user.login}
         bordered={false}
+        locked={props.pull.locked}
         onSave={(title) => update(ctx.owner(), ctx.name(), props.pull.number, { title })}
+        actions={
+          <Show when={feature('view-last-pr-deployment')}>
+            <Loading>
+              <LastDeployment deployments={props.deployments} />
+            </Loading>
+          </Show>
+        }
       >
         <StateBadge state={state()} />
         <span class="flex flex-wrap items-center gap-1">
@@ -138,10 +181,23 @@ function PullHeader(props: { pull: PullRequest }) {
             />
           </Show>
           <span>from</span>
-          <BranchLabel gitRef={props.pull.head} base={props.pull.base} />
+          <BranchLabel gitRef={props.pull.head} base={props.pull.base} deleted={headDeleted()} />
           <CopyButton value={props.pull.head.ref} class="btn-octicon w-6 h-6" label="Copy head branch name to clipboard" />
           <Show when={props.pull.merged && props.pull.merged_at}>
             <RelativeTime datetime={props.pull.merged_at} />
+          </Show>
+          {/* closing-remarks: the first release tag next to the merge time. */}
+          <Show when={feature('closing-remarks') && props.pull.merged}>
+            <Loading>
+              <Show when={props.firstTag?.tag}>
+                {(tag) => (
+                  <a class="Label inline-flex items-center gap-1 link-muted" href={`${ctx.base()}/releases/tag/${encodeURIComponent(tag())}`} title={`First released in ${tag()}`}>
+                    <Octicon icon={tagIcon} size={12} />
+                    {tag()}
+                  </a>
+                )}
+              </Show>
+            </Loading>
           </Show>
         </span>
       </IssueHeader>
@@ -178,15 +234,71 @@ function DiffStat(props: { additions: number; deletions: number }) {
   );
 }
 
-function PullTabs(props: { pull: PullRequest }) {
+const TABS = ['', 'commits', 'checks', 'files'] as const;
+
+function PullTabs(props: { pull: PullRequest; checks: ChecksInfo }) {
   const ctx = useRepo();
   const location = useLocation();
-  const checks = createMemo(() => getPullChecksCount(ctx.owner(), ctx.name(), props.pull.number));
+  const navigate = useNavigate();
   const base = () => `${ctx.base()}/pull/${props.pull.number}`;
   const active = () => {
     const rest = location.pathname.slice(base().length).replace(/^\//, '').split('/')[0];
     return rest === 'commits' || rest === 'checks' || rest === 'files' ? rest : '';
   };
+
+  // pull-request-hotkeys: g ← / g → cycle through the tabs, g 1…g 4 jump to one.
+  const goTo = (i: number) => {
+    const tab = TABS[(i + TABS.length) % TABS.length];
+    navigate(tab ? `${base()}/${tab}` : base());
+  };
+  const current = () => TABS.indexOf(active() as (typeof TABS)[number]);
+  const tabHotkey = { group: 'Pull requests', feature: 'pull-request-hotkeys' };
+  useHotkey({ ...tabHotkey, keys: 'g ArrowLeft', description: 'Go to previous PR tab', handler: () => goTo(current() - 1) });
+  useHotkey({ ...tabHotkey, keys: 'g ArrowRight', description: 'Go to next PR tab', handler: () => goTo(current() + 1) });
+  for (const [i, label] of ['Conversation', 'Commits', 'Checks', 'Files changed'].entries())
+    useHotkey({ ...tabHotkey, keys: `g ${i + 1}`, description: `Go to PR tab ${i + 1} (${label})`, handler: () => goTo(i) });
+
+  // quick-review: v opens the review menu (from any tab), focusing its textarea.
+  const REVIEW_HASH = '#review-changes-modal';
+  const reviewButton = () =>
+    [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="menu"]')].find((b) => /Review changes|Finish your review/.test(b.textContent ?? ''));
+  const focusReviewBox = () => setTimeout(() => document.querySelector<HTMLTextAreaElement>('[aria-label="Submit review"] textarea')?.focus(), 50);
+  const openReviewMenu = () => {
+    const button = reviewButton();
+    if (!button) return false;
+    if (button.getAttribute('aria-expanded') !== 'true') button.click();
+    focusReviewBox();
+    return true;
+  };
+  useHotkey({
+    keys: 'v',
+    description: 'Review pull request',
+    group: 'Pull requests',
+    feature: 'quick-review',
+    handler: () => {
+      if (active() !== 'files' || !openReviewMenu()) navigate(`${base()}/files${REVIEW_HASH}`);
+    },
+  });
+  // Arriving on Files changed via "review now": open the menu once the diff has loaded.
+  createEffect(
+    () => (feature('quick-review') && active() === 'files' && location.hash === REVIEW_HASH ? location.pathname : null),
+    (path) => {
+      if (!path) return;
+      const started = Date.now();
+      const timer = setInterval(() => {
+        if (openReviewMenu() || Date.now() - started > 10_000) clearInterval(timer);
+      }, 200);
+      return () => clearInterval(timer);
+    },
+  );
+  // Opening the review menu by clicking also focuses its textarea.
+  onSettled(() => {
+    const onClick = (e: MouseEvent) => {
+      if (feature('quick-review') && reviewButton()?.contains(e.target as Node)) focusReviewBox();
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  });
   const Tab = (p: { tab: string; icon: OcticonData; label: string; count: () => number | undefined }) => (
     <a
       class={['UnderlineNav-item', { selected: active() === p.tab }]}
@@ -194,18 +306,18 @@ function PullTabs(props: { pull: PullRequest }) {
       aria-current={active() === p.tab ? 'page' : undefined}
     >
       <Octicon icon={p.icon} class="text-fg-muted" />
-      {p.label}
+      <span>{p.label}</span>
       <Loading>
         <span class="Counter">{formatNumber(p.count())}</span>
       </Loading>
     </a>
   );
   return (
-    <nav class="UnderlineNav mb-4" aria-label="Pull request tabs">
+    <nav class={['UnderlineNav mb-4', { 'rgh-mobile-tabs-pr': feature('mobile-tabs-pr') }]} aria-label="Pull request tabs">
       <div class="UnderlineNav-body overflow-x-auto">
         <Tab tab="" icon={commentDiscussionIcon} label="Conversation" count={() => props.pull.comments + props.pull.review_comments} />
         <Tab tab="commits" icon={gitCommitIcon} label="Commits" count={() => props.pull.commits} />
-        <Tab tab="checks" icon={checklistIcon} label="Checks" count={() => checks().count} />
+        <Tab tab="checks" icon={checklistIcon} label="Checks" count={() => props.checks.count} />
         <Tab tab="files" icon={fileDiffIcon} label="Files changed" count={() => props.pull.changed_files} />
       </div>
       <div class="flex-1" />

@@ -6,7 +6,6 @@ import {
   bellSlashIcon,
   checkIcon,
   eyeIcon,
-
   repoForkedIcon,
   starFillIcon,
   starIcon,
@@ -15,6 +14,8 @@ import {
 import { compactNumber } from '../../../lib/format';
 import type { Repository } from '../../../lib/types';
 import { getRepoViewerState, setRepoSubscription, starRepo } from '../api';
+import { DeleteForkButton } from '../refined/ForkTools';
+import GithubIoLink from '../refined/GithubIoLink';
 
 export function VisibilityLabel(props: { repo: Repository }) {
   return (
@@ -38,9 +39,11 @@ export default function RepoTitle(props: { repo: Repository }) {
           {name()}
         </a>
       </strong>
+      <GithubIoLink name={name()} />
       <VisibilityLabel repo={props.repo} />
       <div class="flex-1" />
       <div class="flex flex-wrap gap-2">
+        <DeleteForkButton repo={props.repo} />
         <Loading
           fallback={
             <>

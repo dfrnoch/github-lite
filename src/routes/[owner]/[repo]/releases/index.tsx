@@ -1,10 +1,13 @@
 import { Title } from '@solidjs/meta';
 import { useLocation, useSearchParams } from '@solidjs/router';
-import { createMemo, For, Show } from 'solid-js';
+import { createMemo, Errored, For, Loading, Show } from 'solid-js';
 import { Blankslate, Pagination, pageHref } from '../../../../components/ui';
 import { getLatestReleaseId, getReleases } from '../../../../features/releases/api';
 import ReleaseCard from '../../../../features/releases/components/ReleaseCard';
 import ReleasesSubnav from '../../../../features/releases/components/ReleasesSubnav';
+import { FindRelease, SubscribeReleases, useCreateReleaseHotkey } from '../../../../features/releases/components/RefinedReleases';
+import { feature } from '../../../../features/refined';
+import { UnreleasedCommitsButton } from '../../../../features/repo/refined/RefExtras';
 import { useRepo } from '../../../../features/repo/context';
 import { tagIcon } from '../../../../icons/octicons';
 import { formatDate } from '../../../../lib/format';
@@ -13,24 +16,39 @@ import { formatDate } from '../../../../lib/format';
 export default function ReleasesPage() {
   const ctx = useRepo();
   const location = useLocation();
-  const [search] = useSearchParams<{ page?: string }>();
+  const [search, setSearch] = useSearchParams<{ page?: string; q?: string }>();
   const page = () => Math.max(1, Number(search.page) || 1);
   const releases = createMemo(() => getReleases(ctx.owner(), ctx.name(), page()));
   const latestId = createMemo(() => getLatestReleaseId(ctx.owner(), ctx.name()));
   const canEdit = () => !!ctx.repo().permissions?.push;
+  // releases-dropdown: `prerelease:false` hides pre-releases (on the current page).
+  const hidePrereleases = () => feature('releases-dropdown') && !!search.q?.includes('prerelease:false');
+  const items = createMemo(() => (hidePrereleases() ? releases().items.filter((r) => !r.prerelease) : releases().items));
+  useCreateReleaseHotkey();
 
   return (
     <div class="container-xl px-4 md:px-6 lg:px-8 py-6">
       <Title>{`Releases · ${ctx.fullName()}`}</Title>
       <ReleasesSubnav base={ctx.base()} active="releases">
-        <Show when={canEdit()}>
-          <a class="btn btn-primary" href={`${ctx.base()}/releases/new`}>
-            Draft a new release
-          </a>
-        </Show>
+        <div class="flex flex-wrap items-center gap-2">
+          <SubscribeReleases />
+          <FindRelease prereleasesHidden={hidePrereleases()} onFilter={(q) => setSearch({ q, page: undefined })} />
+          <Show when={feature('unreleased-commits') && page() === 1}>
+            <Errored fallback={null}>
+              <Loading>
+                <UnreleasedCommitsButton repo={ctx.repo()} withDraft={false} />
+              </Loading>
+            </Errored>
+          </Show>
+          <Show when={canEdit()}>
+            <a class="btn btn-primary" href={`${ctx.base()}/releases/new`}>
+              Draft a new release
+            </a>
+          </Show>
+        </div>
       </ReleasesSubnav>
       <For
-        each={releases().items}
+        each={items()}
         fallback={
           <Blankslate
             icon={tagIcon}

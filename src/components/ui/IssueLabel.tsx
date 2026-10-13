@@ -1,6 +1,6 @@
 import type { JSX } from '@solidjs/web';
 
-function hexToVars(hex: string): JSX.CSSProperties {
+export function hexToVars(hex: string): JSX.CSSProperties {
   const h = hex.replace('#', '').padEnd(6, '0');
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);

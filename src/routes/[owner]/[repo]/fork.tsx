@@ -2,7 +2,9 @@ import { Title } from '@solidjs/meta';
 import { useNavigate } from '@solidjs/router';
 import { createMemo, createSignal, Show } from 'solid-js';
 import { toast, toastError } from '../../../components/ui';
-import { createFork, getOrgMemberships } from '../../../features/repo-settings/api';
+import { feature } from '../../../features/refined';
+import { createFork, disableProjectsAndWiki, getOrgMemberships } from '../../../features/repo-settings/api';
+import { DisableProjectsAndWikis } from '../../../features/repo-settings/components/ui';
 import OwnerName, { normalizeRepoName, type OwnerOption } from '../../../features/repo-settings/components/OwnerName';
 import { useRepo } from '../../../features/repo/context';
 import { getViewer } from '../../../features/user/api';
@@ -26,6 +28,7 @@ export default function ForkPage() {
   const [defaultOnly, setDefaultOnly] = createSignal(true);
   const [available, setAvailable] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal<string | null>(null);
+  const [noProjects, setNoProjects] = createSignal(true);
   const isViewer = () => owner() === viewer().login;
   const canSubmit = () => !busy() && available() === `${owner()}/${normalizeRepoName(name())}`;
 
@@ -51,6 +54,9 @@ export default function ForkPage() {
         } catch {
           await sleep(1500);
         }
+      }
+      if (feature('new-repo-disable-projects-and-wikis') && noProjects()) {
+        await disableProjectsAndWiki(fork.full_name).catch(() => {});
       }
       toast(`Forked ${ctx.fullName()} to ${fork.full_name}`, 'success');
       navigate(`/${fork.full_name}`);
@@ -101,6 +107,9 @@ export default function ForkPage() {
           </span>
         </label>
         <div class="border-t border-line-muted pt-4 mt-4">
+          <Show when={feature('new-repo-disable-projects-and-wikis')}>
+            <DisableProjectsAndWikis checked={noProjects()} onChange={setNoProjects} />
+          </Show>
           <p class="text-sm text-fg-muted mb-4">
             You are creating a fork in {isViewer() ? 'your personal account' : `the ${owner()} organization`}.
           </p>

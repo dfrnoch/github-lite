@@ -5,6 +5,8 @@ import { getMilestone } from '../../../../features/issues/api';
 import IssueList from '../../../../features/issues/components/IssueList';
 import { DueDate, MilestoneActions, percentComplete, ProgressBar } from '../../../../features/issues/components/Milestones';
 import { quote } from '../../../../features/issues/query';
+import { RichText } from '../../../../features/issues/refined';
+import { feature } from '../../../../features/refined';
 import { useRepo } from '../../../../features/repo/context';
 
 /** /:owner/:repo/milestone/:number — issues and PRs in a milestone with its progress. */
@@ -29,13 +31,22 @@ export default function MilestonePage() {
             </span>
           </div>
           <Show when={milestone().description}>
-            <p class="mt-3 whitespace-pre-line break-words">{milestone().description}</p>
+            <p class="mt-3 whitespace-pre-line break-words">
+              <RichText text={milestone().description} repo={ctx.fullName()} />
+            </p>
           </Show>
         </div>
         <div class="w-full md:w-[360px] shrink-0">
           <ProgressBar percent={percentComplete(milestone())} class="mb-3 mt-2" />
           <Show when={canEdit()}>
-            <MilestoneActions owner={ctx.owner()} repo={ctx.name()} milestone={milestone()} afterDelete={`${ctx.base()}/milestones`} />
+            <div class="flex flex-wrap items-center gap-3">
+              <MilestoneActions owner={ctx.owner()} repo={ctx.name()} milestone={milestone()} afterDelete={`${ctx.base()}/milestones`} />
+              <Show when={feature('new-milestone-button')}>
+                <a class="btn btn-sm btn-primary ml-auto rgh-new-milestone" href={`${ctx.base()}/milestones/new`}>
+                  New milestone
+                </a>
+              </Show>
+            </div>
           </Show>
         </div>
       </div>

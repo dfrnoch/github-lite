@@ -207,12 +207,18 @@ export interface NewRepoInput {
   autoInit: boolean;
   gitignore: string;
   license: string;
+  /** new-repo-disable-projects-and-wikis: create without Projects and Wiki. */
+  disableProjectsAndWiki?: boolean;
 }
+
+/** Turn off Projects and the Wiki of a freshly created repo / fork. */
+export const disableProjectsAndWiki = (fullName: string) =>
+  gh(`/repos/${fullName}`, { method: 'PATCH', body: { has_projects: false, has_wiki: false } });
 
 /** Create (or generate from a template) a repository. Plain async: the caller navigates away. */
 export async function createRepository(input: NewRepoInput) {
   if (input.template) {
-    return gh<Repository>(`/repos/${input.template}/generate`, {
+    const repo = await gh<Repository>(`/repos/${input.template}/generate`, {
       method: 'POST',
       body: {
         owner: input.owner,
@@ -222,6 +228,9 @@ export async function createRepository(input: NewRepoInput) {
         private: input.visibility !== 'public',
       },
     });
+    // Generated repos don't take feature flags: switch them off afterwards (best effort).
+    if (input.disableProjectsAndWiki) await disableProjectsAndWiki(repo.full_name).catch(() => {});
+    return repo;
   }
   const body: Record<string, unknown> = {
     name: input.name,
@@ -231,6 +240,7 @@ export async function createRepository(input: NewRepoInput) {
     gitignore_template: input.gitignore || undefined,
     license_template: input.license || undefined,
   };
+  if (input.disableProjectsAndWiki) Object.assign(body, { has_projects: false, has_wiki: false });
   if (!input.isViewer) body.visibility = input.visibility;
   return gh<Repository>(input.isViewer ? '/user/repos' : `/orgs/${input.owner}/repos`, { method: 'POST', body });
 }

@@ -3,10 +3,13 @@ import { createMemo, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { CopyButton } from '../../../components/ui';
 import type { RouteDefinition } from '@solidjs/router';
-import { getCommunityFiles, getLastCommit, getReadme, getRepo, getRepoViewerState, getTree, getTreeCommits } from '../../../features/repo/api';
+import { feature } from '../../../features/refined';
+import { getCommunityFiles, getFirstCommit, getLastCommit, getPublishState, getReadme, getRepo, getRepoViewerState, getTree, getTreeCommits } from '../../../features/repo/api';
 import AboutSidebar from '../../../features/repo/components/AboutSidebar';
 import DirectoryView from '../../../features/repo/components/DirectoryView';
 import RepoTitle from '../../../features/repo/components/RepoTitle';
+import { ForkPullsHint } from '../../../features/repo/refined/ForkTools';
+import { stickySidebar } from '../../../features/repo/refined/sticky';
 import { useRepo } from '../../../features/repo/context';
 import { repoForkedIcon, repoTemplateIcon } from '../../../icons/octicons';
 
@@ -18,6 +21,9 @@ export const route = {
     const { owner, repo } = params as { owner: string; repo: string };
     void getRepoViewerState(owner, repo);
     void getCommunityFiles(owner, repo);
+    // Refined GitHub extras, so they don't wait for the file list to render.
+    if (feature('unreleased-commits')) void getPublishState(owner, repo);
+    if (feature('repo-age')) void getFirstCommit(owner, repo);
     void getRepo(owner, repo).then((r) => {
       const ref = r.default_branch;
       void getLastCommit(owner, repo, ref);
@@ -45,6 +51,7 @@ export default function RepoHome() {
         {(parent) => (
           <p class="-mt-3 mb-4 text-xs text-fg-muted flex items-center gap-1">
             <Octicon icon={repoForkedIcon} /> forked from <a href={`/${parent().full_name}`}>{parent().full_name}</a>
+            <ForkPullsHint repo={repo()} />
           </p>
         )}
       </Show>
@@ -61,7 +68,7 @@ export default function RepoHome() {
             <DirectoryView repo={repo()} gitRef={repo().default_branch} path="" />
           </Show>
         </div>
-        <aside class="w-full md:w-[296px] shrink-0">
+        <aside class="w-full md:w-[296px] shrink-0" ref={stickySidebar()}>
           <AboutSidebar repo={repo()} />
         </aside>
       </div>

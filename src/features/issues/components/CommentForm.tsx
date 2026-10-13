@@ -1,17 +1,44 @@
 import { useAction } from '@solidjs/router';
-import { createSignal, Show } from 'solid-js';
+import type { JSX } from '@solidjs/web';
+import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Avatar, Dropdown, MarkdownEditor, toastError } from '../../../components/ui';
 import {
   checkIcon,
+  flameIcon,
   gitPullRequestClosedIcon,
+  gitPullRequestDraftIcon,
+  infoIcon,
   issueClosedIcon,
   issueReopenedIcon,
   lockIcon,
   skipIcon,
   triangleDownIcon,
 } from '../../../icons/octicons';
+import { feature } from '../../refined';
 import { addComment, type IssuePatch } from '../api';
+
+/** Conversation facts the netiquette reminders look at. */
+export interface NetiquetteInfo {
+  closedAt: string | null;
+  isDraft?: boolean;
+  /** The viewer opened the conversation. */
+  own: boolean;
+  /** Triage access or better (moderators aren't told off for commenting). */
+  moderator: boolean;
+  comments: number;
+  participants: number;
+}
+
+const THREE_MONTHS = 90 * 24 * 3600 * 1000;
+
+/** "3 years ago" style without the shared clock. */
+function twas(date: string) {
+  const days = (Date.now() - Date.parse(date)) / (24 * 3600 * 1000);
+  if (days >= 365) return `${Math.floor(days / 365)} year${days >= 730 ? 's' : ''} ago`;
+  if (days >= 30) return `${Math.floor(days / 30)} month${days >= 60 ? 's' : ''} ago`;
+  return `${Math.floor(days)} days ago`;
+}
 
 /**
  * "Add a comment" box at the bottom of an issue / PR, with the state buttons
@@ -30,6 +57,8 @@ export default function CommentForm(props: {
   viewerAvatar?: string;
   value: string;
   onInput: (v: string) => void;
+  /** netiquette: reminders above the comment box. */
+  netiquette?: NetiquetteInfo;
 }) {
   const comment = useAction(addComment);
   const [busy, setBusy] = createSignal(false);
@@ -50,6 +79,31 @@ export default function CommentForm(props: {
   const close = () => submit(props.isPull ? { state: 'closed' } : { state: 'closed', state_reason: reason() });
   const reopen = () => submit(props.isPull ? { state: 'open' } : { state: 'open', state_reason: 'reopened' });
   const withComment = () => !!props.value.trim();
+  const closeAsUnplanned = () => submit({ state: 'closed', state_reason: 'not_planned' });
+
+  const banners = () => {
+    const n = props.netiquette;
+    if (!n || !feature('netiquette')) return [];
+    const thing = props.isPull ? 'PR' : 'issue';
+    if (n.isDraft && !n.own) return [{ icon: gitPullRequestDraftIcon, text: <>This is a <strong>draft PR</strong>, it might not be ready for review.</> }];
+    const out: { icon: typeof infoIcon; text: JSX.Element }[] = [];
+    if (!n.moderator && (n.comments > 30 || n.participants > 20))
+      out.push({
+        icon: flameIcon,
+        text: <>This {thing} is highly active. Reconsider commenting unless you have read all the comments and have something to add.</>,
+      });
+    if (props.state !== 'OPEN' && n.closedAt && Date.now() - Date.parse(n.closedAt) > THREE_MONTHS)
+      out.push({
+        icon: infoIcon,
+        text: (
+          <>
+            This {thing} was closed <strong>{twas(n.closedAt)}</strong>. Please consider opening a{' '}
+            <a href={`/${props.owner}/${props.repo}/issues/new`}>new issue</a> instead of leaving a comment here.
+          </>
+        ),
+      });
+    return out;
+  };
 
   return (
     <Show
@@ -65,6 +119,14 @@ export default function CommentForm(props: {
         <Avatar src={props.viewerAvatar} size={40} class="absolute left-0 top-0" />
         <div class="timeline-comment timeline-comment--caret p-2">
           <h2 class="sr-only">Add a comment</h2>
+          <For each={banners()}>
+            {(b) => (
+              <div class="rgh-netiquette flex items-center gap-2 mb-2 p-2 rounded-md text-sm text-fg-muted bg-accent-muted">
+                <Octicon icon={b.icon} class="shrink-0" />
+                <span>{b.text}</span>
+              </div>
+            )}
+          </For>
           <Show when={props.locked}>
             <div class="flash flash-warn mb-2 text-sm">
               <Octicon icon={lockIcon} /> This conversation has been locked. You can comment because you are a collaborator.
@@ -74,7 +136,7 @@ export default function CommentForm(props: {
             value={props.value}
             onInput={props.onInput}
             repo={`${props.owner}/${props.repo}`}
-            placeholder="Use Markdown to format your comment"
+            placeholder={feature('netiquette') ? 'Add your comment here, be kind' : 'Use Markdown to format your comment'}
             onSubmit={() => void submit()}
             disabled={busy()}
           />
@@ -98,6 +160,12 @@ export default function CommentForm(props: {
                     </button>
                   }
                 >
+                  <Show when={feature('close-as-unplanned')}>
+                    <button type="button" class="btn rgh-close-as-unplanned" disabled={busy()} onClick={closeAsUnplanned} title="Close as not planned: won’t fix, can’t repro, stale">
+                      <Octicon icon={skipIcon} class="text-fg-muted!" />
+                      Close as not planned
+                    </button>
+                  </Show>
                   <div class="BtnGroup">
                     <button type="button" class="btn" disabled={busy()} onClick={close}>
                       <Octicon

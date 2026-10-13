@@ -2,10 +2,12 @@ import { useAction } from '@solidjs/router';
 import { createSignal, For, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { RelativeTime, toastError } from '../../../components/ui';
-import { lawIcon, repoForkedIcon, starFillIcon, starIcon } from '../../../icons/octicons';
+import { gitPullRequestIcon, issueOpenedIcon, lawIcon, repoForkedIcon, starFillIcon, starIcon } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
 import { languageColor } from '../../../lib/languages';
+import { feature } from '../../refined';
 import { starRepo } from '../../repo/api';
+import GithubIoLink from '../../repo/refined/GithubIoLink';
 import type { RepoSummary } from '../api';
 
 /** "Public", "Private archive", "Public template"… — the label next to a repo name. */
@@ -72,6 +74,8 @@ export default function RepoListItem(props: {
   showOwner?: boolean;
   /** Hide the Star button (e.g. compact lists). */
   hideStar?: boolean;
+  /** Issues / pull requests icon links before "Updated" (`conversation-links-on-repo-lists`). */
+  conversationLinks?: boolean;
 }) {
   const href = () => `/${props.repo.fullName}`;
   return (
@@ -85,7 +89,19 @@ export default function RepoListItem(props: {
               </Show>
             </a>
           </h3>
-          <span class={['Label', { 'Label--attention': props.repo.isArchived }]}>{repoVisibilityLabel(props.repo)}</span>
+          <GithubIoLink name={props.repo.name} />
+          <span
+            class={[
+              'Label',
+              {
+                'Label--attention': props.repo.isArchived,
+                // `mark-private-repos`: private repos stand out in the list.
+                'rgh-private-repo': props.repo.isPrivate && !props.repo.isArchived && feature('mark-private-repos'),
+              },
+            ]}
+          >
+            {repoVisibilityLabel(props.repo)}
+          </span>
         </div>
         <Show when={props.repo.parent}>
           {(parent) => (
@@ -137,6 +153,14 @@ export default function RepoListItem(props: {
                 {l()}
               </span>
             )}
+          </Show>
+          <Show when={props.conversationLinks}>
+            <a class="link-muted inline-flex items-center" href={`${href()}/issues`} title="Issues" aria-label={`Issues of ${props.repo.fullName}`}>
+              <Octicon icon={issueOpenedIcon} />
+            </a>
+            <a class="link-muted inline-flex items-center" href={`${href()}/pulls`} title="Pull requests" aria-label={`Pull requests of ${props.repo.fullName}`}>
+              <Octicon icon={gitPullRequestIcon} />
+            </a>
           </Show>
           <span>
             Updated <RelativeTime datetime={props.repo.updatedAt} />

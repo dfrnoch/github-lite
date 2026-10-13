@@ -1,5 +1,5 @@
 import { action, useAction } from '@solidjs/router';
-import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
+import { createMemo, createSignal, Errored, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Dialog, RelativeTime, toastError } from '../../../components/ui';
 import {
@@ -11,6 +11,7 @@ import {
   linkIcon,
   peopleIcon,
   pulseIcon,
+  repoIcon,
   repoForkedIcon,
   shieldIcon,
   starIcon,
@@ -20,7 +21,8 @@ import { compactNumber, formatNumber } from '../../../lib/format';
 import { gh } from '../../../lib/github';
 import { languageColor } from '../../../lib/languages';
 import type { Repository } from '../../../lib/types';
-import { getCommunityFiles, getRepoOverview } from '../api';
+import { feature } from '../../refined';
+import { getCommunityFiles, getFirstCommit, getRepoOverview } from '../api';
 
 export const updateRepoAbout = action(
   async (owner: string, repo: string, about: { description: string; homepage: string; topics: string[] }) => {
@@ -41,6 +43,7 @@ export default function AboutSidebar(props: { repo: Repository }) {
   const overview = createMemo(() => getRepoOverview(owner(), name()));
   const community = createMemo(() => getCommunityFiles(owner(), name()));
   const [editing, setEditing] = createSignal(false);
+  const clean = () => feature('clean-repo-sidebar');
 
   const Link = (p: { icon: typeof bookIcon; href: string; children: any }) => (
     <a class="link-muted flex items-center gap-2 mt-2" href={p.href}>
@@ -52,17 +55,24 @@ export default function AboutSidebar(props: { repo: Repository }) {
   return (
     <div class="text-sm">
       <section class="pb-6 border-b border-line-muted">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-base font-semibold">About</h2>
-          <Show when={props.repo.permissions?.admin}>
-            <button type="button" class="btn-octicon" aria-label="Edit repository metadata" onClick={() => setEditing(true)}>
-              <Octicon icon={gearIcon} />
-            </button>
-          </Show>
-        </div>
+        {/* clean-repo-sidebar: the "About" heading only stays for its edit button. */}
+        <Show when={!clean() || props.repo.permissions?.admin}>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold">About</h2>
+            <Show when={props.repo.permissions?.admin}>
+              <button type="button" class="btn-octicon" aria-label="Edit repository metadata" onClick={() => setEditing(true)}>
+                <Octicon icon={gearIcon} />
+              </button>
+            </Show>
+          </div>
+        </Show>
         <Show
           when={props.repo.description || props.repo.homepage || props.repo.topics?.length}
-          fallback={<p class="text-fg-muted italic">No description, website, or topics provided.</p>}
+          fallback={
+            <Show when={!clean() || props.repo.permissions?.admin}>
+              <p class="text-fg-muted italic">No description, website, or topics provided.</p>
+            </Show>
+          }
         >
           <Show when={props.repo.description}>
             <p class="text-base mb-4">{props.repo.description}</p>
@@ -91,7 +101,7 @@ export default function AboutSidebar(props: { repo: Repository }) {
           <Show when={community()}>
             {(c) => (
               <>
-                <Show when={c().files.readme}>
+                <Show when={c().files.readme && !clean()}>
                   <Link icon={bookIcon} href={`${base()}#readme`}>
                     Readme
                   </Link>
@@ -103,7 +113,7 @@ export default function AboutSidebar(props: { repo: Repository }) {
                     </Link>
                   )}
                 </Show>
-                <Show when={c().files.code_of_conduct}>
+                <Show when={c().files.code_of_conduct && !clean()}>
                   <Link icon={codeOfConductIcon} href={new URL(c().files.code_of_conduct!.html_url).pathname}>
                     Code of conduct
                   </Link>
@@ -132,9 +142,17 @@ export default function AboutSidebar(props: { repo: Repository }) {
         <Link icon={repoForkedIcon} href={`${base()}/forks`}>
           <strong class="text-fg">{compactNumber(props.repo.forks_count)}</strong> forks
         </Link>
+        <Show when={feature('repo-age')}>
+          <Errored fallback={null}>
+            <Loading>
+              <RepoAge owner={owner()} repo={name()} />
+            </Loading>
+          </Errored>
+        </Show>
       </section>
 
       <Loading>
+        <Show when={!clean() || overview().releases.totalCount || props.repo.permissions?.push}>
         <section class="py-6 border-b border-line-muted">
           <h2 class="text-base font-semibold mb-3">
             <a class="link-plain" href={`${base()}/releases`}>
@@ -169,16 +187,17 @@ export default function AboutSidebar(props: { repo: Repository }) {
               </a>
             )}
           </Show>
-          <Show when={overview().releases.totalCount > 1}>
+          <Show when={overview().releases.totalCount > 1 && !clean()}>
             <a class="block mt-3 text-xs" href={`${base()}/releases`}>
               + {formatNumber(overview().releases.totalCount - 1)} releases
             </a>
           </Show>
         </section>
+        </Show>
 
         <Show when={overview().languages.items.length}>
           <section class="py-6">
-            <h2 class="text-base font-semibold mb-3">Languages</h2>
+            <h2 class={['text-base font-semibold mb-3', { 'sr-only': clean() }]}>Languages</h2>
             <div class="flex h-2 rounded-md overflow-hidden gap-0.5 mb-2">
               <For each={overview().languages.items}>
                 {(lang) => (
@@ -269,3 +288,63 @@ function EditAboutDialog(props: { repo: Repository; open: boolean; onClose: () =
   );
 }
 
+
+const FRESH = [
+  'Freshly baked',
+  'Freshly brewed',
+  'Newly minted',
+  'Hot off the presses',
+  'Straight out of the oven',
+  'Still hot',
+  'Smells fresh',
+  'Just a baby',
+  'It’s my birthday',
+  'Brand spanking new',
+  'It’s a new world ✨',
+  'Certified Fresh Repo™',
+  'So it begins, the great battle of our time',
+];
+
+const AGE_UNITS: [string, number][] = [
+  ['year', 365 * 24 * 3600e3],
+  ['month', 30 * 24 * 3600e3],
+  ['week', 7 * 24 * 3600e3],
+  ['day', 24 * 3600e3],
+];
+
+/** repo-age: "5 years old" (age of the first commit), linking to that commit. */
+function RepoAge(props: { owner: string; repo: string }) {
+  const first = createMemo(() => getFirstCommit(props.owner, props.repo));
+  const fresh = FRESH[Math.floor(Math.random() * FRESH.length)]!;
+  const age = createMemo(() => {
+    const c = first();
+    if (!c) return null;
+    const ms = Date.now() - new Date(c.date).getTime();
+    // About a day old or less.
+    if (ms < 10e7) return { fresh, value: '', unit: '' };
+    const [unit, size] = AGE_UNITS.find(([, size]) => ms >= size) ?? AGE_UNITS.at(-1)!;
+    const value = Math.max(1, Math.round(ms / size));
+    return { fresh: '', value: String(value), unit: value === 1 ? unit : `${unit}s` };
+  });
+  return (
+    <Show when={age()}>
+      {(a) => (
+        <>
+          <h3 class="sr-only">Repository age</h3>
+          <a
+            class="link-muted flex items-center gap-2 mt-2"
+            href={`/${props.owner}/${props.repo}/commit/${first()!.oid}`}
+            title={`First commit dated ${new Date(first()!.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`}
+          >
+            <Octicon icon={repoIcon} />
+            <Show when={!a().fresh} fallback={a().fresh}>
+              <span>
+                <strong class="text-fg">{a().value}</strong> {a().unit} old
+              </span>
+            </Show>
+          </a>
+        </>
+      )}
+    </Show>
+  );
+}

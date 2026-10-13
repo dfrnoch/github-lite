@@ -1,9 +1,13 @@
 import type { JSX } from '@solidjs/web';
 import { createMemo, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { cacheIcon, serverIcon, stopIcon } from '../../../icons/octicons';
+import { RelativeTime } from '../../../components/ui';
+import { cacheIcon, playIcon, serverIcon, stopIcon } from '../../../icons/octicons';
+import { feature } from '../../refined';
 import { useRepo } from '../../repo/context';
-import { getWorkflows } from '../api';
+import { getWorkflows, getWorkflowSources } from '../api';
+import { nextCronDate, workflowCrons } from '../cron';
+import { workflowDispatch } from '../yaml';
 import '../actions.css';
 
 /** File name of a workflow path (`.github/workflows/ci.yml` → `ci.yml`); dynamic workflows keep their id. */
@@ -21,6 +25,23 @@ export default function ActionsShell(props: { active: string; children: JSX.Elem
     [...workflows()].filter((w) => w.state !== 'deleted').sort((a, b) => a.name.localeCompare(b.name)),
   );
   const href = (path: string) => `${ctx.base()}/actions${path}`;
+  const canDispatch = () => !!ctx.repo().permissions?.push;
+  // github-actions-indicators: manual trigger + next scheduled run per workflow file.
+  const sources = createMemo(() => (feature('github-actions-indicators') ? getWorkflowSources(ctx.owner(), ctx.name()) : null));
+  const indicators = createMemo(() => {
+    const files = sources();
+    if (!files) return null;
+    const out: Record<string, { manual: boolean; next: Date | null }> = {};
+    for (const [file, source] of Object.entries(files)) {
+      let next: Date | null = null;
+      for (const cron of workflowCrons(source)) {
+        const t = nextCronDate(cron);
+        if (t && (!next || t < next)) next = t;
+      }
+      out[file] = { manual: workflowDispatch(source).dispatchable, next };
+    }
+    return out;
+  });
 
   return (
     <div class="flex flex-col md:flex-row min-h-[calc(100vh-200px)]">
@@ -39,18 +60,56 @@ export default function ActionsShell(props: { active: string; children: JSX.Elem
             <ul class="NavList max-h-[60vh] overflow-auto">
               <For each={sorted()}>
                 {(w) => (
-                  <li>
+                  <li class="relative group">
                     <a
                       class="NavList-item"
                       href={href(`/workflows/${workflowFile(w.path)}`)}
                       aria-current={props.active === workflowFile(w.path) ? 'page' : undefined}
                       title={w.name}
                     >
-                      <span class="truncate flex-1">{w.name}</span>
+                      <span class="truncate flex-1">
+                        {w.name}
+                        <Loading>
+                          <Show when={indicators()?.[workflowFile(w.path)]?.next}>
+                            {(next) => (
+                              <em class="text-fg-muted font-normal">
+                                {' '}
+                                (<RelativeTime datetime={next().toISOString()} relative />)
+                              </em>
+                            )}
+                          </Show>
+                        </Loading>
+                      </span>
                       <Show when={w.state.startsWith('disabled')}>
                         <Octicon icon={stopIcon} aria-label="Disabled" />
                       </Show>
+                      <Loading>
+                        <Show when={indicators()?.[workflowFile(w.path)]?.manual && !canDispatch()}>
+                          <span class="inline-flex text-fg-muted" title="This workflow can be triggered manually">
+                            <Octicon icon={playIcon} />
+                          </span>
+                        </Show>
+                      </Loading>
                     </a>
+                    <Loading>
+                    <Show
+                      when={
+                        indicators()?.[workflowFile(w.path)]?.manual &&
+                        canDispatch() &&
+                        !w.state.startsWith('disabled') &&
+                        props.active !== workflowFile(w.path)
+                      }
+                    >
+                      <a
+                        class="btn-octicon absolute right-1 top-1/2 -translate-y-1/2 bg-canvas!"
+                        href={`${href(`/workflows/${workflowFile(w.path)}`)}#rgh-run-workflow`}
+                        title="Trigger manually"
+                        aria-label={`Run ${w.name}`}
+                      >
+                        <Octicon icon={playIcon} />
+                      </a>
+                    </Show>
+                    </Loading>
                   </li>
                 )}
               </For>

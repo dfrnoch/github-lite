@@ -1,6 +1,11 @@
+import { useLocation } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
-import { createSignal, Show } from 'solid-js';
-import { toastError } from '../../../components/ui';
+import { createSignal, For, Show } from 'solid-js';
+import Octicon from '../../../components/Octicon';
+import { Dropdown, toastError } from '../../../components/ui';
+import { checkIcon, eyeClosedIcon, eyeIcon, lockIcon, triangleDownIcon } from '../../../icons/octicons';
+import { feature } from '../../refined';
+import { ACTIVITY_STATES, type ActivityFilter, activityFilter, CONVERSATION_PATH, RichText, setActivityFilter } from '../refined';
 
 /**
  * Big "Title #123" heading with inline title editing, the state badge / meta
@@ -17,8 +22,26 @@ export default function IssueHeader(props: {
   bordered?: boolean;
   /** State badge + meta line. */
   children: JSX.Element;
+  /** Conversation is locked (locked-issue shows a label). */
+  locked?: boolean;
 }) {
+  const location = useLocation();
   const [editing, setEditing] = createSignal(false);
+  /** Repo of the page ("owner/name"), for #123 references in the title. */
+  const repo = () => location.pathname.split('/').slice(1, 3).join('/');
+  const conversationPath = () => (CONVERSATION_PATH.test(location.pathname) ? location.pathname.replace(/\/$/, '') : null);
+
+  // jump-to-conversation-close-event: clicking the Closed / Merged badge scrolls to the latest close event.
+  const jumpToClose = (e: MouseEvent) => {
+    if (!feature('jump-to-conversation-close-event') || !(e.target as HTMLElement).closest('.State')) return;
+    const events = document.querySelectorAll<HTMLElement>('[data-rgh-close-event]');
+    const last = events[events.length - 1];
+    if (!last) return;
+    last.scrollIntoView({ block: 'center' });
+    last.classList.remove('rgh-flash');
+    void last.offsetWidth;
+    last.classList.add('rgh-flash');
+  };
   const [draft, setDraft] = createSignal(() => props.title);
   const [busy, setBusy] = createSignal(false);
 
@@ -45,7 +68,10 @@ export default function IssueHeader(props: {
         fallback={
           <div class="flex flex-col-reverse md:flex-row md:items-start gap-2">
             <h1 class="flex-1 min-w-0 text-[26px] md:text-[32px] leading-tight font-normal break-words">
-              <bdi class="text-fg">{props.title}</bdi> <span class="text-fg-muted font-light">#{props.number}</span>
+              <bdi class="text-fg">
+                <RichText text={props.title} repo={repo()} />
+              </bdi>{' '}
+              <span class="text-fg-muted font-light">#{props.number}</span>
             </h1>
             <div class="flex items-center gap-2 shrink-0 md:mt-1">
               <Show when={props.canEdit}>
@@ -84,7 +110,63 @@ export default function IssueHeader(props: {
           </button>
         </form>
       </Show>
-      <div class="flex flex-wrap items-center gap-2 mt-2 text-sm text-fg-muted">{props.children}</div>
+      <div
+        class={['flex flex-wrap items-center gap-2 mt-2 text-sm text-fg-muted', { 'rgh-jump-to-close-event': feature('jump-to-conversation-close-event') }]}
+        onClick={jumpToClose}
+      >
+        {props.children}
+        <Show when={props.locked && feature('locked-issue')}>
+          <span class="Label Label--secondary inline-flex items-center gap-1 rgh-locked-issue" title="This conversation is locked">
+            <Octicon icon={lockIcon} size={12} /> Locked
+          </span>
+        </Show>
+        <Show when={feature('conversation-activity-filter') && conversationPath()}>
+          {(path) => <ActivityFilterMenu path={path()} />}
+        </Show>
+      </div>
     </div>
+  );
+}
+
+/** conversation-activity-filter: "Show all activities / Hide events / Hide events, bots, collapsed comments". */
+function ActivityFilterMenu(props: { path: string }) {
+  const current = () => activityFilter(props.path);
+  return (
+    <Dropdown
+      class="btn-invisible btn-sm text-fg-muted! font-normal! px-2! rgh-conversation-activity-filter"
+      title="Conversation activity filter (h)"
+      menuClass="w-72"
+      button={
+        <span class="inline-flex items-center gap-1">
+          <Octicon icon={current() === 'showAll' ? eyeIcon : eyeClosedIcon} />
+          {current() === 'showAll' ? 'Activity' : ACTIVITY_STATES[current()]}
+          <Octicon icon={triangleDownIcon} />
+        </span>
+      }
+    >
+      {(close) => (
+        <For each={Object.entries(ACTIVITY_STATES) as [ActivityFilter, string][]}>
+          {([state, label]) => (
+            <button
+              type="button"
+              class="SelectMenu-item"
+              role="menuitemradio"
+              aria-checked={current() === state ? 'true' : 'false'}
+              onClick={() => {
+                setActivityFilter(props.path, state);
+                close();
+              }}
+            >
+              <span class="w-4 shrink-0">
+                <Show when={current() === state}>
+                  <Octicon icon={checkIcon} />
+                </Show>
+              </span>
+              {label}
+            </button>
+          )}
+        </For>
+      )}
+    </Dropdown>
   );
 }

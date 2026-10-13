@@ -1,9 +1,11 @@
+import { useLocation, useNavigate } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js';
 import Octicon from '../../components/Octicon';
 import { CopyButton, Dropdown } from '../../components/ui';
 import {
   arrowRightIcon,
+  checkIcon,
   chevronDownIcon,
   chevronRightIcon,
   foldDownIcon,
@@ -15,10 +17,22 @@ import {
   unfoldIcon,
 } from '../../icons/octicons';
 import { formatNumber } from '../../lib/format';
+import { useHotkey } from '../../lib/hotkeys';
 import type { DiffFile } from '../../lib/types';
+import { codeTransformOptions, tabSizeStyle, transformCodeLine } from '../code/refined';
+import { feature } from '../refined';
 import DiffFileTree, { FileStatusIcon } from './DiffFileTree';
 import { highlightDiff, plainDiffHtml } from './highlight';
-import { diffAnchor, diffstatBlocks, escapeHtml, parsePatch, toSplitRows, type DiffLine, type Side } from './parse';
+import {
+  diffAnchor,
+  diffstatBlocks,
+  escapeHtml,
+  ignoreWhitespaceChanges,
+  parsePatch,
+  toSplitRows,
+  type DiffLine,
+  type Side,
+} from './parse';
 
 export type { Side } from './parse';
 
@@ -87,6 +101,20 @@ export interface DiffViewProps {
   toolbar?: JSX.Element;
   /** Replace the default "N files changed" summary on the left of the toolbar. */
   summary?: JSX.Element;
+  /** Extra items for a file's "…" menu (e.g. restore-file). */
+  fileMenu?: (file: DiffFile, close: () => void) => JSX.Element;
+}
+
+/** "/o/r/blob/ref/path" → raw / blame / history links (more-file-links). */
+function moreFileLinks(href: string | undefined) {
+  const m = href?.match(/^\/([^/]+)\/([^/]+)\/blob\/(.+)$/);
+  if (!m) return null;
+  const [, owner, repo, rest] = m;
+  return {
+    raw: `https://github.com/${owner}/${repo}/raw/${rest}`,
+    blame: `/${owner}/${repo}/blame/${rest}`,
+    history: `/${owner}/${repo}/commits/${rest}`,
+  };
 }
 
 /**
@@ -96,17 +124,59 @@ export interface DiffViewProps {
  * and review-comment slots under lines.
  */
 export default function DiffView(props: DiffViewProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  /** github.com's `?w=1`: hide whitespace-only changes. */
+  const hideWhitespace = () => new URLSearchParams(location.search).get('w') === '1';
+  const whitespaceHref = () => {
+    const sp = new URLSearchParams(location.search);
+    if (hideWhitespace()) sp.delete('w');
+    else sp.set('w', '1');
+    const qs = sp.toString();
+    return `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`;
+  };
+  useHotkey({
+    keys: 'd w',
+    description: 'Show/hide whitespace changes in diffs',
+    group: 'Pull request list / diffs',
+    feature: 'one-click-diff-options',
+    handler: () => navigate(whitespaceHref(), { replace: true, scroll: false }),
+  });
+  /** "/owner/repo" of the page, for linkify-code's issue references. */
+  const repoBase = () => location.pathname.split('/').slice(0, 3).join('/');
   const [localViewed, setLocalViewed] = createSignal<Record<string, boolean>>(() => readViewed(props.viewedKey));
   const viewable = () => !!props.viewedKey || !!props.onViewedChange;
   const isViewed = (path: string) => (props.viewed ? !!props.viewed[path] : !!localViewed()[path]);
   const setViewed = (path: string, value: boolean) => {
     if (props.onViewedChange) props.onViewedChange(path, value);
     if (!props.viewed && props.viewedKey) {
-      const next = { ...localViewed(), [path]: value };
-      if (!value) delete next[path];
-      setLocalViewed(next);
-      ls?.setItem(`gh-lite:viewed:${props.viewedKey}`, JSON.stringify(next));
+      // Updater form: several files can change in one tick (batch-mark-files-as-viewed).
+      const key = `gh-lite:viewed:${props.viewedKey}`;
+      setLocalViewed((prev) => {
+        const next = { ...prev, [path]: value };
+        if (!value) delete next[path];
+        ls?.setItem(key, JSON.stringify(next));
+        return next;
+      });
     }
+  };
+
+  /** batch-mark-files-as-viewed: shift-click marks every file between the last clicked checkbox and this one. */
+  let lastViewedIndex: number | null = null;
+  const onViewedClick = (index: number, value: boolean, shift: boolean) => {
+    if (shift && lastViewedIndex != null && lastViewedIndex !== index && feature('batch-mark-files-as-viewed')) {
+      const [from, to] = [Math.min(lastViewedIndex, index), Math.max(lastViewedIndex, index)];
+      for (let i = from; i <= to; i++) {
+        const path = props.files[i]?.filename;
+        if (path && isViewed(path) !== value) setViewed(path, value);
+      }
+    } else setViewed(props.files[index]!.filename, value);
+    lastViewedIndex = index;
+  };
+  /** pr-jump-to-first-non-viewed-file */
+  const jumpToFirstUnviewed = () => {
+    const file = props.files.find((f) => !isViewed(f.filename));
+    if (file) jumpTo(file);
   };
 
   const anchors = createMemo(() => new Map(props.files.map((f) => [f, diffAnchor(f.filename)] as const)));
@@ -147,7 +217,7 @@ export default function DiffView(props: DiffViewProps) {
   const showTree = () => props.files.length > 1;
 
   return (
-    <div class="flex gap-4 items-start">
+    <div class={['flex gap-4 items-start', { 'rgh-hide-diff-signs': feature('hide-diff-signs') }]} style={tabSizeStyle()}>
       <Show when={showTree() && treeOpen()}>
         <aside class="hidden md:block w-[280px] shrink-0 sticky top-2 max-h-[calc(100vh-16px)] overflow-auto pr-1">
           <DiffFileTree
@@ -186,12 +256,42 @@ export default function DiffView(props: DiffViewProps) {
               {props.summary}
             </Show>
             <Show when={viewable()}>
-              <span class="ml-2">
-                {props.files.filter((f) => isViewed(f.filename)).length} / {props.files.length} viewed
-              </span>
+              <Show
+                when={feature('pr-jump-to-first-non-viewed-file')}
+                fallback={
+                  <span class="ml-2">
+                    {props.files.filter((f) => isViewed(f.filename)).length} / {props.files.length} viewed
+                  </span>
+                }
+              >
+                <button
+                  type="button"
+                  class="ml-2 text-fg-muted hover:text-fg-accent hover:underline"
+                  title="Jump to the first file that isn't marked as viewed"
+                  onClick={jumpToFirstUnviewed}
+                >
+                  {props.files.filter((f) => isViewed(f.filename)).length} / {props.files.length} viewed
+                </button>
+              </Show>
             </Show>
           </div>
           <div class="flex-1" />
+          <Show when={feature('one-click-diff-options')}>
+            <a
+              class={['btn btn-sm', { 'text-fg-muted!': hideWhitespace() }]}
+              href={whitespaceHref()}
+              title={`${hideWhitespace() ? 'Show' : 'Hide'} whitespace changes (d w)`}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(whitespaceHref(), { replace: true, scroll: false });
+              }}
+            >
+              <Show when={hideWhitespace()}>
+                <Octicon icon={checkIcon} />
+              </Show>
+              No whitespace
+            </a>
+          </Show>
           <div class="SegmentedControl" role="group" aria-label="Diff view">
             <button type="button" class={['SegmentedControl-item text-xs!', { selected: !split() }]} onClick={() => setDiffSplit(false)}>
               Unified
@@ -203,16 +303,19 @@ export default function DiffView(props: DiffViewProps) {
           {props.toolbar}
         </div>
         <For each={props.files}>
-          {(file) => (
+          {(file, index) => (
             <DiffFileView
               file={file}
               anchor={anchors().get(file) ?? ''}
-              split={split()}
+              split={split() && !(feature('no-unnecessary-split-diff-view') && (!file.additions || !file.deletions))}
+              hideWhitespace={hideWhitespace()}
+              repoBase={repoBase()}
+              fileMenu={props.fileMenu}
               startLoaded={!startCollapsed().has(file)}
               forceVisible={forced() === file.filename}
               viewable={viewable()}
               viewed={isViewed(file.filename)}
-              onViewed={(v) => setViewed(file.filename, v)}
+              onViewed={(v, shift) => onViewedClick(index(), v, shift)}
               href={props.fileHref?.(file)}
               loadContent={props.loadContent}
               extraKeys={props.extraKeys}
@@ -258,25 +361,33 @@ function DiffFileView(props: {
   forceVisible: boolean;
   viewable: boolean;
   viewed: boolean;
-  onViewed: (viewed: boolean) => void;
+  onViewed: (viewed: boolean, shift: boolean) => void;
   href?: string;
+  hideWhitespace: boolean;
+  repoBase: string;
+  fileMenu?: (file: DiffFile, close: () => void) => JSX.Element;
   loadContent?: (file: DiffFile) => Promise<string>;
   extraKeys?: Set<string>;
   renderExtras?: (path: string, side: Side, line: number) => JSX.Element;
   onAddComment?: (ref: LineRef) => void;
 }) {
   const path = () => props.file.filename;
-  const lines = createMemo(() => parsePatch(props.file.patch));
+  const parsed = createMemo(() => parsePatch(props.file.patch));
+  const lines = createMemo(() => (props.hideWhitespace ? ignoreWhitespaceChanges(parsed()) : parsed()));
   const [collapsed, setCollapsed] = createSignal(() => props.viewed);
   const [loaded, setLoaded] = createSignal(() => props.startLoaded);
   const [seen, setSeen] = createSignal(false);
   const visible = () => seen() || props.forceVisible;
-  const [hl, setHl] = createSignal<string[] | null>(null);
+  /** Highlighted HTML for a specific `lines()` array (stale once whitespace mode re-parses). */
+  const [hl, setHl] = createSignal<{ lines: DiffLine[]; html: string[] } | null>(null);
   const plain = createMemo(() => plainDiffHtml(lines()));
+  const transforms = createMemo(() => codeTransformOptions(props.repoBase));
   const htmlMap = createMemo(() => {
-    const arr = hl() ?? plain();
+    const h = hl();
+    const arr = h && h.lines === lines() ? h.html : plain();
+    const opts = transforms();
     const map = new Map<DiffLine, string>();
-    lines().forEach((l, i) => map.set(l, arr[i] ?? ''));
+    lines().forEach((l, i) => map.set(l, transformCodeLine(arr[i] ?? '', opts)));
     return map;
   });
   const htmlOf = (line: DiffLine) => htmlMap().get(line) ?? escapeHtml(line.text);
@@ -284,11 +395,11 @@ function DiffFileView(props: {
 
   // Highlight once the file is on screen (keeps huge diffs cheap).
   createEffect(
-    () => (showBody() && !hl() ? lines() : null),
+    () => (showBody() && hl()?.lines !== lines() ? lines() : null),
     (ls) => {
       if (!ls?.length) return;
       void highlightDiff(ls, path()).then((html) => {
-        if (html) setHl(html);
+        if (html) setHl({ lines: ls, html });
       });
     },
   );
@@ -448,8 +559,15 @@ function DiffFileView(props: {
     </td>
   );
 
+  const canExpandHunk = (hunk: DiffLine) => expandable() && !!hunk.hunk && hunk.hunk.newStart > 1;
+  /** extend-diff-expander: the whole hunk row expands, not just the small button. */
+  const wideExpand = (hunk: DiffLine) => feature('extend-diff-expander') && canExpandHunk(hunk);
+  const onHunkRowClick = (e: MouseEvent, hunk: DiffLine) => {
+    if (!wideExpand(hunk) || (e.target as HTMLElement).closest('button')) return;
+    void expand(hunk.hunkIndex);
+  };
   const ExpandButton = (p: { hunk: DiffLine }) => (
-    <Show when={expandable() && p.hunk.hunk && p.hunk.hunk.newStart > 1}>
+    <Show when={canExpandHunk(p.hunk)}>
       <button
         type="button"
         class="w-full h-5 flex items-center justify-center text-fg-muted hover:text-fg-on-emphasis hover:bg-accent-emphasis"
@@ -477,8 +595,15 @@ function DiffFileView(props: {
       <div
         class={[
           'Box-header sticky top-0 z-2 flex items-center gap-2 py-1.5! px-2! text-sm',
-          { 'rounded-b-md': collapsed() || !loaded() },
+          { 'rounded-b-md': collapsed() || !loaded(), 'cursor-pointer': feature('easy-toggle-files') },
         ]}
+        onClick={(e) => {
+          // easy-toggle-files: a click on the bar (not on its controls or while selecting text) toggles the file.
+          if (!feature('easy-toggle-files')) return;
+          if ((e.target as HTMLElement).closest('a, button, input, label, summary, [role="menu"]')) return;
+          if (getSelection()?.toString()) return;
+          setCollapsed(!collapsed());
+        }}
       >
         <button
           type="button"
@@ -523,7 +648,11 @@ function DiffFileView(props: {
               props.viewed ? 'bg-accent-muted border-line-accent-muted' : 'border-line',
             ]}
           >
-            <input type="checkbox" checked={props.viewed} onChange={(e) => props.onViewed(e.currentTarget.checked)} />
+            <input
+              type="checkbox"
+              checked={props.viewed}
+              onClick={(e) => props.onViewed(e.currentTarget.checked, e.shiftKey)}
+            />
             Viewed
           </label>
         </Show>
@@ -534,7 +663,23 @@ function DiffFileView(props: {
                 <a class="SelectMenu-item" href={props.href} onClick={close}>
                   View file
                 </a>
+                <Show when={feature('more-file-links') && moreFileLinks(props.href)}>
+                  {(links) => (
+                    <>
+                      <a class="SelectMenu-item" href={links().raw} target="_blank" rel="noreferrer" onClick={close}>
+                        View raw
+                      </a>
+                      <a class="SelectMenu-item" href={links().blame} onClick={close}>
+                        View blame
+                      </a>
+                      <a class="SelectMenu-item" href={links().history} onClick={close}>
+                        View history
+                      </a>
+                    </>
+                  )}
+                </Show>
               </Show>
+              {props.fileMenu?.(props.file, close)}
               <button
                 type="button"
                 class="SelectMenu-item"
@@ -586,7 +731,7 @@ function DiffFileView(props: {
                         <For each={rows()}>
                           {(line) =>
                             line.type === 'hunk' ? (
-                              <tr>
+                              <tr class={{ 'rgh-extend-diff-expander': wideExpand(line) }} onClick={(e) => onHunkRowClick(e, line)}>
                                 <td colspan={2} class="blob-num blob-num-hunk p-0! cursor-default!">
                                   <ExpandButton hunk={line} />
                                 </td>
@@ -647,7 +792,7 @@ function DiffFileView(props: {
                       <For each={splitRows()}>
                         {(row) =>
                           row.kind === 'hunk' ? (
-                            <tr>
+                            <tr class={{ 'rgh-extend-diff-expander': wideExpand(row.line) }} onClick={(e) => onHunkRowClick(e, row.line)}>
                               <td class="blob-num blob-num-hunk p-0! cursor-default!">
                                 <ExpandButton hunk={row.line} />
                               </td>

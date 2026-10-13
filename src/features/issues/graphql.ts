@@ -17,7 +17,7 @@ const EV = `actor{${ACTOR}} createdAt`;
 /** Timeline item fields shared by issues and pull requests. */
 export const ISSUE_TIMELINE_ITEM = `__typename
   ... on Node{id}
-  ... on IssueComment{${COMMENT} databaseId url viewerCanUpdate viewerCanDelete isMinimized minimizedReason}
+  ... on IssueComment{${COMMENT} databaseId url viewerCanUpdate viewerCanDelete viewerCanMinimize isMinimized minimizedReason}
   ... on LabeledEvent{${EV} label{name color description}}
   ... on UnlabeledEvent{${EV} label{name color description}}
   ... on AssignedEvent{${EV} assignee{${ASSIGNEE}}}
@@ -135,7 +135,7 @@ export const PULL_ITEM_TYPES = [
 ];
 
 /** Fields the issue page and the PR conversation share (header + sidebar). */
-const SHARED = `id number title titleHTML state locked activeLockReason createdAt url
+const SHARED = `id number title titleHTML state locked activeLockReason createdAt closedAt url
   ${COMMENT} viewerCanUpdate viewerCanReact viewerSubscription viewerCanSubscribe viewerCanLabel
   assignees(first:20){nodes{login avatarUrl name}}
   labels(first:50){nodes{id name color description}}
@@ -200,7 +200,7 @@ export const PULL_PAGE = `query($owner:String!,$name:String!,$number:Int!,$first
       closingIssuesReferences(first:10){nodes{number title url state stateReason repository{nameWithOwner}}}
       commits(last:1){totalCount nodes{commit{oid committedDate statusCheckRollup{state ${CHECK_CONTEXTS}}}}}
       reviewThreads(first:100){nodes{id isResolved isOutdated isCollapsed path line originalLine startLine diffSide subjectType viewerCanResolve viewerCanUnresolve viewerCanReply
-        comments(first:50){nodes{${COMMENT} databaseId url path diffHunk outdated line originalLine viewerCanUpdate viewerCanDelete isMinimized minimizedReason replyTo{id} pullRequestReview{id}}}}}
+        comments(first:50){nodes{${COMMENT} databaseId url path diffHunk outdated line originalLine viewerCanUpdate viewerCanDelete viewerCanMinimize isMinimized minimizedReason replyTo{id} pullRequestReview{id}}}}}
       ${timeline(PULL_ITEM_TYPES, PULL_TIMELINE_ITEM)}
     }
   }

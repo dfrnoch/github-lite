@@ -1,5 +1,5 @@
 import { action, query } from '@solidjs/router';
-import { encodePath, gh, ghAll, ghPage, GitHubError } from '../../lib/github';
+import { encodePath, gh, ghAll, ghPage, GitHubError, gql } from '../../lib/github';
 import { getToken } from '../../lib/auth';
 import type { Annotation, Artifact, CheckRun, CommitStatus, Job, Workflow, WorkflowRun } from './types';
 
@@ -240,3 +240,24 @@ export async function downloadArtifact(artifact: Artifact) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+/**
+ * github-actions-indicators: workflow file contents on the default branch,
+ * by file name (one GraphQL request for the whole directory).
+ */
+export const getWorkflowSources = query(async (owner: string, repo: string): Promise<Record<string, string>> => {
+  let data: any;
+  try {
+    data = await gql<any>(
+      `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){
+        object(expression:"HEAD:.github/workflows"){... on Tree{entries{name object{... on Blob{text}}}}}
+      }}`,
+      { owner, name: repo },
+    );
+  } catch {
+    return {}; // Indicators are optional: never break the sidebar.
+  }
+  const out: Record<string, string> = {};
+  for (const e of data.repository.object?.entries ?? []) if (typeof e.object?.text === 'string') out[e.name] = e.object.text;
+  return out;
+}, 'rgh-workflow-sources');

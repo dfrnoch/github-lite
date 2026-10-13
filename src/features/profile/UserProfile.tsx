@@ -21,6 +21,8 @@ import RepoFiltersBar, { FilterSummary, type FilterOption } from './components/R
 import { listPageInfo, page, REPO_SORTS, RepoList } from './components/RepoList';
 import UserListItem from './components/UserListItem';
 import UserSidebar from './components/UserSidebar';
+import { userReposHref } from './links';
+import { feature } from '../refined';
 
 type Tab = 'overview' | 'repositories' | 'projects' | 'packages' | 'stars' | 'followers' | 'following';
 const TABS: Tab[] = ['overview', 'repositories', 'projects', 'packages', 'stars', 'followers', 'following'];
@@ -47,7 +49,7 @@ export default function UserProfile(props: { user: UserProfileData }) {
         offset
         items={[
           { tab: 'overview', label: 'Overview', icon: bookIcon, href: `/${login()}` },
-          { tab: 'repositories', label: 'Repositories', icon: repoIcon, href: `/${login()}?tab=repositories`, count: props.user.repositories },
+          { tab: 'repositories', label: 'Repositories', icon: repoIcon, href: userReposHref(login()), count: props.user.repositories },
           { tab: 'projects', label: 'Projects', icon: tableIcon, href: `/${login()}?tab=projects`, count: props.user.projects },
           { tab: 'packages', label: 'Packages', icon: packageIcon, href: `/${login()}?tab=packages`, count: props.user.packages },
           { tab: 'stars', label: 'Stars', icon: starIcon, href: `/${login()}?tab=stars`, count: props.user.stars },
@@ -123,7 +125,14 @@ function Overview(props: { user: UserProfileData }) {
       <Show when={pinned().length}>
         <section>
           <div class="flex items-center justify-between mb-2">
-            <h2 class="text-base font-normal">{props.user.pinned.length ? 'Pinned' : 'Popular repositories'}</h2>
+            <h2 class="text-base font-normal">
+              {props.user.pinned.length ? 'Pinned' : 'Popular repositories'}
+              <Show when={feature('show-user-top-repositories')}>
+                {' / '}
+                {/* No type=source on purpose: forks can be popular too. */}
+                <a href={`/${props.user.login}?tab=repositories&sort=stargazers`}>Top repositories</a>
+              </Show>
+            </h2>
             <Show when={props.user.isViewer}>
               <a class="text-xs link-muted" href={`https://github.com/${props.user.login}`} target="_blank" rel="noreferrer">
                 Customize your pins
@@ -161,7 +170,7 @@ const userTypes = (isViewer: boolean): FilterOption[] => [
   { value: '', label: 'All' },
   { value: 'public', label: 'Public' },
   ...(isViewer ? [{ value: 'private', label: 'Private' }] : []),
-  { value: 'sources', label: 'Sources' },
+  { value: 'source', label: 'Sources' },
   { value: 'forks', label: 'Forks' },
   { value: 'archived', label: 'Archived' },
   { value: 'mirror', label: 'Mirrors' },
@@ -194,6 +203,7 @@ function Repositories(props: { user: UserProfileData }) {
         />
         <RepoList
           result={result()}
+          conversationLinks={feature('conversation-links-on-repo-lists')}
           empty={`${props.user.login} doesn’t have any repositories that match.`}
         />
       </Loading>
@@ -207,7 +217,7 @@ const STAR_TYPES: FilterOption[] = [
   { value: '', label: 'All' },
   { value: 'public', label: 'Public' },
   { value: 'private', label: 'Private' },
-  { value: 'sources', label: 'Sources' },
+  { value: 'source', label: 'Sources' },
   { value: 'forks', label: 'Forks' },
   { value: 'template', label: 'Templates' },
 ];

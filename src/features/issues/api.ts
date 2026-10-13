@@ -9,13 +9,14 @@ import type { IssueDetail, ListItem, ReactionContent, RepoMeta, TimelineConnecti
 // Lists (GraphQL search)
 // ---------------------------------------------------------------------------
 
-const LIST_COMMON = `id number title titleHTML url state createdAt updatedAt closedAt author{${ACTOR}} authorAssociation
+const LIST_COMMON = `id number title titleHTML url state locked createdAt updatedAt closedAt author{${ACTOR}} authorAssociation
   repository{nameWithOwner} labels(first:10){nodes{name color description}} assignees(first:5){nodes{login avatarUrl}}
-  milestone{number title} comments{totalCount}`;
+  milestone{number title} comments{totalCount} lastComment:comments(last:1){nodes{databaseId}}`;
 
 const LIST_FIELDS = `__typename
-  ... on Issue{${LIST_COMMON} stateReason issueType{name color} closedByPullRequestsReferences(first:0){totalCount} subIssuesSummary{total completed}}
-  ... on PullRequest{${LIST_COMMON} isDraft reviewDecision closingIssuesReferences(first:0){totalCount}
+  ... on Issue{${LIST_COMMON} stateReason isPinned issueType{name color} closedByPullRequestsReferences(first:0){totalCount} subIssuesSummary{total completed}}
+  ... on PullRequest{${LIST_COMMON} isDraft reviewDecision mergeable baseRefName repository{defaultBranchRef{name}} closingIssuesReferences(first:0){totalCount}
+    latestOpinionatedReviews(first:20){nodes{state}}
     commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:0){totalCount checkRunCountsByState{state count} statusContextCountsByState{state count}}}}}}}`;
 
 export const PER_PAGE = 25;
@@ -296,6 +297,23 @@ export const toggleReaction = action(async (subjectId: string, content: Reaction
   );
 }, 'toggle-reaction');
 
+export type MinimizeReason = 'SPAM' | 'ABUSE' | 'OFF_TOPIC' | 'OUTDATED' | 'DUPLICATE' | 'RESOLVED' | 'LOW_QUALITY';
+
+/** Hide (minimize) or unhide a comment. */
+export const setCommentMinimized = action(async (subjectId: string, reason: MinimizeReason | null) => {
+  if (reason)
+    await gql(`mutation($id:ID!,$c:ReportedContentClassifiers!){minimizeComment(input:{subjectId:$id,classifier:$c}){clientMutationId}}`, {
+      id: subjectId,
+      c: reason,
+    });
+  else await gql(`mutation($id:ID!){unminimizeComment(input:{subjectId:$id}){clientMutationId}}`, { id: subjectId });
+}, 'set-comment-minimized');
+
+/** Remove one label from an issue / PR (quick-label-removal). */
+export const removeLabel = action(async (owner: string, repo: string, number: number, name: string) => {
+  await gh(`/repos/${owner}/${repo}/issues/${number}/labels/${encodeURIComponent(name)}`, { method: 'DELETE' });
+}, 'remove-label');
+
 export const setLocked = action(
   async (owner: string, repo: string, number: number, lock: boolean, reason?: string) => {
     if (lock)
@@ -379,6 +397,28 @@ export const deleteMilestone = action(async (owner: string, repo: string, number
   await gh(`/repos/${owner}/${repo}/milestones/${number}`, { method: 'DELETE' });
 }, 'delete-milestone');
 
+
+export interface PinnedIssue {
+  number: number;
+  title: string;
+  titleHTML: string;
+  state: 'OPEN' | 'CLOSED';
+  stateReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  author: { login: string } | null;
+  comments: { totalCount: number };
+}
+
+/** Pinned issues shown above the repo issue list. */
+export const getPinnedIssues = query(async (owner: string, repo: string): Promise<PinnedIssue[]> => {
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pinnedIssues(first:3){nodes{issue{
+      number title titleHTML state stateReason createdAt updatedAt author{login} comments{totalCount}}}}}}`,
+    { owner, name: repo },
+  );
+  return (data.repository?.pinnedIssues?.nodes ?? []).map((n: { issue: PinnedIssue }) => n.issue);
+}, 'pinned-issues');
 
 /** Label / open-milestone counts for the list page buttons. */
 export const getListCounts = query(async (owner: string, repo: string) => {

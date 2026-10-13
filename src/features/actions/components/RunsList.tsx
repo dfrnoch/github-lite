@@ -1,13 +1,14 @@
-import { useLocation, useNavigate } from '@solidjs/router';
+import { useAction, useLocation, useNavigate } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
 import { createMemo, createSignal, For, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Blankslate, Dropdown, PageSpinner, Pagination, RelativeTime, pageHref } from '../../../components/ui';
+import { Blankslate, Dropdown, PageSpinner, Pagination, RelativeTime, pageHref, toast, toastError } from '../../../components/ui';
 import {
   calendarIcon,
   fileIcon,
   kebabHorizontalIcon,
   searchIcon,
+  squareCircleIcon,
   stopwatchIcon,
   trashIcon,
   workflowIcon,
@@ -16,8 +17,9 @@ import { encodePath } from '../../../lib/github';
 import { formatNumber, shortSha } from '../../../lib/format';
 import { getRefNames } from '../../repo/api';
 import { useRepo } from '../../repo/context';
-import { getRuns, getWorkflows, type RunFilters } from '../api';
-import { buildRunQuery, duration, parseRunQuery, RUN_EVENTS, RUN_STATUSES, runState } from '../status';
+import { feature } from '../../refined';
+import { cancelRun, getRuns, getWorkflows, type RunFilters } from '../api';
+import { buildRunQuery, duration, isDone, parseRunQuery, RUN_EVENTS, RUN_STATUSES, runState } from '../status';
 import type { Workflow, WorkflowRun } from '../types';
 import DeleteRunDialog from './DeleteRunDialog';
 import FilterMenu from './FilterMenu';
@@ -273,9 +275,15 @@ export function RunTrigger(props: { run: WorkflowRun }) {
 
 function RunRow(props: { run: WorkflowRun; workflowName: string; onDelete: () => void }) {
   const ctx = useRepo();
-  const href = () => `${ctx.base()}/actions/runs/${props.run.id}`;
+  // action-pr-link: runs of a PR carry ?pr= so the run page can link back to it.
+  const href = () => {
+    const pr = feature('action-pr-link') ? props.run.pull_requests[0]?.number : undefined;
+    return `${ctx.base()}/actions/runs/${props.run.id}${pr ? `?pr=${pr}` : ''}`;
+  };
   const state = () => runState(props.run.status, props.run.conclusion);
   const canWrite = () => !!ctx.repo().permissions?.push;
+  const cancel = useAction(cancelRun);
+  const [cancelling, setCancelling] = createSignal(false);
   return (
     <li class="Box-row Box-row--hover run-row">
       <div class="flex gap-2 min-w-0">
@@ -320,7 +328,39 @@ function RunRow(props: { run: WorkflowRun; workflowName: string; onDelete: () =>
           </Switch>
         </div>
       </div>
-      <div>
+      <div class="flex flex-col items-center -my-3">
+        {/* actions-run-removal: cancel / delete without opening the menu. */}
+        <Show when={feature('actions-run-removal') && canWrite()}>
+          <Show
+            when={isDone(props.run.status)}
+            fallback={
+              <button
+                type="button"
+                class="btn-octicon"
+                title="Cancel run"
+                aria-label="Cancel run"
+                disabled={cancelling()}
+                onClick={async () => {
+                  setCancelling(true);
+                  try {
+                    await cancel(ctx.owner(), ctx.name(), props.run.id, false);
+                    toast('Cancellation requested.', 'success');
+                  } catch (e) {
+                    toastError(e);
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+              >
+                <Octicon icon={squareCircleIcon} />
+              </button>
+            }
+          >
+            <button type="button" class="btn-octicon" title="Delete workflow run" aria-label="Delete workflow run" onClick={() => props.onDelete()}>
+              <Octicon icon={trashIcon} />
+            </button>
+          </Show>
+        </Show>
         <Dropdown class="btn-octicon" align="right" menuClass="w-[220px]" title="Show options" button={<Octicon icon={kebabHorizontalIcon} />}>
           {(close) => (
             <>

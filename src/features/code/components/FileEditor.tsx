@@ -7,10 +7,14 @@ import { encodePath } from '../../../lib/github';
 import { renderMarkdown } from '../../../lib/markdown';
 import type { DiffFile, Repository } from '../../../lib/types';
 import DiffView from '../../diff/DiffView';
+import { fitTextarea, monospaceField } from '../../refined/editor';
+import { feature } from '../../refined';
 import { getFile, getRawFile } from '../../repo/api';
+import { FilePullsMenu } from '../../repo/components/FileView';
 import { getViewer } from '../../user/api';
 import { getProtectedBranches, saveFile } from '../api';
 import { unifiedPatch } from '../linediff';
+import { TitleLengthHint, titleTooLong } from '../refined';
 import CodeEditor, { type EditorSettings } from './CodeEditor';
 
 const MARKDOWN = /\.(md|markdown|mdown|mkd)$/i;
@@ -124,6 +128,11 @@ export default function FileEditor(props: { repo: Repository; gitRef: string; pa
           </span>
         </nav>
         <div class="flex-1" />
+        <Show when={isEdit() && feature('list-prs-for-file')}>
+          <Loading>
+            <FilePullsMenu owner={owner()} repo={name()} base={props.repo.default_branch} path={props.path} editing />
+          </Loading>
+        </Show>
         <a
           class="btn btn-sm"
           href={cancelHref()}
@@ -371,16 +380,20 @@ function CommitDialog(props: {
       </label>
       <input
         id="commit-message"
-        class="form-control w-full mb-3"
+        ref={monospaceField}
+        class={['form-control w-full', { 'rgh-title-too-long': titleTooLong(message() || placeholder()) }]}
         placeholder={placeholder()}
         value={message()}
         onInput={(e) => setMessage(e.currentTarget.value)}
       />
+      <TitleLengthHint value={message() || placeholder()} />
+      <div class="mb-3" />
       <label class="form-label" for="commit-description">
         Extended description
       </label>
       <textarea
         id="commit-description"
+        ref={[monospaceField, fitTextarea]}
         class="form-control w-full mb-3 min-h-24"
         placeholder="Add an optional extended description.."
         value={description()}

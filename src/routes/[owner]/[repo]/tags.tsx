@@ -6,6 +6,7 @@ import { Blankslate, Dropdown, RelativeTime, toast } from '../../../components/u
 import { deleteTag, getTags } from '../../../features/releases/api';
 import { tagHref } from '../../../features/releases/components/ReleaseCard';
 import ReleasesSubnav from '../../../features/releases/components/ReleasesSubnav';
+import { TagChangesLink, useCreateReleaseHotkey } from '../../../features/releases/components/RefinedReleases';
 import { ConfirmDialog } from '../../../features/repo-settings/components/ui';
 import { useRepo } from '../../../features/repo/context';
 import { clockIcon, fileIcon, fileZipIcon, gitCommitIcon, kebabHorizontalIcon, tagIcon } from '../../../icons/octicons';
@@ -18,6 +19,7 @@ export default function TagsPage() {
   const remove = useAction(deleteTag);
   const [deleting, setDeleting] = createSignal<string | null>(null);
   const canEdit = () => !!ctx.repo().permissions?.push;
+  useCreateReleaseHotkey();
   const archive = (tag: string, ext: string) => `https://github.com/${ctx.fullName()}/archive/refs/tags/${tag}.${ext}`;
 
   return (
@@ -82,6 +84,7 @@ export default function TagsPage() {
                     <Octicon icon={fileIcon} /> Notes
                   </a>
                 </Show>
+                <TagChangesLink owner={ctx.owner()} repo={ctx.name()} tag={t.name} />
               </div>
             </div>
           )}

@@ -1,4 +1,7 @@
+import { useLocation } from '@solidjs/router';
 import { Show } from 'solid-js';
+import UsefulNotFound from '../../features/notfound/UsefulNotFound';
+import { feature } from '../../features/refined';
 import { alertIcon } from '../../icons/octicons';
 import { GitHubError } from '../../lib/github';
 import Octicon from '../Octicon';
@@ -9,6 +12,7 @@ import Octicon from '../Octicon';
  * error message with a retry.
  */
 export default function ErrorView(props: { error: unknown; reset?: () => void }) {
+  const location = useLocation();
   const err = () => props.error;
   const status = () => (err() instanceof GitHubError ? (err() as GitHubError).status : 0);
   return (
@@ -22,6 +26,9 @@ export default function ErrorView(props: { error: unknown; reset?: () => void })
             It may not exist, or your token may not have access to it.{' '}
             <a href="/">Go to your dashboard</a>.
           </p>
+          <Show when={feature('useful-not-found-page')}>
+            <UsefulNotFound pathname={location.pathname} />
+          </Show>
         </div>
       }
     >

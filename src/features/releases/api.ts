@@ -1,6 +1,7 @@
 import { action, query } from '@solidjs/router';
 import { encodePath, gh, GitHubError, ghPage, gql } from '../../lib/github';
 import type { Reactions, SimpleUser } from '../../lib/types';
+import type { TagCommit } from './versions';
 
 export interface ReleaseAsset {
   id: number;
@@ -183,3 +184,51 @@ export const checkTagExists = query(async (owner: string, repo: string, tag: str
   );
   return !!data.repository.ref;
 }, 'tag-exists');
+
+/* ------------------------------------------------ Refined GitHub (releases) */
+
+/** tag-changes-link: the newest `max` tags (in pages of 100) with their commits, newest first. */
+export const getTagCommits = query(async (owner: string, repo: string, max: number): Promise<TagCommit[]> => {
+  const out: TagCommit[] = [];
+  let after: string | null = null;
+  while (out.length < max) {
+    const data: any = await gql<any>(
+      `query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){
+        refs(refPrefix:"refs/tags/",first:100,after:$after,orderBy:{field:TAG_COMMIT_DATE,direction:DESC}){
+          pageInfo{hasNextPage endCursor} nodes{name target{oid ... on Tag{target{oid}}}}
+        }
+      }}`,
+      { owner, name: repo, after },
+    );
+    const refs = data.repository.refs;
+    for (const n of refs.nodes) out.push({ name: n.name, oid: n.target.target?.oid ?? n.target.oid });
+    if (!refs.pageInfo.hasNextPage) break;
+    after = refs.pageInfo.endCursor;
+  }
+  return out;
+}, 'rgh-tag-commits');
+
+/** releases-dropdown: tag names of the newest 100 releases. */
+export const getReleaseTagNames = query(async (owner: string, repo: string): Promise<string[]> => {
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){releases(first:100,orderBy:{field:CREATED_AT,direction:DESC}){nodes{tagName}}}}`,
+    { owner, name: repo },
+  );
+  return data.repository.releases.nodes.map((n: any) => n.tagName as string);
+}, 'rgh-release-tag-names');
+
+const CHANGELOG = /^(?:changelog|news|changes|history|release|whatsnew)(?:\.(?:mdx?|mkdn?|mdwn|mdown|markdown|litcoffee|txt|rst))?$/i;
+
+/** link-to-changelog-file: name of a changelog file at the repo root (default branch), or null. */
+export const getChangelogFile = query(async (owner: string, repo: string): Promise<string | null> => {
+  const data = await gql<any>(
+    `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){object(expression:"HEAD:"){... on Tree{entries{name type}}}}}`,
+    { owner, name: repo },
+  );
+  const entries: { name: string; type: string }[] = data.repository.object?.entries ?? [];
+  return entries.find((e) => e.type === 'blob' && CHANGELOG.test(e.name))?.name ?? null;
+}, 'rgh-changelog-file');
+
+/** convert-release-to-draft: PATCH draft:true (the release URL then becomes an untagged draft URL). */
+export const convertReleaseToDraft = (owner: string, repo: string, id: number) =>
+  gh<Release>(`/repos/${owner}/${repo}/releases/${id}`, { method: 'PATCH', body: { draft: true } });

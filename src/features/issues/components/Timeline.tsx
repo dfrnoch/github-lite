@@ -1,7 +1,8 @@
+import { useLocation } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
-import { createMemo, createSignal, For, Match, Show, Switch } from 'solid-js';
+import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, IssueLabel, itemState, RelativeTime, StateIcon, toastError } from '../../../components/ui';
+import { Avatar, IssueLabel, itemState, RelativeTime, StateIcon, toast, toastError } from '../../../components/ui';
 import type { OcticonData } from '../../../icons/octicons';
 import {
   checkIcon,
@@ -36,8 +37,11 @@ import {
   typographyIcon,
 } from '../../../icons/octicons';
 import CommitStatusIcon from '../../repo/components/CommitStatusIcon';
+import { useHotkey } from '../../../lib/hotkeys';
 import ReviewThread from '../../pulls/components/ReviewThread';
+import { feature } from '../../refined';
 import { getTimelinePage } from '../api';
+import { activityFilter, cycleActivityFilter, isBot, isBotLogin, isLowQualityComment, RichText, UserName } from '../refined';
 import type { GqlLabel, RefSubject, Reviewer, ReviewThread as Thread, TimelineConnection, TimelineNode } from '../types';
 import Comment, { userHref } from './Comment';
 
@@ -102,12 +106,20 @@ function group(nodes: TimelineNode[]): Entry[] {
   return out;
 }
 
+/** Authors whose comments always stay visible (they get a label in the header). */
+const LABELLED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER']);
+
+const anchorOf = (n: TimelineNode) =>
+  n.__typename === 'IssueComment' ? `issuecomment-${n.databaseId}` : n.__typename === 'PullRequestReview' ? `pullrequestreview-${n.databaseId}` : '';
+
 /** Issue / PR timeline below the opening comment. */
 export default function Timeline(props: TimelineProps) {
+  const location = useLocation();
   // Items loaded through "Load more" (between head and tail).
   const [extra, setExtra] = createSignal<TimelineNode[]>([]);
   const [cursor, setCursor] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(false);
+  const [showLowQuality, setShowLowQuality] = createSignal(false);
 
   const entries = createMemo(() => {
     const head = props.head.nodes;
@@ -125,14 +137,24 @@ export default function Timeline(props: TimelineProps) {
     return joined || hidden === 0 ? [...before, ...after] : [...before, { type: 'hidden' as const, key: 'hidden', count: hidden }, ...after];
   });
 
-  const loadMore = async () => {
-    const after = cursor() ?? props.head.pageInfo.endCursor;
+  const fetchPage = async (after: string) => {
+    const page = await getTimelinePage(props.owner, props.repo, props.number, props.isPull, after);
+    setExtra((list) => [...list, ...page.nodes]);
+    setCursor(page.pageInfo.endCursor ?? null);
+    return page;
+  };
+  /** Next page of hidden items — or, with `all` (expand-all-hidden-comments), every hidden item. */
+  const loadMore = async (all = false) => {
+    let after = cursor() ?? props.head.pageInfo.endCursor;
     if (!after) return;
     setLoading(true);
     try {
-      const page = await getTimelinePage(props.owner, props.repo, props.number, props.isPull, after);
-      setExtra((list) => [...list, ...page.nodes]);
-      setCursor(page.pageInfo.endCursor ?? null);
+      const tailIds = new Set(props.tail.nodes.map((n) => n.id));
+      for (let i = 0; i < (all ? 20 : 1); i++) {
+        const page = await fetchPage(after);
+        after = page.pageInfo.endCursor ?? null;
+        if (!after || !page.pageInfo.hasNextPage || page.nodes.some((n) => tailIds.has(n.id))) break;
+      }
     } catch (e) {
       toastError(e);
     } finally {
@@ -151,62 +173,197 @@ export default function Timeline(props: TimelineProps) {
     return map;
   });
 
+  const path = () => `/${props.owner}/${props.repo}/${props.isPull ? 'pull' : 'issues'}/${props.number}`;
+  const filter = () => activityFilter(path());
+  const deepLinked = (n: TimelineNode) => !!location.hash && location.hash.slice(1) === anchorOf(n);
+
+  // hide-low-quality-comments: "+1" comments by people without a label, unless they already said something useful.
+  const lowQuality = createMemo(() => {
+    const hidden: string[] = [];
+    if (props.isPull || !feature('hide-low-quality-comments')) return hidden;
+    const spoke = new Set<string>();
+    for (const e of entries()) {
+      if (e.type !== 'node' || e.node.__typename !== 'IssueComment') continue;
+      const n = e.node;
+      const login = n.author?.login ?? 'ghost';
+      const candidate =
+        !deepLinked(n) && login !== props.issueAuthor && !LABELLED.has(n.authorAssociation ?? '') && isLowQualityComment(n.body ?? '', n.bodyHTML ?? '');
+      if (candidate && !spoke.has(login)) hidden.push(n.id!);
+      else spoke.add(login);
+    }
+    return hidden;
+  });
+
+  /** Review threads still shown under a review with the current filter. */
+  const threadsFor = (reviewId: string | undefined) => {
+    const all = threadsByReview().get(reviewId ?? '') ?? [];
+    return filter() === 'hideAllNoise' ? all.filter((t) => !t.isResolved) : all;
+  };
+
+  // conversation-activity-filter + hide-low-quality-comments
+  const visible = createMemo(() => {
+    const f = filter();
+    const hiddenLowQuality = new Set(showLowQuality() ? [] : lowQuality());
+    return entries().filter((e) => {
+      if (e.type === 'hidden') return true;
+      if (e.type === 'node' && hiddenLowQuality.has(e.node.id!)) return false;
+      if (f === 'showAll' || e.type === 'commits') return true;
+      if (e.type !== 'node') return false;
+      const n = e.node;
+      if (deepLinked(n)) return true;
+      if (n.__typename === 'IssueComment') return f === 'hideEvents' || (!n.isMinimized && !isBot(n.author));
+      if (n.__typename === 'PullRequestReview') {
+        if (f === 'hideEvents') return true;
+        if (n.state === 'DISMISSED' || isBot(n.author)) return false;
+        return (!!n.body?.trim() && !n.isMinimized) || threadsFor(n.id).length > 0;
+      }
+      return false;
+    });
+  });
+
+  // keyboard-navigation: j / k move between comments.
+  const focusComment = (direction: 1 | -1) => {
+    const items = [...document.querySelectorAll<HTMLElement>('[data-rgh-comment][id]')].filter(
+      (el) => el.offsetParent !== null && !el.querySelector(':scope > .timeline-comment > .rgh-minimized-comment, :scope > div > .timeline-comment > .rgh-minimized-comment'),
+    );
+    if (!items.length) return;
+    const current = items.findIndex((el) => `#${el.id}` === window.location.hash);
+    const next = Math.min(Math.max(0, current + direction), items.length - 1);
+    if (current === next) return;
+    document.querySelector('.rgh-keyboard-target')?.classList.remove('rgh-keyboard-target');
+    const el = items[next]!;
+    history.replaceState(history.state, '', `#${el.id}`);
+    el.classList.add('rgh-keyboard-target');
+    el.scrollIntoView({ block: 'start' });
+  };
+  useHotkey({ keys: 'j', description: 'Focus the comment below', group: 'Conversations', feature: 'keyboard-navigation', handler: () => focusComment(1) });
+  useHotkey({ keys: 'k', description: 'Focus the comment above', group: 'Conversations', feature: 'keyboard-navigation', handler: () => focusComment(-1) });
+  useHotkey({
+    keys: 'h',
+    description: 'Cycle through conversation activity filters',
+    group: 'Conversations',
+    feature: 'conversation-activity-filter',
+    handler: () => cycleActivityFilter(path()),
+  });
+
+  onSettled(() => {
+    // hidden-content: warn that the browser's find won't see unloaded / hidden items.
+    const onKey = (e: KeyboardEvent) => {
+      const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? e.metaKey : e.ctrlKey;
+      if (!mod || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'f' || !feature('hidden-content')) return;
+      const loadMoreEl = document.querySelector('[data-rgh-load-more]');
+      const filtered = filter() !== 'showAll' || (lowQuality().length > 0 && !showLowQuality());
+      if (!loadMoreEl && !filtered) return;
+      loadMoreEl?.scrollIntoView({ block: 'center' });
+      toast(loadMoreEl ? 'There are hidden comments that won’t be searched' : 'Some comments are filtered out and won’t be searched', 'info', 4000);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // easy-toggle-hidden-comments + toggle-everything-with-alt for review threads (rendered by ReviewThread).
+  const onClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const toggle = target.closest<HTMLButtonElement>('button[aria-label="Expand thread"], button[aria-label="Collapse thread"]');
+    if (toggle && e.altKey && feature('toggle-everything-with-alt')) {
+      for (const b of document.querySelectorAll<HTMLButtonElement>(`button[aria-label="${toggle.getAttribute('aria-label')}"]`)) if (b !== toggle) b.click();
+      return;
+    }
+    const minimized = target.closest('.rgh-show-minimized, .rgh-hide-minimized');
+    if (minimized && e.altKey && feature('toggle-everything-with-alt')) {
+      const cls = minimized.classList.contains('rgh-show-minimized') ? '.rgh-show-minimized' : '.rgh-hide-minimized';
+      for (const b of document.querySelectorAll<HTMLButtonElement>(cls)) if (b !== minimized) b.click();
+      return;
+    }
+    if (toggle || !feature('easy-toggle-hidden-comments') || target.closest('a, button, input, textarea, select, summary')) return;
+    const header = target.closest('.Box > div:first-child');
+    const headerToggle = header?.querySelector<HTMLButtonElement>(':scope > button[aria-label="Expand thread"], :scope > button[aria-label="Collapse thread"]');
+    headerToggle?.click();
+  };
+
+  const revealLowQuality = () => {
+    const first = lowQuality()[0];
+    setShowLowQuality(true);
+    requestAnimationFrame(() => {
+      const node = entries().find((e) => e.type === 'node' && e.node.id === first);
+      if (node?.type === 'node') document.getElementById(anchorOf(node.node))?.scrollIntoView({ block: 'center' });
+    });
+  };
+
   return (
-    <For each={entries()} keyed={(e) => (e.type === 'node' ? (e.node.id ?? e.node.createdAt) : e.key)}>
-      {(entry) => (
-        <Switch>
-          <Match when={entry().type === 'hidden' && (entry() as Extract<Entry, { type: 'hidden' }>)}>
-            {(h) => (
-              <div class="relative py-4 my-2 text-center bg-canvas">
-                <div class="border-y-4 border-dotted border-line py-3">
-                  <span class="text-sm text-fg-muted mr-2">{h().count} remaining items</span>
-                  <button type="button" class="btn btn-sm" disabled={loading()} onClick={loadMore}>
-                    {loading() ? 'Loading…' : 'Load more…'}
-                  </button>
+    <div class="rgh-timeline" data-rgh-activity-filter={filter()} onClick={onClick}>
+      <For each={visible()} keyed={(e) => (e.type === 'node' ? (e.node.id ?? e.node.createdAt) : e.key)}>
+        {(entry) => (
+          <Switch>
+            <Match when={entry().type === 'hidden' && (entry() as Extract<Entry, { type: 'hidden' }>)}>
+              {(h) => (
+                <div class="relative py-4 my-2 text-center bg-canvas" data-rgh-load-more>
+                  <div class="border-y-4 border-dotted border-line py-3">
+                    <span class="text-sm text-fg-muted mr-2">{h().count} remaining items</span>
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      disabled={loading()}
+                      title={feature('expand-all-hidden-comments') ? 'Alt-click to load all remaining items' : undefined}
+                      onClick={(e) => void loadMore(e.altKey && feature('expand-all-hidden-comments'))}
+                    >
+                      {loading() ? 'Loading…' : 'Load more…'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </Match>
-          <Match when={entry().type === 'labels' && (entry() as Extract<Entry, { type: 'labels' }>)}>
-            {(e) => (
-              <Event icon={tagIcon} actor={e().actor} createdAt={e().createdAt}>
-                <Show when={e().added.length}>
-                  added{' '}
-                  <For each={e().added}>{(l) => <IssueLabel name={l.name} color={l.color} class="mx-0.5" />}</For>
-                </Show>
-                <Show when={e().added.length && e().removed.length}> and </Show>
-                <Show when={e().removed.length}>
-                  removed{' '}
-                  <For each={e().removed}>{(l) => <IssueLabel name={l.name} color={l.color} class="mx-0.5" />}</For>
-                </Show>{' '}
-                {e().added.length + e().removed.length === 1 ? 'label' : 'labels'}
-              </Event>
-            )}
-          </Match>
-          <Match when={entry().type === 'reviewers' && (entry() as Extract<Entry, { type: 'reviewers' }>)}>
-            {(e) => (
-              <Event icon={eyeIcon} actor={e().actor} createdAt={e().createdAt}>
-                {e().removed ? 'removed the request for review from ' : 'requested a review from '}
-                <For each={e().reviewers}>
-                  {(r, i) => (
-                    <>
-                      {i() > 0 ? ', ' : ''}
-                      <ReviewerName reviewer={r} />
-                    </>
-                  )}
-                </For>
-              </Event>
-            )}
-          </Match>
-          <Match when={entry().type === 'commits' && (entry() as Extract<Entry, { type: 'commits' }>)}>
-            {(e) => <CommitGroup nodes={e().nodes} owner={props.owner} repo={props.repo} />}
-          </Match>
-          <Match when={entry().type === 'node' && (entry() as Extract<Entry, { type: 'node' }>).node}>
-            {(n) => <TimelineNodeView node={n()} props={props} threads={threadsByReview().get(n().id ?? '') ?? []} />}
-          </Match>
-        </Switch>
-      )}
-    </For>
+              )}
+            </Match>
+            <Match when={entry().type === 'labels' && (entry() as Extract<Entry, { type: 'labels' }>)}>
+              {(e) => (
+                <Event icon={tagIcon} actor={e().actor} createdAt={e().createdAt}>
+                  <Show when={e().added.length}>
+                    added{' '}
+                    <For each={e().added}>{(l) => <IssueLabel name={l.name} color={l.color} class="mx-0.5" />}</For>
+                  </Show>
+                  <Show when={e().added.length && e().removed.length}> and </Show>
+                  <Show when={e().removed.length}>
+                    removed{' '}
+                    <For each={e().removed}>{(l) => <IssueLabel name={l.name} color={l.color} class="mx-0.5" />}</For>
+                  </Show>{' '}
+                  {e().added.length + e().removed.length === 1 ? 'label' : 'labels'}
+                </Event>
+              )}
+            </Match>
+            <Match when={entry().type === 'reviewers' && (entry() as Extract<Entry, { type: 'reviewers' }>)}>
+              {(e) => (
+                <Event icon={eyeIcon} actor={e().actor} createdAt={e().createdAt}>
+                  {e().removed ? 'removed the request for review from ' : 'requested a review from '}
+                  <For each={e().reviewers}>
+                    {(r, i) => (
+                      <>
+                        {i() > 0 ? ', ' : ''}
+                        <ReviewerName reviewer={r} />
+                      </>
+                    )}
+                  </For>
+                </Event>
+              )}
+            </Match>
+            <Match when={entry().type === 'commits' && (entry() as Extract<Entry, { type: 'commits' }>)}>
+              {(e) => <CommitGroup nodes={e().nodes} owner={props.owner} repo={props.repo} />}
+            </Match>
+            <Match when={entry().type === 'node' && (entry() as Extract<Entry, { type: 'node' }>).node}>
+              {(n) => <TimelineNodeView node={n()} props={props} threads={threadsFor(n().id)} />}
+            </Match>
+          </Switch>
+        )}
+      </For>
+      <Show when={lowQuality().length > 0 && !showLowQuality()}>
+        <div class="rgh-low-quality-comments ml-14 mb-4 px-3 py-2 rounded-md border border-line bg-canvas-muted text-sm text-fg-muted flex items-center gap-2">
+          <span class="flex-1">
+            {lowQuality().length} unhelpful comment{lowQuality().length === 1 ? ' was' : 's were'} automatically hidden.
+          </span>
+          <button type="button" class="btn-link text-sm" onClick={revealLowQuality}>
+            Show
+          </button>
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -233,9 +390,11 @@ export function Event(props: {
   badgeClass?: string;
   children: JSX.Element;
   extra?: JSX.Element;
+  /** Marks a close / merge event (jump-to-conversation-close-event). */
+  closeEvent?: boolean;
 }) {
   return (
-    <div class="TimelineItem ml-[72px]! py-3!">
+    <div class="TimelineItem ml-[72px]! py-3!" data-rgh-close-event={props.closeEvent ? '' : undefined}>
       <div class={['TimelineItem-badge', props.badgeClass]}>
         <Octicon icon={props.icon} />
       </div>
@@ -248,6 +407,7 @@ export function Event(props: {
                 <a class="link-plain font-semibold" href={userHref(a().login)}>
                   {a().login}
                 </a>
+                <UserName login={a().login} />
               </>
             )}
           </Show>
@@ -272,7 +432,9 @@ function SubjectLink(props: { subject: RefSubject | null | undefined; currentRep
           <StateIcon
             state={itemState({ isPull: s().__typename === 'PullRequest', state: s().state, stateReason: s().stateReason, merged: s().merged, draft: s().isDraft })}
           />
-          <span>{s().title}</span>
+          <span>
+            <RichText text={s().title} links={false} />
+          </span>
           <span class="text-fg-muted font-normal">
             {s().repository.nameWithOwner === props.currentRepo ? '' : s().repository.nameWithOwner}#{s().number}
           </span>
@@ -308,7 +470,12 @@ function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string
       <div class="ml-[-8px] mt-1">
         <For each={props.nodes}>
           {(n) => (
-            <div class="flex items-center gap-2 py-1 pl-0 text-sm">
+            <div
+              class={[
+                'flex items-center gap-2 py-1 pl-0 text-sm',
+                { 'rgh-dim-bot': feature('dim-bots') && isBotLogin(n.commit?.authors?.nodes[0]?.user?.login ?? n.commit?.authors?.nodes[0]?.name) },
+              ]}
+            >
               <span class="relative z-1 bg-canvas text-fg-muted flex">
                 <Octicon icon={gitCommitIcon} />
               </span>
@@ -318,7 +485,7 @@ function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string
                 href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}
                 title={n.commit?.messageHeadline}
               >
-                {n.commit?.messageHeadline}
+                <RichText text={n.commit?.messageHeadline} links={false} />
               </a>
               <CommitStatusIcon state={n.commit?.statusCheckRollup?.state} />
               <a class="link-muted font-mono text-xs" href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}>
@@ -385,6 +552,7 @@ function TimelineNodeView(p: { node: TimelineNode; props: TimelineProps; threads
           }
           actor={n().actor}
           createdAt={n().createdAt}
+          closeEvent
         >
           {p.props.isPull
             ? 'closed this'
@@ -425,9 +593,38 @@ function TimelineNodeView(p: { node: TimelineNode; props: TimelineProps; threads
         </Event>
       </Match>
       <Match when={n().__typename === 'RenamedTitleEvent'}>
-        <Event icon={pencilIcon} actor={n().actor} createdAt={n().createdAt}>
-          changed the title <del class="text-fg-muted">{n().previousTitle}</del> <span class="font-semibold text-fg">{n().currentTitle}</span>
-        </Event>
+        <Show
+          when={feature('readable-title-change-events')}
+          fallback={
+            <Event icon={pencilIcon} actor={n().actor} createdAt={n().createdAt}>
+              changed the title{' '}
+              <del class="text-fg-muted">
+                <RichText text={n().previousTitle} />
+              </del>{' '}
+              <span class="font-semibold text-fg">
+                <RichText text={n().currentTitle} repo={repoName()} />
+              </span>
+            </Event>
+          }
+        >
+          <Event
+            icon={pencilIcon}
+            actor={n().actor}
+            createdAt={n().createdAt}
+            extra={
+              <div class="rgh-readable-title-change mt-1 flex flex-col gap-0.5 text-sm">
+                <del class="text-fg-muted break-words">
+                  <RichText text={n().previousTitle} />
+                </del>
+                <span class="font-semibold text-fg break-words">
+                  <RichText text={n().currentTitle} repo={repoName()} />
+                </span>
+              </div>
+            }
+          >
+            changed the title
+          </Event>
+        </Show>
       </Match>
       <Match when={n().__typename === 'CrossReferencedEvent'}>
         <Event
@@ -591,7 +788,7 @@ function TimelineNodeView(p: { node: TimelineNode; props: TimelineProps; threads
         </Event>
       </Match>
       <Match when={n().__typename === 'MergedEvent'}>
-        <Event icon={gitMergeIcon} badgeClass="bg-done-emphasis! text-fg-on-emphasis!" actor={n().actor} createdAt={n().createdAt}>
+        <Event icon={gitMergeIcon} badgeClass="bg-done-emphasis! text-fg-on-emphasis!" actor={n().actor} createdAt={n().createdAt} closeEvent>
           merged commit{' '}
           <a class="link-plain font-mono text-xs font-semibold" href={`/${repoName()}/commit/${n().commit?.oid}`}>
             {n().commit?.abbreviatedOid}

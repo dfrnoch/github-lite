@@ -7,6 +7,7 @@ import { languageColor } from '../../lib/languages';
 import { getProfileReadme, type OrgProfile } from '../profile/api';
 import PinnedCard from '../profile/components/PinnedCard';
 import RepoListItem from '../profile/components/RepoListItem';
+import { orgReposHref } from '../profile/links';
 import OrgInfo from './components/OrgInfo';
 import OrgTabs from './components/OrgTabs';
 
@@ -64,7 +65,7 @@ export default function OrgOverview(props: { org: OrgProfile }) {
                 <For each={props.org.recent}>{(repo) => <RepoListItem repo={repo} />}</For>
               </ul>
               <div class="Box-footer text-center py-3!">
-                <a class="font-semibold" href={`/orgs/${props.org.login}/repositories`}>
+                <a class="font-semibold" href={orgReposHref(props.org.login)}>
                   View all repositories
                 </a>
               </div>

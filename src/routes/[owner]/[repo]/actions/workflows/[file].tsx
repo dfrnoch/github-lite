@@ -1,6 +1,6 @@
 import { Title } from '@solidjs/meta';
-import { useAction, useParams } from '@solidjs/router';
-import { createMemo, createSignal, Loading, Show } from 'solid-js';
+import { useAction, useLocation, useParams } from '@solidjs/router';
+import { createEffect, createMemo, createSignal, Loading, Show } from 'solid-js';
 import Octicon from '../../../../../components/Octicon';
 import { Dropdown, toast, toastError } from '../../../../../components/ui';
 import { getWorkflow, getWorkflowFile, setWorkflowEnabled } from '../../../../../features/actions/api';
@@ -104,6 +104,17 @@ function WorkflowBanner(props: { workflow: Workflow; file: string }) {
   };
   const disabled = () => props.workflow.state.startsWith('disabled');
   const canWrite = () => !!ctx.repo().permissions?.push;
+  // github-actions-indicators: the sidebar's ▶ links here with #rgh-run-workflow to open "Run workflow".
+  const location = useLocation();
+  let runBox: HTMLSpanElement | undefined;
+  createEffect(
+    () => location.hash === '#rgh-run-workflow' && !disabled() && dispatchable() && canWrite(),
+    (open) => {
+      if (!open) return;
+      history.replaceState(history.state, '', window.location.pathname + window.location.search);
+      queueMicrotask(() => runBox?.querySelector('button')?.click());
+    },
+  );
   return (
     <div>
       <Show when={disabled()}>
@@ -138,7 +149,9 @@ function WorkflowBanner(props: { workflow: Workflow; file: string }) {
           <span class="flex-1">
             This workflow has a <code class="text-xs bg-canvas-muted px-1 rounded">workflow_dispatch</code> event trigger.
           </span>
-          <RunWorkflowButton workflow={props.workflow} defaultBranch={ctx.repo().default_branch} />
+          <span class="contents" ref={(el) => (runBox = el)}>
+            <RunWorkflowButton workflow={props.workflow} defaultBranch={ctx.repo().default_branch} />
+          </span>
         </div>
       </Show>
     </div>
