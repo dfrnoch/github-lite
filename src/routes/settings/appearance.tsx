@@ -1,5 +1,5 @@
 import { Title } from '@solidjs/meta';
-import { For, onSettled, Show } from 'solid-js';
+import { createEffect, createSignal, For, onSettled, Show } from 'solid-js';
 import Octicon from '../../components/Octicon';
 import Subhead from '../../features/settings/components/Subhead';
 import { moonIcon, sunIcon } from '../../icons/octicons';
@@ -21,9 +21,26 @@ import {
  * theme's real colors (canvas, borders, accents, syntax and diff colors).
  */
 function ThemePreview(props: { theme: string }) {
-  const dark = () => isDarkTheme(props.theme);
+  const dark = () => isDarkTheme(props.theme.replace(/_high_contrast$/, ''));
+  // Theme stylesheets load only once their preview scrolls into view.
+  const [visible, setVisible] = createSignal(false);
+  let el!: HTMLDivElement;
+  onSettled(() => {
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setVisible(true), {
+      rootMargin: '300px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  });
+  createEffect(
+    () => visible() && props.theme,
+    (theme) => {
+      if (theme) ensureThemeCss(theme);
+    },
+  );
   return (
     <div
+      ref={el}
       data-color-mode={dark() ? 'dark' : 'light'}
       data-light-theme={dark() ? undefined : props.theme}
       data-dark-theme={dark() ? props.theme : undefined}
@@ -61,35 +78,53 @@ function ThemePreview(props: { theme: string }) {
   );
 }
 
-function ThemeGrid(props: { name: string; selected: ThemeId; onSelect: (id: ThemeId) => void; only?: 'light' | 'dark' }) {
-  const themes = () => THEMES.filter((t) => !props.only || isDarkTheme(t.id) === (props.only === 'dark'));
+const GROUPS = [
+  { group: 'github', title: 'GitHub' },
+  { group: 'community', title: 'Community' },
+] as const;
+
+function ThemeGrid(props: { name: string; selected: ThemeId; onSelect: (id: ThemeId) => void }) {
   return (
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" role="radiogroup" aria-label={props.name}>
-      <For each={themes()}>
-        {(t) => {
-          const contrast = () => themeSettings().contrast[isDarkTheme(t.id) ? 'dark' : 'light'];
-          const selected = () => props.selected === t.id;
-          return (
-            <label
-              class={[
-                'Box overflow-hidden cursor-pointer block transition-shadow',
-                { 'outline outline-2 -outline-offset-1 outline-[var(--borderColor-accent-emphasis)]': selected() },
-              ]}
+    <div class="flex flex-col gap-5">
+      <For each={GROUPS}>
+        {(g) => (
+          <section>
+            <h4 class="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">{g.title}</h4>
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+              role="radiogroup"
+              aria-label={`${props.name}: ${g.title}`}
             >
-              <ThemePreview theme={resolvedTheme(t.id, themeSettings())} />
-              <div class="flex items-center gap-2 px-3 py-2 border-t border-line text-sm">
-                <input
-                  type="radio"
-                  name={props.name}
-                  value={t.id}
-                  checked={selected()}
-                  onChange={() => props.onSelect(t.id)}
-                />
-                <span class={{ 'font-semibold': selected() }}>{themeLabel(t.id, contrast())}</span>
-              </div>
-            </label>
-          );
-        }}
+              <For each={THEMES.filter((t) => t.group === g.group)}>
+                {(t) => {
+                  const contrast = () => themeSettings().contrast[isDarkTheme(t.id) ? 'dark' : 'light'];
+                  const selected = () => props.selected === t.id;
+                  return (
+                    <label
+                      class={[
+                        'Box overflow-hidden cursor-pointer block transition-shadow',
+                        { 'outline outline-2 -outline-offset-1 outline-[var(--borderColor-accent-emphasis)]': selected() },
+                      ]}
+                    >
+                      <ThemePreview theme={resolvedTheme(t.id, themeSettings())} />
+                      <div class="flex items-center gap-2 px-3 py-2 border-t border-line text-sm">
+                        <input
+                          type="radio"
+                          name={props.name}
+                          value={t.id}
+                          checked={selected()}
+                          onChange={() => props.onSelect(t.id)}
+                        />
+                        <span class={['flex-1 truncate', { 'font-semibold': selected() }]}>{themeLabel(t.id, contrast())}</span>
+                        <Octicon icon={isDarkTheme(t.id) ? moonIcon : sunIcon} class="text-fg-muted" aria-label={isDarkTheme(t.id) ? 'Dark' : 'Light'} />
+                      </div>
+                    </label>
+                  );
+                }}
+              </For>
+            </div>
+          </section>
+        )}
       </For>
     </div>
   );
@@ -123,14 +158,6 @@ function SyncPanel(props: { kind: 'day' | 'night' }) {
 
 /** /settings/appearance — GitHub's theme preferences. */
 export default function AppearanceSettings() {
-  // Previews render every theme, so load all theme stylesheets on this page.
-  onSettled(() => {
-    for (const t of THEMES) {
-      ensureThemeCss(t.id);
-      ensureThemeCss(`${t.id}_high_contrast`);
-    }
-  });
-
   return (
     <>
       <Title>Appearance</Title>
@@ -190,7 +217,7 @@ export default function AppearanceSettings() {
               <span>
                 <span class="font-semibold">Increase contrast for {family} themes</span>
                 <span class="note">
-                  Uses the high contrast variant of the selected {family} theme
+                  Uses the high contrast variant of the selected GitHub {family} theme
                   {family === 'dark' ? ' (including Dark dimmed)' : ''} — stronger borders and text, for readability.
                 </span>
               </span>

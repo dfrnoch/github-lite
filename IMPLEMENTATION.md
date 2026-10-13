@@ -14,7 +14,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [x] API client: REST (`gh`, `ghPage`, `ghAll`), GraphQL (`gql`), ETag revalidation, rate-limit tracking (`src/lib/github.ts`)
 - [x] Auth: personal access token (classic, scopes pre-filled) — works on any static host
 - [x] Auth: OAuth App via one server function (`src/lib/oauth.ts`, needs `GITHUB_CLIENT_ID/SECRET`)
-- [x] Theming like github.com: single theme or sync with system (day/night), all Primer themes (light, dark, dark dimmed, Protanopia & Deuteranopia, Tritanopia) with per-family "increase contrast" (high-contrast variants), live previews on `/settings/appearance`, applied before first paint
+- [x] Theming like github.com: single theme or sync with system (day/night), all Primer themes (light, dark, dark dimmed, Protanopia & Deuteranopia, Tritanopia) with per-family "increase contrast" (high-contrast variants), plus 20 community themes (Dracula, Nord, Catppuccin ×4, Tokyo Night (+ Day), One Dark, Gruvbox ×2, Solarized ×2, Rosé Pine (+ Dawn), Monokai, Everforest, Kanagawa, Ayu Mirage, Synthwave) generated from Primer's tokens; live previews on `/settings/appearance`, applied before first paint
 - [x] App header (context breadcrumbs, search with `/` shortcut, create menu, issues/PRs/notifications, user drawer, nav drawer)
 - [x] UI kit: Avatar, Dropdown, Dialog, Toast, Pagination, Markdown (GitHub-rendered HTML), MarkdownEditor (write/preview/toolbar), RelativeTime, IssueLabel, Blankslate, CopyButton, ErrorView
 - [x] github.com links inside rendered markdown are rewritten to stay in-app

@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+import { PALETTES } from './theme-palettes';
 
 /**
  * GitHub's theme preferences: a single theme, or "sync with system" with
@@ -12,17 +13,32 @@ import { createSignal } from 'solid-js';
  * inline script in src/Document.tsx, which mirrors `themeAttributes()`.
  */
 
-export const THEMES = [
-  { id: 'light', name: 'Light default' },
-  { id: 'light_colorblind', name: 'Light Protanopia & Deuteranopia' },
-  { id: 'light_tritanopia', name: 'Light Tritanopia' },
-  { id: 'dark', name: 'Dark default' },
-  { id: 'dark_dimmed', name: 'Dark dimmed' },
-  { id: 'dark_colorblind', name: 'Dark Protanopia & Deuteranopia' },
-  { id: 'dark_tritanopia', name: 'Dark Tritanopia' },
+/** GitHub's own themes (each has a high-contrast variant). */
+const GITHUB_THEMES = [
+  { id: 'light', name: 'Light default', family: 'light' },
+  { id: 'light_colorblind', name: 'Light Protanopia & Deuteranopia', family: 'light' },
+  { id: 'light_tritanopia', name: 'Light Tritanopia', family: 'light' },
+  { id: 'dark', name: 'Dark default', family: 'dark' },
+  { id: 'dark_dimmed', name: 'Dark dimmed', family: 'dark' },
+  { id: 'dark_colorblind', name: 'Dark Protanopia & Deuteranopia', family: 'dark' },
+  { id: 'dark_tritanopia', name: 'Dark Tritanopia', family: 'dark' },
 ] as const;
 
-export type ThemeId = (typeof THEMES)[number]['id'];
+export interface ThemeInfo {
+  id: string;
+  name: string;
+  family: 'light' | 'dark';
+  group: 'github' | 'community';
+}
+
+/** Every selectable theme: GitHub's, then community palettes (src/lib/theme-palettes.ts). */
+export const THEMES: ThemeInfo[] = [
+  ...GITHUB_THEMES.map((t) => ({ ...t, group: 'github' as const })),
+  ...PALETTES.map((p) => ({ id: p.id, name: p.name, family: p.family, group: 'community' as const })),
+];
+
+export type ThemeId = string;
+const byId = new Map(THEMES.map((t) => [t.id, t]));
 
 export interface ThemeSettings {
   mode: 'single' | 'sync';
@@ -46,15 +62,19 @@ export const DEFAULT_THEME: ThemeSettings = {
 const KEY = 'gh-lite:theme';
 const LEGACY_KEY = 'gh-lite:color-mode';
 
-export const isDarkTheme = (id: string) => id.startsWith('dark');
+export const isDarkTheme = (id: string) => (byId.get(id)?.family ?? (id.startsWith('dark') ? 'dark' : 'light')) === 'dark';
+/** Only GitHub's themes have high-contrast variants. */
+export const hasContrastVariant = (id: string) => byId.get(id)?.group === 'github';
+const contrastOn = (id: ThemeId, s: ThemeSettings) => hasContrastVariant(id) && s.contrast[isDarkTheme(id) ? 'dark' : 'light'];
+
 export const themeLabel = (id: ThemeId, contrast = false) => {
-  const name = THEMES.find((t) => t.id === id)?.name ?? id;
-  return contrast ? name.replace(' default', '').concat(' high contrast') : name;
+  const name = byId.get(id)?.name ?? id;
+  return contrast && hasContrastVariant(id) ? name.replace(' default', '').concat(' high contrast') : name;
 };
 
-/** The Primer theme name actually applied for a base theme (e.g. "dark_dimmed_high_contrast"). */
+/** The theme name actually applied for a base theme (e.g. "dark_dimmed_high_contrast"). */
 export function resolvedTheme(id: ThemeId, s: ThemeSettings) {
-  return s.contrast[isDarkTheme(id) ? 'dark' : 'light'] ? `${id}_high_contrast` : id;
+  return contrastOn(id, s) ? `${id}_high_contrast` : id;
 }
 
 /** The <html> attributes for a settings object. */
@@ -84,7 +104,11 @@ function load(): ThemeSettings {
   if (typeof localStorage === 'undefined') return DEFAULT_THEME;
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT_THEME, ...JSON.parse(raw) };
+    if (raw) {
+      const saved = { ...DEFAULT_THEME, ...JSON.parse(raw) } as ThemeSettings;
+      for (const k of ['single', 'day', 'night'] as const) if (!byId.has(saved[k])) saved[k] = DEFAULT_THEME[k];
+      return saved;
+    }
     // Older versions stored just the color mode.
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy === 'light' || legacy === 'dark') return { ...DEFAULT_THEME, mode: 'single', single: legacy };
@@ -135,6 +159,6 @@ export { systemDark };
 
 /** Short description of the active preference, e.g. for the account menu. */
 export function themeSummary(s: ThemeSettings = themeSettings()) {
-  if (s.mode === 'single') return themeLabel(s.single, s.contrast[isDarkTheme(s.single) ? 'dark' : 'light']);
+  if (s.mode === 'single') return themeLabel(s.single, contrastOn(s.single, s));
   return 'Sync with system';
 }
