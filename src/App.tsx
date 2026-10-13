@@ -4,7 +4,7 @@ import { Errored, Loading, Show } from 'solid-js';
 import '@unocss/reset/tailwind.css';
 import '@primer/primitives/dist/css/functional/themes/light.css';
 import '@primer/primitives/dist/css/functional/themes/dark.css';
-import 'github-markdown-css/github-markdown.css';
+import './styles/markdown.css';
 import './styles/primer.css';
 import 'virtual:uno.css';
 import AppHeader from './components/layout/AppHeader';

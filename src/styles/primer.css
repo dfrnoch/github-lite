@@ -1302,16 +1302,108 @@ dialog.Dialog::backdrop {
   content: attr(data-code-marker);
   padding-right: 8px;
 }
-/* Shiki dual-theme output: switch to the dark token colors in dark mode. */
-@media (prefers-color-scheme: dark) {
-  html:not([data-color-mode='light']) .shiki,
-  html:not([data-color-mode='light']) .shiki span {
-    color: var(--shiki-dark) !important;
-  }
+/* ---------- Syntax highlighting ----------
+ * github.com's "prettylights" classes, emitted by our highlighter
+ * (src/lib/syntax-classes.ts) and by GitHub's markdown renderer, colored by
+ * the active Primer theme's tokens — so code follows every theme. */
+.pl-c {
+  color: var(--color-prettylights-syntax-comment);
 }
-html[data-color-mode='dark'] .shiki,
-html[data-color-mode='dark'] .shiki span {
-  color: var(--shiki-dark) !important;
+.pl-c1,
+.pl-s .pl-v {
+  color: var(--color-prettylights-syntax-constant);
+}
+.pl-e,
+.pl-en {
+  color: var(--color-prettylights-syntax-entity);
+}
+.pl-smi,
+.pl-s .pl-s1 {
+  color: var(--color-prettylights-syntax-storage-modifier-import);
+}
+.pl-ent {
+  color: var(--color-prettylights-syntax-entity-tag);
+}
+.pl-k {
+  color: var(--color-prettylights-syntax-keyword);
+}
+.pl-s,
+.pl-pds,
+.pl-s .pl-pse .pl-s1 {
+  color: var(--color-prettylights-syntax-string);
+}
+.pl-sr,
+.pl-sr .pl-cce,
+.pl-sr .pl-sre,
+.pl-sr .pl-sra {
+  color: var(--color-prettylights-syntax-string-regexp);
+}
+.pl-v,
+.pl-smw {
+  color: var(--color-prettylights-syntax-variable);
+}
+.pl-bu {
+  color: var(--color-prettylights-syntax-brackethighlighter-unmatched);
+}
+.pl-ii {
+  color: var(--color-prettylights-syntax-invalid-illegal-text);
+  background-color: var(--color-prettylights-syntax-invalid-illegal-bg);
+}
+.pl-c2 {
+  color: var(--color-prettylights-syntax-carriage-return-text);
+  background-color: var(--color-prettylights-syntax-carriage-return-bg);
+}
+.pl-ml {
+  color: var(--color-prettylights-syntax-markup-list);
+}
+.pl-mh,
+.pl-mh .pl-en,
+.pl-ms {
+  font-weight: bold;
+  color: var(--color-prettylights-syntax-markup-heading);
+}
+.pl-mi {
+  font-style: italic;
+  color: var(--color-prettylights-syntax-markup-italic);
+}
+.pl-mb {
+  font-weight: bold;
+  color: var(--color-prettylights-syntax-markup-bold);
+}
+.pl-md {
+  color: var(--color-prettylights-syntax-markup-deleted-text);
+  background-color: var(--color-prettylights-syntax-markup-deleted-bg);
+}
+.pl-mi1 {
+  color: var(--color-prettylights-syntax-markup-inserted-text);
+  background-color: var(--color-prettylights-syntax-markup-inserted-bg);
+}
+.pl-mc {
+  color: var(--color-prettylights-syntax-markup-changed-text);
+  background-color: var(--color-prettylights-syntax-markup-changed-bg);
+}
+.pl-mi2 {
+  color: var(--color-prettylights-syntax-markup-ignored-text);
+  background-color: var(--color-prettylights-syntax-markup-ignored-bg);
+}
+.pl-mdr {
+  font-weight: bold;
+  color: var(--color-prettylights-syntax-meta-diff-range);
+}
+.pl-ba {
+  color: var(--color-prettylights-syntax-brackethighlighter-angle);
+}
+.pl-sg {
+  color: var(--color-prettylights-syntax-sublimelinter-gutter-mark);
+}
+.pl-corl {
+  text-decoration: underline;
+  color: var(--color-prettylights-syntax-constant-other-reference-link);
+}
+/* Diff lines keep syntax colors readable on their tinted backgrounds. */
+.blob-code-addition .pl-mi1,
+.blob-code-deletion .pl-md {
+  background-color: transparent;
 }
 
 /* ---------- Misc ---------- */

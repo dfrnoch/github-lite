@@ -16,6 +16,7 @@ import {
   inboxIcon,
   issueOpenedIcon,
   markGithubIcon,
+  deviceDesktopIcon,
   moonIcon,
   organizationIcon,
   personIcon,
@@ -31,7 +32,7 @@ import {
 } from '../../icons/octicons';
 import { signOut } from '../../lib/auth';
 import { useHotkey } from '../../lib/hotkeys';
-import { colorMode, setColorMode } from '../../lib/theme';
+import { isDarkTheme, themeSettings, themeSummary } from '../../lib/theme';
 import Octicon from '../Octicon';
 import { Avatar, Dropdown, QUERY_KEYS, QueryInput } from '../ui';
 import Drawer from './Drawer';
@@ -249,14 +250,11 @@ export default function AppHeader() {
               </a>
             </li>
             <li>
-              <button
-                type="button"
-                class="NavList-item w-full"
-                onClick={() => setColorMode(colorMode() === 'dark' ? 'light' : colorMode() === 'light' ? 'auto' : 'dark')}
-              >
-                <Octicon icon={colorMode() === 'light' ? sunIcon : moonIcon} />
-                Theme: {colorMode() === 'auto' ? 'Sync with system' : colorMode() === 'dark' ? 'Dark' : 'Light'}
-              </button>
+              <a class="NavList-item" href="/settings/appearance">
+                <Octicon icon={themeSettings().mode === 'sync' ? deviceDesktopIcon : isDarkTheme(themeSettings().single) ? moonIcon : sunIcon} />
+                <span class="flex-1">Appearance</span>
+                <span class="text-xs text-fg-muted truncate">{themeSummary()}</span>
+              </a>
             </li>
             <li>
               <a class="NavList-item" href="https://docs.github.com" target="_blank" rel="noreferrer">

@@ -1,12 +1,13 @@
 import type { HighlighterCore, ThemedToken } from 'shiki/core';
+import { classForColor, primerSyntaxTheme } from './syntax-classes';
 
 /**
  * Shiki highlighting proper — runs inside the highlight worker
  * (highlight.worker.ts), or on the main thread as a fallback where workers
  * are unavailable. The core, the JS regex engine and each grammar are separate
  * chunks fetched the first time a file of that language is highlighted.
- * Output is GitHub's light theme with the dark theme's colors carried in
- * --shiki-dark (switched by CSS in primer.css).
+ * Output uses github.com's `pl-*` syntax classes (see syntax-classes.ts), so
+ * the same HTML renders correctly in every Primer theme.
  */
 
 const EXT_ALIASES: Record<string, string> = {
@@ -110,14 +111,13 @@ let bundled: Promise<typeof import('shiki/langs')> | undefined;
 
 async function getHighlighter() {
   highlighter ??= (async () => {
-    const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, light, dark] = await Promise.all([
+    const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, base] = await Promise.all([
       import('shiki/core'),
       import('shiki/engine/javascript'),
-      import('shiki/themes/github-light.mjs'),
-      import('shiki/themes/github-dark.mjs'),
+      import('shiki/themes/github-light-default.mjs'),
     ]);
     return createHighlighterCore({
-      themes: [light.default, dark.default],
+      themes: [primerSyntaxTheme(base.default)],
       langs: [],
       engine: createJavaScriptRegexEngine({ forgiving: true }),
     });
@@ -138,21 +138,10 @@ export async function languageFor(filename: string): Promise<string | undefined>
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** github-light's color for the `comment` scope (and only that scope). */
-const COMMENT_COLOR = '#6a737d';
-
 function tokenHtml(token: ThemedToken) {
-  const light = (token.htmlStyle?.color ?? token.color ?? '').toLowerCase();
-  const style = token.htmlStyle
-    ? Object.entries(token.htmlStyle)
-        .map(([k, v]) => `${k}:${v}`)
-        .join(';')
-    : token.color
-      ? `color:${token.color}`
-      : '';
-  // `pl-c` marks comments like github.com's own highlighter (used by linkify-code).
-  const cls = light === COMMENT_COLOR ? ' class="pl-c"' : '';
-  return style ? `<span${cls} style="${style}">${escapeHtml(token.content)}</span>` : escapeHtml(token.content);
+  const cls = classForColor(token.color);
+  // `pl-c` marks comments like github.com's own highlighter (linkify-code relies on it).
+  return cls ? `<span class="${cls}">${escapeHtml(token.content)}</span>` : escapeHtml(token.content);
 }
 
 /**
@@ -169,11 +158,7 @@ export async function highlightCode(code: string, filename: string, lang?: strin
     if (!loader) return null;
     await hl.loadLanguage((await loader()).default);
   }
-  const { tokens } = hl.codeToTokens(code, {
-    lang: id,
-    themes: { light: 'github-light', dark: 'github-dark' },
-    defaultColor: 'light',
-  });
+  const { tokens } = hl.codeToTokens(code, { lang: id, theme: 'github-primer' });
   return tokens.map((line) => line.map(tokenHtml).join(''));
 }
 

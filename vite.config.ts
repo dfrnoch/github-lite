@@ -3,6 +3,7 @@ import UnoCSS from 'unocss/vite';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import solid from '@solidjs/vite-plugin';
+import { primerThemes } from './scripts/primer-themes-plugin.ts';
 
 export default defineConfig(({ mode }) => {
   // Expose GITHUB_* from .env to server functions in development (OAuth).
@@ -24,6 +25,7 @@ export default defineConfig(({ mode }) => {
       }),
       fileRoutes({ types: true }),
       UnoCSS(), // config in uno.config.ts
+      primerThemes(), // /themes/<name>.css for the non-default Primer themes
     ],
     server: {
       port: 3000,

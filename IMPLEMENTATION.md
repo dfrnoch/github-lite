@@ -14,7 +14,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [x] API client: REST (`gh`, `ghPage`, `ghAll`), GraphQL (`gql`), ETag revalidation, rate-limit tracking (`src/lib/github.ts`)
 - [x] Auth: personal access token (classic, scopes pre-filled) — works on any static host
 - [x] Auth: OAuth App via one server function (`src/lib/oauth.ts`, needs `GITHUB_CLIENT_ID/SECRET`)
-- [x] Light / dark / system theme switch
+- [x] Theming like github.com: single theme or sync with system (day/night), all Primer themes (light, dark, dark dimmed, Protanopia & Deuteranopia, Tritanopia) with per-family "increase contrast" (high-contrast variants), live previews on `/settings/appearance`, applied before first paint
 - [x] App header (context breadcrumbs, search with `/` shortcut, create menu, issues/PRs/notifications, user drawer, nav drawer)
 - [x] UI kit: Avatar, Dropdown, Dialog, Toast, Pagination, Markdown (GitHub-rendered HTML), MarkdownEditor (write/preview/toolbar), RelativeTime, IssueLabel, Blankslate, CopyButton, ErrorView
 - [x] github.com links inside rendered markdown are rewritten to stay in-app
@@ -24,7 +24,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [~] Commit signature badge `VerifiedBadge` with details popover (GPG key ID / SSH fingerprint, signer, failure reason) — "Partially verified" and vigilant-mode "Unverified" for unsigned commits aren't exposed by the API
 - [ ] Route `preload`s for the heavy pages (removes the request waterfalls the Solid diagnostics report)
 - [~] Keyboard shortcuts beyond `/` (`t` file finder done on code pages; `g i`, `g p`, … todo)
-- [ ] Respect forced light/dark theme inside `.markdown-body` (github-markdown-css follows the OS)
+- [x] Rendered markdown and syntax highlighting follow the selected theme (generated themeable markdown CSS; github.com's `pl-*` syntax classes)
 
 ## Repository — code (`/:owner/:repo`)
 
