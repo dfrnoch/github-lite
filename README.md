@@ -54,6 +54,15 @@ bun run build
   token-exchange endpoint: `GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… bun dist/server/node.js`
   (`PORT`/`HOST` configurable).
 
+### Cloudflare Pages
+
+- Build command: `bun run build` — Build output directory: `dist/client`
+- Environment variable **`BUN_VERSION` = `1.4.3`** (Pages picks the Bun version only from
+  this variable; its default Bun is too old for `bun.lock`)
+- No `404.html` is emitted, so Pages serves `index.html` for every route (SPA mode).
+- OAuth sign-in needs the Node server and is not available on Pages; use a personal
+  access token there.
+
 ## How it works
 
 - `src/lib/github.ts` — REST + GraphQL client. GETs revalidate the browser's
