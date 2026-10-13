@@ -52,8 +52,10 @@ A lightweight GitHub client. Routes mirror github.com URLs exactly (swap the hos
 
 ### Verifying
 
-- `npx tsc --noEmit` and `npx oxlint src` must pass.
-- Dev server: `npx vite --port 3000` (check `curl -s localhost:3000 >/dev/null` first; one shared instance is usually already running).
+- Package manager is **bun** (`bun install`, `bun add`, `bunx`). Never use npm/npx/pnpm in this repo.
+
+- `bunx tsc --noEmit` and `bunx oxlint src` must pass.
+- Dev server: `bun run dev` (check `curl -s localhost:3000 >/dev/null` first; one shared instance is usually already running).
 - Screenshot harness: `cd /tmp/shot-tool && GH_TOKEN=$(gh auth token) WAIT=2500 node app.mjs /tmp/appshots /owner/repo/path …` writes PNGs and prints console warnings/errors (Solid diagnostics included). `node eval.mjs <path> '<js expr>'` evaluates in the page.
 - **Never perform mutating API calls against real GitHub data while testing** (no creating/editing/deleting anything) — verify mutation UIs up to the submit button, and check request shapes against the REST docs.
 

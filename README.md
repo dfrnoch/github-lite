@@ -34,18 +34,18 @@ link out to github.com.
 ## Development
 
 ```bash
-pnpm install
-pnpm dev          # http://localhost:3000
-pnpm test         # vitest
-pnpm typecheck    # tsc
-pnpm lint         # oxlint
-node scripts/gen-octicons.mjs   # regenerate src/icons/octicons.ts after upgrading @primer/octicons
+bun install
+bun run dev          # http://localhost:3000
+bun run test         # vitest
+bun run typecheck    # tsc
+bun run lint         # oxlint
+bun scripts/gen-octicons.mjs   # regenerate src/icons/octicons.ts after upgrading @primer/octicons
 ```
 
 ## Building & deploying
 
 ```bash
-pnpm build
+bun run build
 ```
 
 - `dist/client` is a static site (SPA with history fallback) — deploy it to
