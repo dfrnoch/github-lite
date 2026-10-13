@@ -257,7 +257,7 @@ function EditAboutDialog(props: { repo: Repository; open: boolean; onClose: () =
           <p class="note">Topics are lowercase, may include hyphens, and are limited to 50 characters.</p>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-          <button type="button" class="btn" onClick={props.onClose}>
+          <button type="button" class="btn" onClick={() => props.onClose()}>
             Cancel
           </button>
           <button type="submit" class="btn btn-primary" disabled={busy()}>

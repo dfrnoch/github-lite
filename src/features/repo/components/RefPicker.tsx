@@ -17,7 +17,7 @@ export default function RefPicker(props: {
 }) {
   const [tab, setTab] = createSignal<'branches' | 'tags'>('branches');
   const [filter, setFilter] = createSignal('');
-  let input!: HTMLInputElement;
+  let input: HTMLInputElement | undefined;
   const isSha = () => /^[0-9a-f]{40}$/i.test(props.current);
 
   return (
@@ -38,7 +38,7 @@ export default function RefPicker(props: {
         <>
           <div class="SelectMenu-filter">
             <input
-              ref={input}
+              ref={(el) => (input = el)}
               class="form-control form-control-sm"
               placeholder={tab() === 'branches' ? 'Find a branch…' : 'Find a tag…'}
               value={filter()}

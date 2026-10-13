@@ -41,21 +41,15 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
-      path: "/";
+      path: "/:owner/:repo";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/index")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
       $$route?: undefined;
     },
     {
-      path: "/login/";
+      path: "/:owner/:repo/blob/*path";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/login/index")>;
-      $$route?: undefined;
-    },
-    {
-      path: "/login/callback";
-      page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/login/callback")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/blob/[...path]")>;
       $$route?: undefined;
     },
     {
@@ -65,21 +59,27 @@ declare module "virtual:file-routes" {
       $$route?: undefined;
     },
     {
-      path: "/:owner/:repo";
-      page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]")>;
-      $$route?: undefined;
-    },
-    {
       path: "/:owner/:repo/tree/*path";
       page: true;
       $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/tree/[...path]")>;
       $$route?: undefined;
     },
     {
-      path: "/:owner/:repo/blob/*path";
+      path: "/";
       page: true;
-      $component: FileRouteLazyRef<typeof import("./src/routes/[owner]/[repo]/blob/[...path]")>;
+      $component: FileRouteLazyRef<typeof import("./src/routes/index")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/login/callback";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/login/callback")>;
+      $$route?: undefined;
+    },
+    {
+      path: "/login/";
+      page: true;
+      $component: FileRouteLazyRef<typeof import("./src/routes/login/index")>;
       $$route?: undefined;
     }
   ];

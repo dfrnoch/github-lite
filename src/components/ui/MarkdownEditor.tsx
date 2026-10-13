@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Loading, Show } from 'solid-js';
+import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import {
   boldIcon,
   codeIcon,
@@ -46,12 +46,14 @@ export default function MarkdownEditor(props: {
   disabled?: boolean;
 }) {
   const [tab, setTab] = createSignal<'write' | 'preview'>('write');
-  let textarea!: HTMLTextAreaElement;
+  let textarea: HTMLTextAreaElement | undefined;
 
   const preview = createMemo(() => (tab() === 'preview' ? renderMarkdown(props.value, props.repo) : ''));
 
   const apply = (f: Format) => {
-    const { selectionStart: s, selectionEnd: e, value } = textarea;
+    if (!textarea) return;
+    const el = textarea;
+    const { selectionStart: s, selectionEnd: e, value } = el;
     let next: string;
     let cursor: [number, number];
     if (f.line) {
@@ -70,8 +72,8 @@ export default function MarkdownEditor(props: {
     }
     props.onInput(next);
     queueMicrotask(() => {
-      textarea.focus();
-      textarea.setSelectionRange(...cursor);
+      el.focus();
+      el.setSelectionRange(...cursor);
     });
   };
 
@@ -102,7 +104,7 @@ export default function MarkdownEditor(props: {
         </div>
         <Show when={tab() === 'write'}>
           <div class="hidden md:flex items-center pb-1">
-            {FORMATS.map((f) => (
+            <For each={FORMATS}>{(f) => (
               <button
                 type="button"
                 class="btn-octicon w-7 h-7"
@@ -112,7 +114,7 @@ export default function MarkdownEditor(props: {
               >
                 <Octicon icon={f.icon} />
               </button>
-            ))}
+            )}</For>
           </div>
         </Show>
       </div>
@@ -121,7 +123,7 @@ export default function MarkdownEditor(props: {
           when={tab() === 'preview'}
           fallback={
             <textarea
-              ref={textarea}
+              ref={(el) => (textarea = el)}
               id={props.id}
               class="form-control border-none! shadow-none! bg-canvas"
               style={{ 'min-height': `${props.minHeight ?? 120}px` }}

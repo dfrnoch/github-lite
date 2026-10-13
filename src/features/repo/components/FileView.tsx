@@ -190,7 +190,10 @@ function CodeView(props: {
   const raw = createMemo(() => getRawFile(props.owner, props.repo, props.gitRef, props.path));
   const binary = () => raw().slice(0, 8000).includes('\0');
   const text = () => raw().replace(/\n$/, '');
-  const lines = createMemo(async () => (await highlightLines(text(), props.path)) ?? escapeLines(text()));
+  const lines = createMemo(async () => {
+    const code = text();
+    return (await highlightLines(code, props.path)) ?? escapeLines(code);
+  });
   const table = createMemo(() =>
     lines()
       .map(
@@ -226,6 +229,7 @@ function CodeView(props: {
         <table class="w-full border-collapse">
           <tbody
             ref={(el) => (tbody = el)}
+            // oxlint-disable-next-line solid/no-innerhtml -- escaped/highlighted source
             innerHTML={table()}
             onClick={(e) => {
               const cell = (e.target as HTMLElement).closest('.blob-num') as HTMLElement | null;
@@ -264,7 +268,7 @@ function DeleteFileDialog(props: {
       title="Delete file"
       footer={
         <>
-          <button type="button" class="btn" onClick={props.onClose}>
+          <button type="button" class="btn" onClick={() => props.onClose()}>
             Cancel
           </button>
           <button

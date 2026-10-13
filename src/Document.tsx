@@ -13,6 +13,7 @@ export default function Document(props: ParentProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <title>GitHub</title>
+        {/* oxlint-disable-next-line solid/no-innerhtml -- static inline script */}
         <script innerHTML={themeScript} />
         <HydrationScript />
       </head>

@@ -6,5 +6,6 @@ import { rewriteHtmlLinks } from '../../lib/markdown';
  * sanitizes it; github.com links are rewritten to stay inside this app.
  */
 export default function Markdown(props: { html: string | null | undefined; class?: string }) {
+  // oxlint-disable-next-line solid/no-innerhtml -- HTML is sanitized by GitHub's renderer
   return <div class={['markdown-body', props.class]} innerHTML={rewriteHtmlLinks(props.html ?? '')} />;
 }
