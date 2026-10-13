@@ -11,4 +11,5 @@ export { default as MarkdownEditor } from './MarkdownEditor';
 export { default as Pagination, pageHref } from './Pagination';
 export { default as RelativeTime } from './RelativeTime';
 export { default as Spinner, PageSpinner } from './Spinner';
+export { default as StateIcon, itemState, StateBadge, type ItemState } from './StateIcon';
 export { toast, toastError, Toasts } from './Toast';
