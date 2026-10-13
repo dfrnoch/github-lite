@@ -1,5 +1,6 @@
 import type { JSX } from '@solidjs/web';
 import { createSignal, onSettled, Show } from 'solid-js';
+import { fitInViewport } from '../../lib/viewport';
 
 /**
  * Button + popover menu (GitHub's ActionMenu). Closes on outside click,
@@ -62,6 +63,7 @@ export default function Dropdown(props: {
       </button>
       <Show when={open()}>
         <div
+          ref={fitInViewport}
           role="menu"
           class={['SelectMenu mt-1', props.align === 'right' ? 'right-0' : 'left-0', props.menuClass]}
         >

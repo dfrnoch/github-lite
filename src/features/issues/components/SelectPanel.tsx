@@ -1,4 +1,5 @@
 import type { JSX } from '@solidjs/web';
+import { fitInViewport } from '../../../lib/viewport';
 import { createMemo, createSignal, For, Loading, onSettled, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import { Spinner } from '../../../components/ui';
@@ -100,6 +101,7 @@ export default function SelectPanel<T>(props: SelectPanelProps<T>) {
       </button>
       <Show when={open()}>
         <div
+          ref={fitInViewport}
           class={['SelectMenu mt-1 py-0!', props.align === 'right' ? 'right-0' : 'left-0']}
           style={{ width: `${props.width ?? 300}px`, 'max-width': 'calc(100vw - 32px)' }}
           role="dialog"

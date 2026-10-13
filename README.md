@@ -51,7 +51,7 @@ bun run build
 - `dist/client` is a static site (SPA with history fallback) — deploy it to
   any static host if you only use personal access tokens.
 - For OAuth, run the bundled Node server, which serves `dist/client` and the
-  token-exchange endpoint: `GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… node dist/server/node.js`
+  token-exchange endpoint: `GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… bun dist/server/node.js`
   (`PORT`/`HOST` configurable).
 
 ## How it works
