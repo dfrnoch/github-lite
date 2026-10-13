@@ -45,6 +45,12 @@ mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/$APP_NAME.app"
 cp -R "$APP" "$HOME/Applications/"
 codesign --verify --deep --strict "$HOME/Applications/$APP_NAME.app"
+
+# Drop the build output so Safari doesn't list the extension twice (macOS
+# registers every copy of the app it sees).
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -u "$APP" 2>/dev/null || true
+rm -rf "$BUILD_DIR"
 echo "Installed: $HOME/Applications/$APP_NAME.app"
 
 # Launching the app once registers the extension with Safari.
