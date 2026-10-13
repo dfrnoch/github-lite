@@ -1,5 +1,5 @@
 import { action, query } from '@solidjs/router';
-import { gh, GitHubError, gql } from '../../lib/github';
+import { gh, ghAll, GitHubError, gql } from '../../lib/github';
 import type { PullRequest } from '../../lib/types';
 import { TIMELINE_EDGE } from '../issues/api';
 import { PULL_PAGE } from '../issues/graphql';
@@ -182,6 +182,42 @@ export const countPullsBasedOn = (owner: string, repo: string, branch: string) =
     `query($owner:String!,$name:String!,$base:String!){repository(owner:$owner,name:$name){pullRequests(baseRefName:$base,states:OPEN){totalCount}}}`,
     { owner, name: repo, base: branch },
   ).then((d) => d.repository.pullRequests.totalCount as number);
+
+interface CompareFile {
+  filename: string;
+  previous_filename?: string;
+}
+
+/**
+ * Merge box: an approximation of the files a conflicting PR conflicts in —
+ * the API doesn't list them. Files the PR changes (GET /pulls/:n/files) that
+ * were also changed on the base branch since the two diverged (compare from
+ * the merge base to the base branch's tip). Renames match on either name.
+ */
+export const getPullConflictFiles = query(
+  async (owner: string, repo: string, number: number, base: string, headSha: string, headLabel: string): Promise<string[]> => {
+    const path = `/repos/${owner}/${repo}`;
+    const mergeBase = async () => {
+      const cmp = (head: string) =>
+        gh<{ merge_base_commit: { sha: string } }>(`${path}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`, { query: { per_page: 1 } });
+      // A fork's head SHA usually resolves in the parent's network; fall back to "owner:branch".
+      const res = await cmp(headSha).catch(() => cmp(headLabel));
+      return res.merge_base_commit.sha;
+    };
+    const [sha, prFiles] = await Promise.all([mergeBase(), ghAll<CompareFile>(`${path}/pulls/${number}/files`, { max: 3000 })]);
+    const onBase = await gh<{ files?: CompareFile[] }>(`${path}/compare/${sha}...${encodeURIComponent(base)}`, { query: { per_page: 1 } });
+    const changed = new Set<string>();
+    for (const f of onBase.files ?? []) {
+      changed.add(f.filename);
+      if (f.previous_filename) changed.add(f.previous_filename);
+    }
+    return prFiles
+      .filter((f) => changed.has(f.filename) || (!!f.previous_filename && changed.has(f.previous_filename)))
+      .map((f) => f.filename)
+      .sort((a, b) => a.localeCompare(b));
+  },
+  'pull-conflict-files',
+);
 
 export interface PullPageData {
   repo: PullRepoMeta;

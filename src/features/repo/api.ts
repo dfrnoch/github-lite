@@ -138,7 +138,10 @@ export interface LastCommit {
   messageHeadline: string;
   message: string;
   committedDate: string;
+  /** Distinct authors (co-authors with the same login / name are merged). */
   authors: { name: string | null; avatarUrl: string; user: { login: string } | null }[];
+  /** All authors, including ones beyond the fetched `authors`. */
+  authorCount: number;
   status: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
   signature: CommitSignature | null;
   historyCount: number;
@@ -146,9 +149,13 @@ export interface LastCommit {
 }
 
 const COMMIT_FIELDS = `oid abbreviatedOid messageHeadline message committedDate
-  authors(first:3){nodes{name avatarUrl user{login}}}
+  authors(first:3){totalCount nodes{name avatarUrl user{login}}}
   statusCheckRollup{state}
   ${SIGNATURE_FIELDS}`;
+
+/** A co-author trailer for the commit author themself (another email) is the same person. */
+const distinctAuthors = (nodes: LastCommit['authors']) =>
+  nodes.filter((a, i) => nodes.findIndex((x) => (x.user && a.user ? x.user.login === a.user.login : x.name === a.name)) === i);
 
 const toLastCommit = (c: any, historyCount = 0): LastCommit => ({
   oid: c.oid,
@@ -156,7 +163,8 @@ const toLastCommit = (c: any, historyCount = 0): LastCommit => ({
   messageHeadline: c.messageHeadline,
   message: c.message,
   committedDate: c.committedDate,
-  authors: c.authors.nodes,
+  authors: distinctAuthors(c.authors.nodes),
+  authorCount: Math.max(distinctAuthors(c.authors.nodes).length, c.authors.totalCount ?? 0),
   status: c.statusCheckRollup?.state ?? null,
   signature: signatureFromGql(c.signature),
   historyCount,

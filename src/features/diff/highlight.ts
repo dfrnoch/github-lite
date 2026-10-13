@@ -2,20 +2,24 @@ import { highlightLines } from '../../lib/highlight';
 import { escapeHtml, markRange, type DiffLine } from './parse';
 
 /** Patches above this many lines are shown without syntax colors. */
-const MAX_HIGHLIGHT_LINES = 3000;
+const MAX_HIGHLIGHT_LINES = 6000;
+
+const withWord = (html: string, line: DiffLine) => (line.word ? markRange(html, line.word[0], line.word[1]) : html);
+
+/** Plain (escaped) HTML for one line, with its word-level mark. */
+export const plainLineHtml = (line: DiffLine) => (line.type === 'hunk' ? '' : withWord(escapeHtml(line.text), line));
 
 /** Plain (escaped) HTML for each line, with word-level marks. */
 export function plainDiffHtml(lines: DiffLine[]): string[] {
-  return lines.map((l) => (l.type === 'hunk' ? '' : withWord(escapeHtml(l.text), l)));
+  return lines.map(plainLineHtml);
 }
-
-const withWord = (html: string, line: DiffLine) => (line.word ? markRange(html, line.word[0], line.word[1]) : html);
 
 /**
  * Syntax-highlighted HTML for each line of a parsed patch. The old side
  * (context + deletions) and new side (context + additions) are highlighted as
  * two pseudo-files so multi-line tokens (comments, strings) carry over within
- * a hunk. Returns null for unknown languages / huge patches.
+ * a hunk; both go to the highlight worker pool in parallel. Returns null for
+ * unknown languages / huge patches.
  */
 export async function highlightDiff(lines: DiffLine[], filename: string): Promise<string[] | null> {
   if (lines.length > MAX_HIGHLIGHT_LINES) return null;

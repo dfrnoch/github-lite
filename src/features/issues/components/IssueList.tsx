@@ -4,13 +4,9 @@ import { createEffect, createMemo, createSignal, For, isPending, Loading, Show }
 import Octicon from '../../../components/Octicon';
 import { Avatar, Blankslate, ISSUE_QUALIFIERS, itemState, Pagination, QueryInput, RelativeTime, Spinner, StateIcon } from '../../../components/ui';
 import {
-  checkIcon,
   commentIcon,
-  gitMergeIcon,
   gitPullRequestIcon,
-  linkExternalIcon,
   pinIcon,
-  issueClosedIcon,
   issueOpenedIcon,
   searchIcon,
   sortDescIcon,
@@ -21,7 +17,7 @@ import { formatNumber } from '../../../lib/format';
 import { feature } from '../../refined';
 import { getViewer } from '../../user/api';
 import { getAssignableUsers, getListCounts, getMilestones, getPinnedIssues, getRepoLabels, type PinnedIssue, PER_PAGE, searchIssues } from '../api';
-import { qualifier, qualifiers, setQualifier, SORTS, stateOf, tokenize, withoutState, withState } from '../query';
+import { qualifier, qualifiers, setQualifier, SORTS, stateOf, tokenize, withState } from '../query';
 import { TITLE_CODE } from './IssueRow';
 import IssueRow from './IssueRow';
 import SelectPanel from './SelectPanel';
@@ -112,12 +108,6 @@ export default function IssueList(props: IssueListProps) {
     return hrefFor(setQualifier(q(), key, value));
   };
   const state = () => stateOf(q());
-  /** extend-conversation-status-filters: clicking the selected state shows every state. */
-  const stateHref = (s: 'open' | 'closed') =>
-    feature('extend-conversation-status-filters') && state() === s ? hrefFor(withoutState(q())) : hrefFor(withState(q(), s));
-  const openAll = () => {
-    for (const item of result().items) window.open(`/${item.repository.nameWithOwner}/${item.__typename === 'PullRequest' ? 'pull' : 'issues'}/${item.number}`, '_blank');
-  };
   const lastPage = () => Math.max(1, Math.ceil(Math.min(result().total, 1000) / PER_PAGE));
 
   /** A repo count once loaded (undefined while loading, so filters stay visible). */
@@ -128,10 +118,12 @@ export default function IssueList(props: IssueListProps) {
       return undefined;
     }
   };
-  const filterClass = 'btn-invisible btn-sm text-fg-muted! font-normal! px-2!';
+  // github.com's ListView toolbar: invisible buttons, muted label + caret.
+  const filterClass = 'ListToolbar-button';
   const caret = (label: string) => (
     <>
-      {label} <Octicon icon={triangleDownIcon} />
+      <span>{label}</span>
+      <Octicon icon={triangleDownIcon} />
     </>
   );
 
@@ -176,47 +168,22 @@ export default function IssueList(props: IssueListProps) {
       <div class="Box">
         <div
           class={[
-            'Box-header flex flex-wrap items-center gap-x-4 gap-y-2 py-2! px-4!',
+            'Box-header ListToolbar',
             { 'rgh-sticky-list-toolbar sticky top-0 z-10 rounded-t-md': feature('sticky-conversation-list-toolbar') },
           ]}
         >
-          <div class="flex items-center gap-4 text-sm">
-            <Loading fallback={<span class="text-fg-muted">Loading…</span>}>
-              <a class={['flex items-center gap-1.5', state() === 'open' ? 'link-plain font-semibold' : 'link-muted']} href={stateHref('open')}>
-                <Octicon icon={feature('extend-conversation-status-filters') && state() === 'open' ? checkIcon : props.kind === 'pr' ? gitPullRequestIcon : issueOpenedIcon} />
+          <div class="flex items-center">
+            <Loading fallback={<span class="ListToolbar-state">Loading…</span>}>
+              <a class="ListToolbar-state" aria-current={state() === 'open' ? 'page' : undefined} href={hrefFor(withState(q(), 'open'))}>
                 Open <span class="Counter">{formatNumber(result().open)}</span>
               </a>
-              <a class={['flex items-center gap-1.5', state() === 'closed' ? 'link-plain font-semibold' : 'link-muted']} href={stateHref('closed')}>
-                <Octicon icon={feature('extend-conversation-status-filters') && state() === 'closed' ? checkIcon : props.kind === 'pr' ? checkIcon : issueClosedIcon} />
+              <a class="ListToolbar-state" aria-current={state() === 'closed' ? 'page' : undefined} href={hrefFor(withState(q(), 'closed'))}>
                 Closed <span class="Counter">{formatNumber(result().closed)}</span>
               </a>
-              <Show when={props.kind === 'pr' && feature('extend-conversation-status-filters')}>
-                <a
-                  class={['flex items-center gap-1.5 rgh-merged-filter', state() === 'merged' ? 'link-plain font-semibold' : 'link-muted']}
-                  href={state() === 'merged' ? hrefFor(withoutState(q())) : hrefFor(`${withoutState(q())} is:merged`.trim())}
-                >
-                  <Octicon icon={state() === 'merged' ? checkIcon : gitMergeIcon} />
-                  Merged
-                </a>
-              </Show>
             </Loading>
           </div>
           <div class="flex-1" />
           <div class="flex flex-wrap items-center gap-1">
-            <Show when={feature('open-all-conversations')}>
-              <Loading>
-                <Show when={result().items.length}>
-                  <button
-                    type="button"
-                    class={`${filterClass} rgh-open-all-conversations`}
-                    title="Open every item on this page in a new tab"
-                    onClick={openAll}
-                  >
-                    <Octicon icon={linkExternalIcon} /> Open all
-                  </button>
-                </Show>
-              </Loading>
-            </Show>
             <Show when={repoScoped()}>
               <SelectPanel
                 triggerClass={filterClass}
@@ -333,11 +300,11 @@ export default function IssueList(props: IssueListProps) {
             <SelectPanel
               triggerClass={filterClass}
               trigger={
-                <span class="inline-flex items-center gap-1">
+                <>
                   <Octicon icon={sortDescIcon} />
-                  {SORTS.find((s) => s.value === (qualifier(q(), 'sort') ?? 'created-desc'))?.label ?? 'Sort'}
+                  <span>{SORTS.find((s) => s.value === (qualifier(q(), 'sort') ?? 'created-desc'))?.label ?? 'Sort'}</span>
                   <Octicon icon={triangleDownIcon} />
-                </span>
+                </>
               }
               title="Sort by"
               align="right"

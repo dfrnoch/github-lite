@@ -38,5 +38,10 @@ export default defineConfig(({ mode }) => {
       target: 'esnext',
       assetsInlineLimit: 0,
     },
+    // The syntax-highlight worker (src/lib/highlight.worker.ts) lazy-loads
+    // Shiki grammars, so it must be an ES module worker to keep code splitting.
+    worker: {
+      format: 'es',
+    },
   };
 });

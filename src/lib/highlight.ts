@@ -1,183 +1,116 @@
-import type { HighlighterCore, ThemedToken } from 'shiki/core';
+import type { HighlightRequest, HighlightResponse } from './highlight.worker';
 
 /**
- * Syntax highlighting with Shiki, loaded lazily: the core, the JS regex
- * engine and each grammar are separate chunks fetched the first time a file
- * of that language is shown. Output is GitHub's light theme with the dark
- * theme's colors carried in --shiki-dark (switched by CSS in primer.css).
+ * Syntax highlighting with Shiki, off the main thread: requests go to a small
+ * pool of module workers (highlight.worker.ts) created on first use, so
+ * tokenizing big files and diffs never blocks scrolling or input. Results are
+ * cached (LRU by language + content), and identical in-flight requests are
+ * shared. Where workers are unavailable (tests, old browsers) the same code
+ * runs on the main thread (highlight-core.ts, loaded lazily).
  */
 
-const EXT_ALIASES: Record<string, string> = {
-  mjs: 'javascript',
-  cjs: 'javascript',
-  mts: 'typescript',
-  cts: 'typescript',
-  h: 'c',
-  hh: 'cpp',
-  hpp: 'cpp',
-  cc: 'cpp',
-  cxx: 'cpp',
-  yml: 'yaml',
-  md: 'markdown',
-  mdown: 'markdown',
-  rs: 'rust',
-  rb: 'ruby',
-  py: 'python',
-  pyi: 'python',
-  kt: 'kotlin',
-  kts: 'kotlin',
-  sh: 'shellscript',
-  bash: 'shellscript',
-  zsh: 'shellscript',
-  fish: 'fish',
-  ps1: 'powershell',
-  cs: 'csharp',
-  fs: 'fsharp',
-  ex: 'elixir',
-  exs: 'elixir',
-  erl: 'erlang',
-  hs: 'haskell',
-  ml: 'ocaml',
-  clj: 'clojure',
-  tf: 'terraform',
-  json5: 'json5',
-  jsonc: 'jsonc',
-  lock: 'json',
-  htm: 'html',
-  xhtml: 'html',
-  svg: 'xml',
-  plist: 'xml',
-  csproj: 'xml',
-  gradle: 'groovy',
-  m: 'objective-c',
-  mm: 'objective-cpp',
-  pl: 'perl',
-  pm: 'perl',
-  sol: 'solidity',
-  vue: 'vue',
-  svelte: 'svelte',
-  astro: 'astro',
-  graphql: 'graphql',
-  gql: 'graphql',
-  proto: 'proto',
-  dockerfile: 'docker',
-  tex: 'latex',
-  nix: 'nix',
-  zig: 'zig',
-  toml: 'toml',
-  ini: 'ini',
-  cfg: 'ini',
-  conf: 'ini',
-  env: 'dotenv',
-  diff: 'diff',
-  patch: 'diff',
-  sql: 'sql',
-  prisma: 'prisma',
-  glsl: 'glsl',
-  wgsl: 'wgsl',
-  hlsl: 'hlsl',
-  lua: 'lua',
-  dart: 'dart',
-  swift: 'swift',
-  go: 'go',
-  java: 'java',
-  scala: 'scala',
-  php: 'php',
-  r: 'r',
-  jl: 'julia',
-};
-
-const FILENAMES: Record<string, string> = {
-  dockerfile: 'docker',
-  makefile: 'make',
-  gnumakefile: 'make',
-  cmakelists: 'cmake',
-  'cmakelists.txt': 'cmake',
-  '.gitignore': 'ini',
-  '.editorconfig': 'ini',
-  '.npmrc': 'ini',
-  '.env': 'dotenv',
-  justfile: 'just',
-  gemfile: 'ruby',
-  rakefile: 'ruby',
-  'go.mod': 'go',
-};
-
-let highlighter: Promise<HighlighterCore> | undefined;
-let bundled: Promise<typeof import('shiki/langs')> | undefined;
-
-async function getHighlighter() {
-  highlighter ??= (async () => {
-    const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, light, dark] = await Promise.all([
-      import('shiki/core'),
-      import('shiki/engine/javascript'),
-      import('shiki/themes/github-light.mjs'),
-      import('shiki/themes/github-dark.mjs'),
-    ]);
-    return createHighlighterCore({
-      themes: [light.default, dark.default],
-      langs: [],
-      engine: createJavaScriptRegexEngine({ forgiving: true }),
-    });
-  })();
-  return highlighter;
-}
-
-/** Shiki language id for a file name, or undefined for plain text. */
-export async function languageFor(filename: string): Promise<string | undefined> {
-  bundled ??= import('shiki/langs');
-  const { bundledLanguages } = await bundled;
-  const base = filename.split('/').pop()!.toLowerCase();
-  if (FILENAMES[base]) return FILENAMES[base];
-  const ext = base.includes('.') ? base.split('.').pop()! : base;
-  const id = EXT_ALIASES[ext] ?? ext;
-  return id in bundledLanguages ? id : undefined;
-}
-
-const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-/** github-light's color for the `comment` scope (and only that scope). */
-const COMMENT_COLOR = '#6a737d';
-
-function tokenHtml(token: ThemedToken) {
-  const light = (token.htmlStyle?.color ?? token.color ?? '').toLowerCase();
-  const style = token.htmlStyle
-    ? Object.entries(token.htmlStyle)
-        .map(([k, v]) => `${k}:${v}`)
-        .join(';')
-    : token.color
-      ? `color:${token.color}`
-      : '';
-  // `pl-c` marks comments like github.com's own highlighter (used by linkify-code).
-  const cls = light === COMMENT_COLOR ? ' class="pl-c"' : '';
-  return style ? `<span${cls} style="${style}">${escapeHtml(token.content)}</span>` : escapeHtml(token.content);
-}
-
-/** Files bigger than this render as plain text (highlighting would stall the page). */
+/** Files bigger than this render as plain text. */
 const MAX_HIGHLIGHT = 400_000;
+
+// ---------------------------------------------------------------------------
+// Worker pool
+
+interface PoolWorker {
+  worker: Worker;
+  pending: Map<number, { req: HighlightRequest; resolve: (lines: string[] | null) => void }>;
+}
+
+let pool: PoolWorker[] | null | undefined;
+let nextId = 1;
+
+function createPool(): PoolWorker[] | null {
+  if (typeof Worker === 'undefined') return null;
+  const size = Math.max(1, Math.min(2, (navigator.hardwareConcurrency || 2) - 1));
+  try {
+    return Array.from({ length: size }, () => {
+      const pw: PoolWorker = {
+        worker: new Worker(new URL('./highlight.worker.ts', import.meta.url), { type: 'module', name: 'highlight' }),
+        pending: new Map(),
+      };
+      pw.worker.onmessage = (e: MessageEvent<HighlightResponse>) => {
+        const job = pw.pending.get(e.data.id);
+        pw.pending.delete(e.data.id);
+        job?.resolve(e.data.lines);
+      };
+      // A worker that fails to load disables the pool; its queue reruns on the main thread.
+      pw.worker.onerror = () => {
+        const jobs = [...pw.pending.values()];
+        pw.pending.clear();
+        disablePool();
+        for (const job of jobs) void mainThread(job.req).then(job.resolve);
+      };
+      return pw;
+    });
+  } catch {
+    return null;
+  }
+}
+
+function disablePool() {
+  for (const pw of pool ?? []) pw.worker.terminate();
+  pool = null;
+}
+
+async function mainThread(req: HighlightRequest) {
+  const { highlightCode } = await import('./highlight-core');
+  return highlightCode(req.code, req.filename, req.lang).catch(() => null);
+}
+
+function run(req: HighlightRequest): Promise<string[] | null> {
+  if (pool === undefined) pool = createPool();
+  if (!pool) return mainThread(req);
+  // Least busy worker first.
+  const pw = pool.reduce((a, b) => (b.pending.size < a.pending.size ? b : a));
+  return new Promise((resolve) => {
+    pw.pending.set(req.id, { req, resolve });
+    pw.worker.postMessage(req);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Cache: same file content (e.g. revisiting a diff, toggling split view) is
+// highlighted once. Keyed by language hint + content; bounded by total size.
+
+const CACHE_CHARS = 8_000_000;
+const cache = new Map<string, Promise<string[] | null>>();
+let cachedChars = 0;
+
+function remember(key: string, value: Promise<string[] | null>) {
+  cache.set(key, value);
+  cachedChars += key.length;
+  for (const k of cache.keys()) {
+    if (cachedChars <= CACHE_CHARS || k === key) break;
+    cache.delete(k);
+    cachedChars -= k.length;
+  }
+}
 
 /**
  * Highlight `code` and return one HTML string per line, or null when the
  * language is unknown / the file is too large (callers render plain text).
  */
-export async function highlightLines(code: string, filename: string, lang?: string): Promise<string[] | null> {
-  if (code.length > MAX_HIGHLIGHT) return null;
-  const id = lang ?? (await languageFor(filename));
-  if (!id) return null;
-  const hl = await getHighlighter();
-  if (!hl.getLoadedLanguages().includes(id)) {
-    const { bundledLanguages } = await bundled!;
-    const loader = bundledLanguages[id as keyof typeof bundledLanguages];
-    if (!loader) return null;
-    await hl.loadLanguage((await loader()).default);
+export function highlightLines(code: string, filename: string, lang?: string): Promise<string[] | null> {
+  if (code.length > MAX_HIGHLIGHT) return Promise.resolve(null);
+  const base = filename.split('/').pop()!.toLowerCase();
+  const key = `${lang ?? base}\0${code}`;
+  const hit = cache.get(key);
+  if (hit) {
+    // LRU: move to the end.
+    cache.delete(key);
+    cache.set(key, hit);
+    return hit;
   }
-  const { tokens } = hl.codeToTokens(code, {
-    lang: id,
-    themes: { light: 'github-light', dark: 'github-dark' },
-    defaultColor: 'light',
-  });
-  return tokens.map((line) => line.map(tokenHtml).join(''));
+  const result = run({ id: nextId++, code, filename, lang });
+  remember(key, result);
+  return result;
 }
+
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function escapeLines(code: string) {
   return code.split('\n').map(escapeHtml);

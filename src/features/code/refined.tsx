@@ -86,11 +86,17 @@ export function codeTransformOptions(base: string) {
   };
 }
 
+/** The tab width code is shown with: `tab-size`'s setting, or GitHub's default of 8 (reactive). */
+export function tabSize(): number {
+  if (!feature('tab-size')) return 8;
+  const n = Number(featureOption<number>('tab-size', 'size')) || 4;
+  return Math.min(16, Math.max(1, n));
+}
+
 /** `tab-size`: inline style for code containers (GitHub's default is 8). */
 export function tabSizeStyle(): JSX.CSSProperties | undefined {
   if (!feature('tab-size')) return undefined;
-  const n = Number(featureOption<number>('tab-size', 'size')) || 4;
-  return { '--tab-size': String(Math.min(16, Math.max(1, n))) };
+  return { '--tab-size': String(tabSize()) };
 }
 
 // ---------------------------------------------------------------------------

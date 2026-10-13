@@ -5,6 +5,7 @@ import { userReposHref } from '../../features/profile/links';
 import { feature } from '../../features/refined';
 import { RepoHeaderAvatar, RepoHeaderInfo } from '../../features/repo/refined/HeaderInfo';
 import { getTopRepos, getUnreadNotifications, getViewer } from '../../features/user/api';
+import { PinnedNav } from '../../features/user/components/PinnedRepos';
 import {
   arrowUpRightIcon,
   bookIcon,
@@ -87,9 +88,10 @@ export default function AppHeader() {
             <Match when={ctx().kind === 'repo' && (ctx() as { owner: string; repo: string })}>
               {(c) => (
                 <>
-                  <RepoHeaderAvatar owner={c().owner} repo={c().repo} />
-                  <a class="AppHeader-context-item truncate" href={`/${c().owner}`}>
-                    {c().owner}
+                  {/* The owner crumb includes its avatar, so the hover highlight covers both (like github.com). */}
+                  <a class="AppHeader-context-item inline-flex! items-center gap-2 min-w-0" href={`/${c().owner}`}>
+                    <RepoHeaderAvatar owner={c().owner} repo={c().repo} />
+                    <span class="truncate">{c().owner}</span>
                   </a>
                   <span class="text-fg-muted px-0.5">/</span>
                   <a class="AppHeader-context-item font-semibold truncate" href={`/${c().owner}/${c().repo}`}>
@@ -193,6 +195,7 @@ export default function AppHeader() {
           </li>
         </ul>
         <hr class="NavList-divider" />
+        <PinnedNav />
         <div class="NavList-heading">Repositories</div>
         <Loading fallback={<div class="px-2 text-fg-muted text-sm">Loading…</div>}>
           <TopRepos />

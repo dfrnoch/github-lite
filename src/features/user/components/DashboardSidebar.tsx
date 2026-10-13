@@ -4,13 +4,14 @@ import { Avatar, RelativeTime, StateIcon, itemState } from '../../../components/
 import { repoIcon } from '../../../icons/octicons';
 import { getTopRepos } from '../api';
 import { getRecentActivity } from '../feed';
+import { PinIconButton, PinnedSection } from './PinnedRepos';
 
 const COLLAPSED = 7;
 
-/** Left column of the dashboard: "Top repositories" (filterable) and "Recent activity". */
-export default function DashboardSidebar(props: { login: string }) {
+/** Left column of the dashboard: "Pinned", "Top repositories" (filterable) and "Recent activity". */
+export default function DashboardSidebar() {
   const repos = createMemo(() => getTopRepos(100));
-  const recent = createMemo(() => getRecentActivity(props.login));
+  const recent = createMemo(() => getRecentActivity(), { name: 'recentActivity' });
   const [filter, setFilter] = createSignal('');
   const [expanded, setExpanded] = createSignal(false);
   const matches = createMemo(() => {
@@ -21,6 +22,7 @@ export default function DashboardSidebar(props: { login: string }) {
 
   return (
     <div class="flex flex-col gap-8">
+      <PinnedSection />
       <section>
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-sm font-semibold">Top repositories</h2>
@@ -54,13 +56,15 @@ export default function DashboardSidebar(props: { login: string }) {
           <ul>
             <For each={visible()} fallback={<li class="text-xs text-fg-muted py-2">No repositories match.</li>}>
               {(repo) => (
-                <li class="flex items-center gap-2 py-1.5 min-w-0">
+                <li class="group flex items-center gap-2 py-1 min-w-0">
                   <a href={`/${repo.owner.login}`} class="shrink-0">
                     <Avatar src={repo.owner.avatar_url} size={16} square={repo.owner.type === 'Organization'} />
                   </a>
                   <a class="link-plain font-semibold text-sm truncate" href={`/${repo.full_name}`}>
                     {repo.full_name}
                   </a>
+                  <span class="flex-1" />
+                  <PinIconButton name={repo.full_name} class="w-6! h-6! shrink-0" revealOnHover />
                 </li>
               )}
             </For>

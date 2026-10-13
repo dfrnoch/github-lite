@@ -13,6 +13,7 @@ import {
 } from '../../../icons/octicons';
 import { compactNumber } from '../../../lib/format';
 import type { Repository } from '../../../lib/types';
+import { PinButton } from '../../user/components/PinnedRepos';
 import { getRepoViewerState, setRepoSubscription, starRepo } from '../api';
 import { DeleteForkButton } from '../refined/ForkTools';
 import GithubIoLink from '../refined/GithubIoLink';
@@ -44,6 +45,7 @@ export default function RepoTitle(props: { repo: Repository }) {
       <div class="flex-1" />
       <div class="flex flex-wrap gap-2">
         <DeleteForkButton repo={props.repo} />
+        <PinButton name={props.repo.full_name} />
         <Loading
           fallback={
             <>

@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
 import ChecksStatus, { RollupGlyph } from '../../../components/checks/ChecksStatus';
-import { Avatar, CopyButton, RelativeTime, VerifiedBadge } from '../../../components/ui';
+import { AvatarStack, CopyButton, RelativeTime, VerifiedBadge } from '../../../components/ui';
 import { codeIcon, ellipsisIcon, gitCommitIcon, gitMergeIcon, tagIcon } from '../../../icons/octicons';
 import { encodePath } from '../../../lib/github';
 import { feature } from '../../refined';
@@ -120,9 +120,7 @@ export function CommitAuthors(props: {
   );
   return (
     <span class="inline-flex items-center gap-1.5 flex-wrap min-w-0">
-      <span class="AvatarStack shrink-0">
-        <For each={authors().slice(0, 3)}>{(a) => <Avatar src={a.avatarUrl} size={props.size ?? 16} login={a.user?.login} hovercard />}</For>
-      </span>
+      <AvatarStack avatars={authors().map((a) => ({ src: a.avatarUrl, login: a.user?.login }))} size={props.size ?? 16} />
       <Switch>
         <Match when={props.commit.authorCount > 2}>
           <span class={props.strong ? 'font-semibold text-fg' : 'text-fg'}>{props.commit.authorCount} people</span>

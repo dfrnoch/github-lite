@@ -9,9 +9,7 @@ import {
   chevronDownIcon,
   chevronRightIcon,
   foldDownIcon,
-  foldUpIcon,
   kebabHorizontalIcon,
-  plusIcon,
   sidebarCollapseIcon,
   sidebarExpandIcon,
   unfoldIcon,
@@ -19,20 +17,34 @@ import {
 import { formatNumber } from '../../lib/format';
 import { useHotkey } from '../../lib/hotkeys';
 import type { DiffFile } from '../../lib/types';
-import { codeTransformOptions, tabSizeStyle, transformCodeLine } from '../code/refined';
+import { codeTransformOptions, tabSize, tabSizeStyle, transformCodeLine } from '../code/refined';
 import { feature } from '../refined';
 import DiffFileTree, { FileStatusIcon } from './DiffFileTree';
-import { highlightDiff, plainDiffHtml } from './highlight';
+import { highlightDiff, plainLineHtml } from './highlight';
 import {
   diffAnchor,
   diffstatBlocks,
-  escapeHtml,
   ignoreWhitespaceChanges,
   parsePatch,
   toSplitRows,
   type DiffLine,
   type Side,
+  type SplitRow,
 } from './parse';
+import {
+  CHUNK_ROWS,
+  commentButton,
+  displayWidth,
+  lineSpan,
+  ROW_HEIGHT,
+  splitRowHtml,
+  splitRowSlots,
+  unifiedRowHtml,
+  unifiedRowSlots,
+  type RowRenderContext,
+  type Selection,
+} from './rows';
+import { watchViewport } from './viewport';
 
 export type { Side } from './parse';
 
@@ -78,7 +90,7 @@ function readViewed(key: string | undefined): Record<string, boolean> {
 /** Patches longer than this start collapsed behind "Load diff". */
 const LARGE_FILE_LINES = 400;
 /** After this many rendered lines in one diff, the remaining files start collapsed. */
-const TOTAL_LINES_BUDGET = 8000;
+const TOTAL_LINES_BUDGET = 20000;
 
 export interface DiffViewProps {
   files: DiffFile[];
@@ -353,6 +365,30 @@ export function Diffstat(props: { additions: number; deletions: number; showCoun
 
 const END = -1;
 
+/**
+ * A run of rows [start, end) rendered as one lazily mounted `<tbody>`, or
+ * (with `side` + `line`) the review-comment slot under a line.
+ */
+interface Segment {
+  id: string;
+  start: number;
+  end: number;
+  side?: Side;
+  line?: number;
+}
+
+const sameSelection = (a: Selection | null, b: Selection | null) =>
+  a === b || (!!a && !!b && a.side === b.side && a.start === b.start && a.end === b.end);
+
+/**
+ * One file of a diff. The body is a single table whose rows are rendered in
+ * chunks (`<tbody>` per {@link CHUNK_ROWS} rows) from HTML strings: a chunk
+ * mounts when it nears the viewport and turns back into a fixed-height
+ * placeholder once it is far away, so DOM size stays flat however long the
+ * diff is. Review-comment slots are reactive `<tbody>`s between chunks.
+ * Syntax highlighting runs in a worker (see lib/highlight.ts) once the file is
+ * first seen; chunks show escaped text until it arrives.
+ */
 function DiffFileView(props: {
   file: DiffFile;
   anchor: string;
@@ -378,19 +414,21 @@ function DiffFileView(props: {
   const [loaded, setLoaded] = createSignal(() => props.startLoaded);
   const [seen, setSeen] = createSignal(false);
   const visible = () => seen() || props.forceVisible;
+
+  // ---- code HTML: highlighted (once the worker answers) or escaped, then the refined transforms
   /** Highlighted HTML for a specific `lines()` array (stale once whitespace mode re-parses). */
   const [hl, setHl] = createSignal<{ lines: DiffLine[]; html: string[] } | null>(null);
-  const plain = createMemo(() => plainDiffHtml(lines()));
-  const transforms = createMemo(() => codeTransformOptions(props.repoBase));
-  const htmlMap = createMemo(() => {
+  const highlighted = createMemo(() => {
     const h = hl();
-    const arr = h && h.lines === lines() ? h.html : plain();
-    const opts = transforms();
-    const map = new Map<DiffLine, string>();
-    lines().forEach((l, i) => map.set(l, transformCodeLine(arr[i] ?? '', opts)));
-    return map;
+    return h && h.lines === lines() ? h.html : null;
   });
-  const htmlOf = (line: DiffLine) => htmlMap().get(line) ?? escapeHtml(line.text);
+  const lineIndex = createMemo(() => new Map(lines().map((l, i) => [l, i] as const)));
+  const transforms = createMemo(() => codeTransformOptions(props.repoBase));
+  const htmlOf = (line: DiffLine) => {
+    const i = lineIndex().get(line);
+    const arr = highlighted();
+    return transformCodeLine((i != null && arr?.[i]) || plainLineHtml(line), transforms());
+  };
   const showBody = () => !collapsed() && loaded() && visible();
 
   // Highlight once the file is on screen (keeps huge diffs cheap).
@@ -443,9 +481,12 @@ function DiffFileView(props: {
   });
   const splitRows = createMemo(() => (props.split ? toSplitRows(rows()) : []));
   const canExpandEnd = () => expandable() && !expanded().has(END);
+  const canExpandHunk = (hunk: DiffLine) => expandable() && !!hunk.hunk && hunk.hunk.newStart > 1;
+  /** extend-diff-expander: the whole hunk row expands, not just the small button. */
+  const wideExpand = (hunk: DiffLine) => feature('extend-diff-expander') && canExpandHunk(hunk);
 
   // ---- line selection (#diff-…R12 / shift-click ranges)
-  const [selection, setSelection] = createSignal<{ side: Side; start: number; end: number } | null>(null);
+  const [selection, setSelection] = createSignal<Selection | null>(null);
   const selectLine = (side: Side, n: number, shift: boolean) => {
     const cur = selection();
     const next =
@@ -464,33 +505,160 @@ function DiffFileView(props: {
       setSelection({ side: m[1] === 'L' ? 'LEFT' : 'RIGHT', start: Number(m[2]), end: Number(m[3] ?? m[2]) });
     }
   });
-  const isSelected = (side: Side, n: number | undefined) => {
-    const s = selection();
-    return !!s && n != null && s.side === side && n >= s.start && n <= s.end;
-  };
   const comment = (side: Side, n: number) => {
     const s = selection();
     const range = s && s.side === side && s.end === n && s.start < n ? s.start : undefined;
     props.onAddComment?.({ path: path(), side, line: n, startLine: range, startSide: range ? side : undefined });
   };
-  const hasExtras = (side: Side, n: number | undefined) => n != null && !!props.extraKeys?.has(lineKey(path(), side, n));
 
-  // ---- lazy rendering: only build rows once the file scrolls near the viewport
-  let box!: HTMLDivElement;
-  onSettled(() => {
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setSeen(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: '1500px 0px' },
-    );
-    io.observe(box);
-    return () => io.disconnect();
+  // ---- segments: row chunks, split around the lines that carry review-comment slots
+  /** This file's slots from `extraKeys`, as "SIDE:line" (a string so unrelated files' changes compare equal). */
+  const slotKeys = createMemo(() => {
+    if (!props.renderExtras || !props.extraKeys?.size) return '';
+    const prefix = `${path()}:`;
+    const out: string[] = [];
+    for (const k of props.extraKeys) if (k.startsWith(prefix)) out.push(k.slice(prefix.length));
+    return out.sort().join('\n');
   });
-  const estimate = () => Math.max(lines().length, 3) * 20;
+  const segments = createMemo(() => {
+    const split = props.split;
+    const list: (DiffLine | SplitRow)[] = split ? splitRows() : rows();
+    const keys = new Set(slotKeys() ? slotKeys().split('\n') : []);
+    const out: Segment[] = [];
+    const mode = split ? 's' : 'u';
+    let start = 0;
+    for (let i = 0; i < list.length; i++) {
+      const slots = keys.size
+        ? (split ? splitRowSlots(list[i] as SplitRow) : unifiedRowSlots(list[i] as DiffLine)).filter(([side, n]) => keys.has(`${side}:${n}`))
+        : [];
+      // Chunk boundaries sit on multiples of CHUNK_ROWS, so a new slot only splits its own chunk.
+      if (slots.length || (i + 1) % CHUNK_ROWS === 0 || i === list.length - 1) {
+        out.push({ id: `${mode}${start}-${i + 1}`, start, end: i + 1 });
+        start = i + 1;
+        for (const [side, line] of slots) out.push({ id: `x${side}${line}`, start, end: start, side, line });
+      }
+    }
+    return out;
+  });
+
+  /** The unified table sizes its columns to the widest row; keep that row's text in a collapsed sizer row so unmounted chunks don't change the width. */
+  const widest = createMemo(() => {
+    if (props.split) return null;
+    const tab = tabSize();
+    let best: DiffLine | null = null;
+    let bestWidth = -1;
+    for (const l of rows()) {
+      // Hunk headers have no marker column; "no newline" adds a glyph.
+      const w = displayWidth(l.text, tab) - (l.type === 'hunk' ? 2 : 0) + (l.noNewline ? 2 : 0);
+      if (w > bestWidth) {
+        best = l;
+        bestWidth = w;
+      }
+    }
+    return best;
+  });
+
+  const Chunk = (p: { start: number; end: number }) => {
+    const [mounted, setMounted] = createSignal(false);
+    let measured = 0;
+    let el!: HTMLTableSectionElement;
+    onSettled(() =>
+      watchViewport(el, {
+        near: () => {
+          setSeen(true);
+          setMounted(true);
+        },
+        far: (height) => {
+          if (!mounted()) return;
+          measured = height;
+          setMounted(false);
+        },
+      }),
+    );
+    /** The selection, only while it touches this chunk (others don't re-render on clicks). */
+    const span = createMemo(() =>
+      lineSpan(
+        props.split
+          ? splitRows()
+              .slice(p.start, p.end)
+              .flatMap((r) => (r.kind === 'pair' ? [r.left, r.right] : []))
+          : rows().slice(p.start, p.end),
+      ),
+    );
+    const sel = createMemo(
+      () => {
+        const s = selection();
+        if (!s) return null;
+        const [a, b] = span()[s.side];
+        return s.end >= a && s.start <= b ? s : null;
+      },
+      { equals: sameSelection },
+    );
+    const html = () => {
+      const ctx: RowRenderContext = {
+        html: htmlOf,
+        selection: sel(),
+        commentable: !!props.onAddComment,
+        canExpand: canExpandHunk,
+        wideExpand,
+      };
+      let out = '';
+      if (props.split) {
+        const list = splitRows();
+        for (let i = p.start; i < p.end && i < list.length; i++) out += splitRowHtml(list[i]!, ctx);
+      } else {
+        const list = rows();
+        for (let i = p.start; i < p.end && i < list.length; i++) out += unifiedRowHtml(list[i]!, ctx);
+      }
+      return out;
+    };
+    const placeholder = () =>
+      `<tr><td colspan="${props.split ? 4 : 3}" class="p-0" style="height:${measured || (p.end - p.start) * ROW_HEIGHT}px"></td></tr>`;
+    // oxlint-disable-next-line solid/no-innerhtml -- rows built from escaped / highlighted source (rows.ts)
+    return <tbody ref={el} data-chunk="" innerHTML={mounted() ? html() : placeholder()} />;
+  };
+
+  const ExtrasBody = (p: { side: Side; line: number }) => (
+    <tbody>
+      <tr>
+        <td colspan={props.split ? 4 : 3} class="border-y border-line-muted bg-canvas p-0 whitespace-normal font-sans">
+          {props.renderExtras?.(path(), p.side, p.line)}
+        </td>
+      </tr>
+    </tbody>
+  );
+
+  /** Clicks inside row chunks, by delegation: line numbers select, "+" comments, hunk rows expand. */
+  const onBodyClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('tbody[data-chunk]')) return;
+    const button = target.closest('button');
+    if (button) {
+      const cell = button.parentElement;
+      if (button === plus && cell?.dataset.comment) {
+        const [side, n] = cell.dataset.comment.split(':');
+        comment(side as Side, Number(n));
+      } else if (button.dataset.expand != null) void expand(Number(button.dataset.expand));
+      return;
+    }
+    const num = target.closest<HTMLElement>('td.blob-num[data-line-number]');
+    if (num) {
+      selectLine(num.dataset.side as Side, Number(num.dataset.lineNumber), e.shiftKey);
+      return;
+    }
+    const hunkRow = target.closest<HTMLElement>('tr.rgh-extend-diff-expander[data-hunk]');
+    if (hunkRow) void expand(Number(hunkRow.dataset.hunk));
+  };
+
+  /** The "+" button, moved into whichever commentable code cell the pointer is over. */
+  let plus: HTMLButtonElement | undefined;
+  const onBodyOver = (e: MouseEvent) => {
+    if (!props.onAddComment) return;
+    const cell = (e.target as HTMLElement).closest<HTMLElement>('td[data-comment]');
+    if (!cell || plus?.parentElement === cell) return;
+    plus ??= commentButton();
+    cell.prepend(plus);
+  };
 
   const notice = () => {
     const f = props.file;
@@ -500,98 +668,38 @@ function DiffFileView(props: {
     return 'Large diffs are not rendered by default.';
   };
 
-  const NumCell = (p: { n?: number; side: Side; kind: 'add' | 'del' | 'ctx' | 'empty' }) => (
-    <td
-      class={[
-        'blob-num',
-        {
-          'blob-num-addition': p.kind === 'add',
-          'blob-num-deletion': p.kind === 'del',
-          'bg-canvas-muted cursor-default!': p.kind === 'empty',
-          'highlighted-line': isSelected(p.side, p.n),
-        },
-      ]}
-      data-line-number={p.n}
-      onClick={(e) => p.n != null && selectLine(p.side, p.n, e.shiftKey)}
-    />
-  );
-
-  const CodeCell = (p: { line?: DiffLine; side: Side; n?: number; wrap: boolean }) => (
-    <td
-      class={[
-        'blob-code',
-        {
-          'blob-code-addition': p.line?.type === 'add',
-          'blob-code-deletion': p.line?.type === 'del',
-          'bg-canvas-muted': !p.line,
-          'highlighted-line': isSelected(p.side, p.n),
-          'whitespace-pre-wrap! break-all': p.wrap,
-        },
-      ]}
-    >
-      <Show when={p.line}>
-        {(line) => (
-          <>
-            <Show when={props.onAddComment && p.n != null}>
-              <button
-                type="button"
-                class="absolute -left-2.5 top-0.5 z-1 w-5 h-4 rounded-md bg-accent-emphasis text-fg-on-emphasis items-center justify-center hidden group-hover:flex"
-                aria-label="Add a comment on this line"
-                onClick={() => comment(p.side, p.n!)}
-              >
-                <Octicon icon={plusIcon} size={12} />
-              </button>
-            </Show>
-            <span
-              class="blob-code-marker"
-              data-code-marker={line().type === 'add' ? '+' : line().type === 'del' ? '-' : ' '}
-            />
-            {/* oxlint-disable-next-line solid/no-innerhtml -- escaped / highlighted source */}
-            <span class="blob-code-inner shiki" innerHTML={htmlOf(line())} />
-            <Show when={line().noNewline}>
-              <span class="ml-2 text-fg-danger" title="No newline at end of file">
-                ⊖
-              </span>
-            </Show>
-          </>
-        )}
-      </Show>
-    </td>
-  );
-
-  const canExpandHunk = (hunk: DiffLine) => expandable() && !!hunk.hunk && hunk.hunk.newStart > 1;
-  /** extend-diff-expander: the whole hunk row expands, not just the small button. */
-  const wideExpand = (hunk: DiffLine) => feature('extend-diff-expander') && canExpandHunk(hunk);
-  const onHunkRowClick = (e: MouseEvent, hunk: DiffLine) => {
-    if (!wideExpand(hunk) || (e.target as HTMLElement).closest('button')) return;
-    void expand(hunk.hunkIndex);
-  };
-  const ExpandButton = (p: { hunk: DiffLine }) => (
-    <Show when={canExpandHunk(p.hunk)}>
-      <button
-        type="button"
-        class="w-full h-5 flex items-center justify-center text-fg-muted hover:text-fg-on-emphasis hover:bg-accent-emphasis"
-        aria-label="Expand hidden lines"
-        title="Expand hidden lines"
-        onClick={() => void expand(p.hunk.hunkIndex)}
-      >
-        <Octicon icon={p.hunk.hunkIndex === 0 ? foldUpIcon : unfoldIcon} />
-      </button>
+  const ExpandEndRow = () => (
+    <Show when={canExpandEnd()}>
+      <tbody>
+        <tr>
+          <td colspan={props.split ? 1 : 2} class="blob-num blob-num-hunk p-0! cursor-default!">
+            <button
+              type="button"
+              class="w-full h-5 flex items-center justify-center text-fg-muted hover:text-fg-on-emphasis hover:bg-accent-emphasis"
+              aria-label="Expand below"
+              onClick={() => void expand(END)}
+            >
+              <Octicon icon={foldDownIcon} />
+            </button>
+          </td>
+          <td colspan={props.split ? 3 : 1} class="blob-code blob-code-hunk" />
+        </tr>
+      </tbody>
     </Show>
   );
 
-  const ExtrasRow = (p: { side: Side; n?: number; cols: number }) => (
-    <Show when={hasExtras(p.side, p.n) && props.renderExtras}>
-      <tr>
-        <td colspan={p.cols} class="border-y border-line-muted bg-canvas p-0 whitespace-normal font-sans">
-          {props.renderExtras!(path(), p.side, p.n!)}
-        </td>
-      </tr>
-    </Show>
+  const Segments = () => (
+    <For each={segments()} keyed={(s) => s.id}>
+      {(seg) => (
+        <Show when={seg().side} fallback={<Chunk start={seg().start} end={seg().end} />}>
+          {(side) => <ExtrasBody side={side()} line={seg().line ?? 0} />}
+        </Show>
+      )}
+    </For>
   );
 
   return (
-    <div ref={box} id={props.anchor} class="Box mb-4 scroll-mt-2" data-path={path()}>
+    <div id={props.anchor} class="Box mb-4 scroll-mt-2" data-path={path()}>
       <div
         class={[
           'Box-header sticky top-0 z-2 flex items-center gap-2 py-1.5! px-2! text-sm',
@@ -721,131 +829,44 @@ function DiffFileView(props: {
               </div>
             }
           >
-            <Show when={visible()} fallback={<div style={{ height: `${estimate()}px` }} />}>
-              <div class={props.split ? '' : 'overflow-x-auto'}>
-                <Show
-                  when={props.split}
-                  fallback={
-                    <table class="diff-table table-auto! min-w-full w-max" style={{ 'border-spacing': 0 }}>
-                      <tbody>
-                        <For each={rows()}>
-                          {(line) =>
-                            line.type === 'hunk' ? (
-                              <tr class={{ 'rgh-extend-diff-expander': wideExpand(line) }} onClick={(e) => onHunkRowClick(e, line)}>
-                                <td colspan={2} class="blob-num blob-num-hunk p-0! cursor-default!">
-                                  <ExpandButton hunk={line} />
-                                </td>
-                                <td class="blob-code blob-code-hunk">{line.text}</td>
-                              </tr>
-                            ) : (
-                              <>
-                                <tr class="group">
-                                  <NumCell n={line.oldNo} side="LEFT" kind={line.type} />
-                                  <NumCell n={line.newNo} side={line.type === 'del' ? 'LEFT' : 'RIGHT'} kind={line.type} />
-                                  <CodeCell
-                                    line={line}
-                                    side={line.type === 'del' ? 'LEFT' : 'RIGHT'}
-                                    n={line.type === 'del' ? line.oldNo : line.newNo}
-                                    wrap={false}
-                                  />
-                                </tr>
-                                <Show when={line.type !== 'add'}>
-                                  <ExtrasRow side="LEFT" n={line.oldNo} cols={3} />
-                                </Show>
-                                <Show when={line.type !== 'del'}>
-                                  <ExtrasRow side="RIGHT" n={line.newNo} cols={3} />
-                                </Show>
-                              </>
-                            )
-                          }
-                        </For>
-                        <Show when={canExpandEnd()}>
-                          <tr>
-                            <td colspan={2} class="blob-num blob-num-hunk p-0! cursor-default!">
-                              <button
-                                type="button"
-                                class="w-full h-5 flex items-center justify-center text-fg-muted hover:text-fg-on-emphasis hover:bg-accent-emphasis"
-                                aria-label="Expand below"
-                                onClick={() => void expand(END)}
-                              >
-                                <Octicon icon={foldDownIcon} />
-                              </button>
-                            </td>
-                            <td class="blob-code blob-code-hunk" />
-                          </tr>
-                        </Show>
-                      </tbody>
-                    </table>
-                  }
-                >
-                  <table class="diff-table" style={{ 'border-spacing': 0 }}>
-                    {/* Fixed layout sizes columns from the first row, so give it one cell per column. */}
-                    <thead>
-                      <tr class="h-0">
-                        <th class="w-[50px] p-0" />
-                        <th class="p-0" />
-                        <th class="w-[50px] p-0" />
-                        <th class="p-0" />
+            <div class={props.split ? '' : 'overflow-x-auto'}>
+              <Show
+                when={props.split}
+                fallback={
+                  <table class="diff-table table-auto! min-w-full w-max" style={{ 'border-spacing': 0 }} onClick={onBodyClick} onMouseOver={onBodyOver}>
+                    <tbody aria-hidden="true">
+                      <tr style={{ visibility: 'collapse' }}>
+                        <td class="blob-num" />
+                        <td class="blob-num" />
+                        <td class="blob-code">
+                          <span class="blob-code-marker" data-code-marker=" " />
+                          <span class="blob-code-inner">{widest()?.text}</span>
+                          <Show when={widest()?.noNewline}>
+                            <span class="ml-2">⊖</span>
+                          </Show>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      <For each={splitRows()}>
-                        {(row) =>
-                          row.kind === 'hunk' ? (
-                            <tr class={{ 'rgh-extend-diff-expander': wideExpand(row.line) }} onClick={(e) => onHunkRowClick(e, row.line)}>
-                              <td class="blob-num blob-num-hunk p-0! cursor-default!">
-                                <ExpandButton hunk={row.line} />
-                              </td>
-                              <td colspan={3} class="blob-code blob-code-hunk">
-                                {row.line.text}
-                              </td>
-                            </tr>
-                          ) : (
-                            <>
-                              <tr class="group">
-                                <NumCell
-                                  n={row.left?.oldNo}
-                                  side="LEFT"
-                                  kind={row.left ? (row.left.type === 'del' ? 'del' : 'ctx') : 'empty'}
-                                />
-                                <CodeCell line={row.left} side="LEFT" n={row.left?.oldNo} wrap />
-                                <NumCell
-                                  n={row.right?.newNo}
-                                  side="RIGHT"
-                                  kind={row.right ? (row.right.type === 'add' ? 'add' : 'ctx') : 'empty'}
-                                />
-                                <CodeCell line={row.right} side="RIGHT" n={row.right?.newNo} wrap />
-                              </tr>
-                              <Show when={row.left && row.left.type === 'del'}>
-                                <ExtrasRow side="LEFT" n={row.left?.oldNo} cols={4} />
-                              </Show>
-                              <Show when={row.right}>
-                                <ExtrasRow side="RIGHT" n={row.right?.newNo} cols={4} />
-                              </Show>
-                            </>
-                          )
-                        }
-                      </For>
-                      <Show when={canExpandEnd()}>
-                        <tr>
-                          <td class="blob-num blob-num-hunk p-0! cursor-default!">
-                            <button
-                              type="button"
-                              class="w-full h-5 flex items-center justify-center text-fg-muted hover:text-fg-on-emphasis hover:bg-accent-emphasis"
-                              aria-label="Expand below"
-                              onClick={() => void expand(END)}
-                            >
-                              <Octicon icon={foldDownIcon} />
-                            </button>
-                          </td>
-                          <td colspan={3} class="blob-code blob-code-hunk" />
-                        </tr>
-                      </Show>
                     </tbody>
+                    <Segments />
+                    <ExpandEndRow />
                   </table>
-                </Show>
-              </div>
-            </Show>
+                }
+              >
+                <table class="diff-table" style={{ 'border-spacing': 0 }} onClick={onBodyClick} onMouseOver={onBodyOver}>
+                  {/* Fixed layout sizes columns from the first row, so give it one cell per column. */}
+                  <thead>
+                    <tr class="h-0">
+                      <th class="w-[50px] p-0" />
+                      <th class="p-0" />
+                      <th class="w-[50px] p-0" />
+                      <th class="p-0" />
+                    </tr>
+                  </thead>
+                  <Segments />
+                  <ExpandEndRow />
+                </table>
+              </Show>
+            </div>
           </Show>
         </Show>
       </Show>

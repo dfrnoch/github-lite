@@ -1,30 +1,22 @@
 import { useAction } from '@solidjs/router';
-import type { JSX } from '@solidjs/web';
 import { createMemo, createSignal, For, Loading, Match, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, Dropdown, Spinner, toast, toastError } from '../../../components/ui';
+import { Avatar, Dropdown, toast, toastError } from '../../../components/ui';
 import PrBaseCommit from '../../code/components/PrBaseCommit';
 import { feature, featureOption } from '../../refined';
 import { avoidAccidentalSubmissions, fitTextarea, monospaceField, oneKeyFormatting, tabToIndent } from '../../refined/editor';
 import { useRepo } from '../../repo/context';
-import type { OcticonData } from '../../../icons/octicons';
 import {
-  alertFillIcon,
-  checkCircleFillIcon,
+  alertIcon,
   checkIcon,
-  copilotIcon,
-  dotFillIcon,
   gitBranchIcon,
   gitMergeIcon,
   gitPullRequestClosedIcon,
   gitPullRequestDraftIcon,
-  skipIcon,
   triangleDownIcon,
-  xCircleFillIcon,
   xIcon,
 } from '../../../icons/octicons';
-import { toAppUrl } from '../../../lib/markdown';
-import type { CheckContext, MergeMethod, PullDetail, PullRepoMeta } from '../../issues/types';
+import type { MergeMethod, PullDetail, PullRepoMeta } from '../../issues/types';
 import { canPush } from '../../issues/types';
 import {
   countPullsBasedOn,
@@ -40,64 +32,12 @@ import {
   updatePullBranchWith,
 } from '../api';
 import { cleanCommitMessage, cleanPrCommitTitle, DEFAULT_BRANCH_EXCEPTIONS, defaultSquashMessage, matchesBranchPattern } from '../refined';
+import CommandLineInstructions from './CommandLineInstructions';
+import MergeChecks, { checkOutcome } from './MergeChecks';
+import MergeConflicts from './MergeConflicts';
+import MergeReviews from './MergeReviews';
+import { MergeSection, StatusCircle, TONE_BG, type Tone } from './MergeSection';
 
-const FAIL = ['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'];
-const NEUTRAL = ['CANCELLED', 'SKIPPED', 'NEUTRAL', 'STALE'];
-
-/** success | failure | neutral | pending for a check run or commit status. */
-export function checkOutcome(c: CheckContext): 'success' | 'failure' | 'neutral' | 'pending' {
-  if (c.__typename === 'StatusContext') {
-    if (c.state === 'SUCCESS') return 'success';
-    if (c.state === 'FAILURE' || c.state === 'ERROR') return 'failure';
-    return 'pending';
-  }
-  if (c.status !== 'COMPLETED') return 'pending';
-  if (c.conclusion === 'SUCCESS') return 'success';
-  if (FAIL.includes(c.conclusion ?? '')) return 'failure';
-  if (NEUTRAL.includes(c.conclusion ?? '')) return 'neutral';
-  return 'pending';
-}
-
-export function CheckIcon(props: { outcome: ReturnType<typeof checkOutcome> }) {
-  return (
-    <Switch>
-      <Match when={props.outcome === 'success'}>
-        <Octicon icon={checkIcon} class="text-fg-success" aria-label="Successful" />
-      </Match>
-      <Match when={props.outcome === 'failure'}>
-        <Octicon icon={xIcon} class="text-fg-danger" aria-label="Failing" />
-      </Match>
-      <Match when={props.outcome === 'neutral'}>
-        <Octicon icon={skipIcon} class="text-fg-muted" aria-label="Skipped or cancelled" />
-      </Match>
-      <Match when={props.outcome === 'pending'}>
-        <Octicon icon={dotFillIcon} class="text-fg-attention" aria-label="Pending" />
-      </Match>
-    </Switch>
-  );
-}
-
-/** One row of the merge box: status icon, title, description, optional action. */
-function Section(props: { icon: OcticonData; iconClass: string; title: string; children?: JSX.Element; action?: JSX.Element; spinner?: boolean }) {
-  return (
-    <div class="flex items-start gap-3 px-4 py-3 border-b border-line">
-      <span class="mt-0.5 shrink-0 flex">
-        <Show when={!props.spinner} fallback={<Spinner size={20} class="text-fg-muted" />}>
-          <Octicon icon={props.icon} size={20} class={props.iconClass} />
-        </Show>
-      </span>
-      <div class="flex-1 min-w-0">
-        <div class="font-semibold">{props.title}</div>
-        <Show when={props.children}>
-          <div class="text-xs text-fg-muted mt-0.5">{props.children}</div>
-        </Show>
-      </div>
-      <Show when={props.action}>
-        <div class="shrink-0">{props.action}</div>
-      </Show>
-    </div>
-  );
-}
 
 const METHOD_LABEL: Record<MergeMethod, { button: string; confirm: string; desc: string }> = {
   MERGE: {
@@ -129,48 +69,70 @@ export interface MergeBoxProps {
   onInsertComment?: (text: string) => void;
 }
 
-/** The merge box at the bottom of a PR conversation. */
+const isConflicting = (p: PullDetail) => p.mergeable === 'CONFLICTING' || p.mergeStateStatus === 'DIRTY';
+
+/**
+ * The merge box at the bottom of a PR conversation (github.com's current
+ * design): a status badge in the avatar column, and a box whose caret points
+ * at it with reviews / checks / mergeability sections and the merge footer.
+ */
 export default function MergeBox(props: MergeBoxProps) {
   const headRepo = () => props.pull.headRepository?.nameWithOwner ?? `${props.owner}/${props.repo}`;
   const push = () => canPush(props.meta.viewerPermission);
-  const badge = () => {
-    if (props.pull.merged) return { icon: gitMergeIcon, class: 'bg-done-emphasis' };
-    if (props.pull.state === 'CLOSED') return { icon: gitPullRequestClosedIcon, class: 'bg-closed-emphasis' };
-    if (props.pull.isDraft) return { icon: gitPullRequestDraftIcon, class: 'bg-neutral-emphasis' };
-    const ok = ['CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(props.pull.mergeStateStatus);
-    return { icon: gitMergeIcon, class: ok ? 'bg-success-emphasis' : 'bg-neutral-emphasis' };
+  const draft = useAction(setDraft);
+  const [converting, setConverting] = createSignal(false);
+  const badge = (): { icon: typeof gitMergeIcon; tone: Tone } => {
+    if (props.pull.merged) return { icon: gitMergeIcon, tone: 'done' };
+    if (props.pull.state === 'CLOSED') return { icon: gitPullRequestClosedIcon, tone: 'closed' };
+    if (props.pull.isDraft) return { icon: gitPullRequestDraftIcon, tone: 'neutral' };
+    const ok = ['CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(props.pull.mergeStateStatus) && !isConflicting(props.pull);
+    return { icon: gitMergeIcon, tone: ok ? 'success' : 'neutral' };
+  };
+  const toDraft = async () => {
+    setConverting(true);
+    try {
+      await draft(props.pull.id, true);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setConverting(false);
+    }
   };
 
   return (
-    <div class="relative pl-14 pb-4" id="partial-pull-merging">
-      <div class={['absolute left-0 top-0 w-10 h-10 rounded-md flex items-center justify-center text-fg-on-emphasis', badge().class]}>
-        <Octicon icon={badge().icon} size={24} />
+    <div class="pb-4" id="partial-pull-merging">
+      <div class="MergeBox">
+        <div class={['MergeBox-badge', TONE_BG[badge().tone]]} aria-hidden="true">
+          <Octicon icon={badge().icon} size={24} />
+        </div>
+        <div class={['MergeBox-box', { 'MergeBox-box--merged': props.pull.merged }]}>
+          <Switch>
+            <Match when={props.pull.merged}>
+              <BranchSection {...props} headRepo={headRepo()} title="Pull request successfully merged and closed" icon={gitMergeIcon} tone="done" />
+            </Match>
+            <Match when={props.pull.state === 'CLOSED'}>
+              <BranchSection {...props} headRepo={headRepo()} title="Closed with unmerged commits" icon={gitPullRequestClosedIcon} tone="closed" />
+            </Match>
+            <Match when={true}>
+              <OpenBox {...props} push={push()} />
+            </Match>
+          </Switch>
+        </div>
       </div>
-      <div class="Box timeline-comment--caret overflow-visible">
-        <Switch>
-          <Match when={props.pull.merged}>
-            <BranchFooter {...props} headRepo={headRepo()} title="Pull request successfully merged and closed" icon={gitMergeIcon} iconClass="text-fg-done" />
-          </Match>
-          <Match when={props.pull.state === 'CLOSED'}>
-            <BranchFooter
-              {...props}
-              headRepo={headRepo()}
-              title="Closed with unmerged commits"
-              icon={gitPullRequestClosedIcon}
-              iconClass="text-fg-closed"
-            />
-          </Match>
-          <Match when={true}>
-            <OpenBox {...props} push={push()} />
-          </Match>
-        </Switch>
-      </div>
+      <Show when={props.pull.state === 'OPEN' && !props.pull.isDraft && props.pull.viewerCanUpdate}>
+        <div class="text-right text-xs text-fg-muted mt-2">
+          Still in progress?{' '}
+          <button type="button" class="btn-link text-xs" disabled={converting()} onClick={toDraft}>
+            {converting() ? 'Converting…' : 'Convert to draft'}
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }
 
 /** Merged / closed: offer to delete (or restore) the head branch. */
-function BranchFooter(props: MergeBoxProps & { headRepo: string; title: string; icon: OcticonData; iconClass: string }) {
+function BranchSection(props: MergeBoxProps & { headRepo: string; title: string; icon: typeof gitMergeIcon; tone: Tone }) {
   const del = useAction(deleteBranch);
   const restore = useAction(restoreBranch);
   const [busy, setBusy] = createSignal(false);
@@ -187,161 +149,61 @@ function BranchFooter(props: MergeBoxProps & { headRepo: string; title: string; 
   };
   const head = () => props.pull.headRefName;
   return (
-    <div class="flex items-center gap-3 px-4 py-3">
-      <Octicon icon={props.icon} size={20} class={props.iconClass} />
-      <div class="flex-1 min-w-0">
-        <div class="font-semibold">{props.title}</div>
-        <div class="text-xs text-fg-muted mt-0.5">
+    <MergeSection
+      icon={<StatusCircle tone={props.tone} icon={props.icon} />}
+      title={props.title}
+      desc={
+        <Show
+          when={props.pull.headRef}
+          fallback={
+            <>
+              The{' '}
+              <code
+                class={['font-mono', { 'rgh-deleted-branch': feature('cross-deleted-pr-branches') }]}
+                title={feature('cross-deleted-pr-branches') ? 'This branch has been deleted' : undefined}
+              >
+                {head()}
+              </code>{' '}
+              branch has been deleted.
+            </>
+          }
+        >
           <Show
-            when={props.pull.headRef}
+            when={props.pull.merged}
             fallback={
               <>
-                The{' '}
-                <code
-                  class={['font-mono', { 'rgh-deleted-branch': feature('cross-deleted-pr-branches') }]}
-                  title={feature('cross-deleted-pr-branches') ? 'This branch has been deleted' : undefined}
-                >
-                  {head()}
-                </code>{' '}
-                branch has been deleted.
+                This pull request is closed, but the <code class="font-mono">{head()}</code> branch has unmerged commits.
               </>
             }
           >
-            <Show
-              when={props.pull.merged}
-              fallback={
-                <>
-                  This pull request is closed, but the <code class="font-mono">{head()}</code> branch has unmerged commits.
-                </>
-              }
-            >
-              You’re all set — the <code class="font-mono">{head()}</code> branch can be safely deleted.
-            </Show>
+            You’re all set — the <code class="font-mono">{head()}</code> branch can be safely deleted.
           </Show>
-        </div>
-      </div>
-      <Show
-        when={props.pull.headRef}
-        fallback={
-          <Show when={props.pull.headRepository && canPush(props.meta.viewerPermission)}>
-            <button
-              type="button"
-              class="btn btn-sm"
-              disabled={busy()}
-              onClick={() => run(() => restore(props.headRepo, head(), props.pull.headRefOid), 'Branch restored')}
-            >
-              <Octicon icon={gitBranchIcon} /> Restore branch
+        </Show>
+      }
+      action={
+        <Show
+          when={props.pull.headRef}
+          fallback={
+            <Show when={props.pull.headRepository && canPush(props.meta.viewerPermission)}>
+              <button
+                type="button"
+                class="btn btn-sm"
+                disabled={busy()}
+                onClick={() => run(() => restore(props.headRepo, head(), props.pull.headRefOid), 'Branch restored')}
+              >
+                <Octicon icon={gitBranchIcon} /> Restore branch
+              </button>
+            </Show>
+          }
+        >
+          <Show when={props.pull.viewerCanDeleteHeadRef}>
+            <button type="button" class="btn btn-sm" disabled={busy()} onClick={() => run(() => del(props.headRepo, head()), 'Branch deleted')}>
+              Delete branch
             </button>
           </Show>
-        }
-      >
-        <Show when={props.pull.viewerCanDeleteHeadRef}>
-          <button type="button" class="btn btn-sm" disabled={busy()} onClick={() => run(() => del(props.headRepo, head()), 'Branch deleted')}>
-            Delete branch
-          </button>
         </Show>
-      </Show>
-    </div>
-  );
-}
-
-function ChecksSection(props: { pull: PullDetail; owner: string; repo: string }) {
-  const rollup = () => props.pull.commits.nodes[0]?.commit.statusCheckRollup ?? null;
-  const contexts = () => rollup()?.contexts.nodes ?? [];
-  const [open, setOpen] = createSignal(() => rollup()?.state !== 'SUCCESS');
-  const counts = createMemo(() => {
-    const c = { success: 0, failure: 0, neutral: 0, pending: 0 };
-    for (const ctx of contexts()) c[checkOutcome(ctx)]++;
-    return c;
-  });
-  // clean-checks-list: failing first, then running, then the rest (stable within each group).
-  const clean = () => feature('clean-checks-list');
-  const RANK = { failure: 0, pending: 1, success: 2, neutral: 2 } as const;
-  const shown = createMemo(() => (clean() ? [...contexts()].sort((a, b) => RANK[checkOutcome(a)] - RANK[checkOutcome(b)]) : contexts()));
-  const dim = () => clean() && (counts().failure > 0 || counts().pending > 0);
-  const summary = () => {
-    const c = counts();
-    const parts = [
-      c.failure && `${c.failure} failing`,
-      c.pending && `${c.pending} in progress`,
-      c.neutral && `${c.neutral} skipped`,
-      c.success && `${c.success} successful`,
-    ].filter(Boolean);
-    return `${parts.join(', ')} check${contexts().length === 1 ? '' : 's'}`;
-  };
-  const look = () => {
-    switch (rollup()?.state) {
-      case 'SUCCESS':
-        return { icon: checkCircleFillIcon, class: 'text-fg-success', title: 'All checks have passed' };
-      case 'FAILURE':
-      case 'ERROR':
-        return { icon: xCircleFillIcon, class: 'text-fg-danger', title: 'Some checks were not successful' };
-      default:
-        return { icon: dotFillIcon, class: 'text-fg-attention', title: 'Some checks haven’t completed yet' };
-    }
-  };
-  return (
-    <Show when={rollup()}>
-      <Section
-        icon={look().icon}
-        iconClass={look().class}
-        title={look().title}
-        action={
-          <button type="button" class="btn-link text-xs" onClick={() => setOpen(!open())}>
-            {open() ? 'Hide all checks' : 'Show all checks'}
-          </button>
-        }
-      >
-        {summary()}
-      </Section>
-      <Show when={open()}>
-        <div
-          class={[
-            'border-b border-line bg-canvas-muted rgh-checks-list',
-            // unclip-checks: show every check instead of a scrolling box.
-            { 'max-h-[340px] overflow-auto': !feature('unclip-checks'), 'rgh-checks-dim': dim() },
-          ]}
-        >
-          <For each={shown()}>
-            {(c) => (
-              <div
-                class={[
-                  'flex gap-2 px-4 py-2 text-xs border-b border-line-muted last:border-b-0',
-                  clean() ? 'items-start' : 'items-center',
-                  { 'rgh-check-done': ['success', 'neutral'].includes(checkOutcome(c)) },
-                ]}
-              >
-                <CheckIcon outcome={checkOutcome(c)} />
-                <Show when={c.checkSuite?.app?.logoUrl ?? c.avatarUrl}>
-                  {(src) => <Avatar src={src()} size={20} square />}
-                </Show>
-                <span class={['min-w-0 flex-1', clean() ? 'break-words' : 'truncate']}>
-                  <strong class="text-fg">
-                    {c.__typename === 'CheckRun' ? (c.checkSuite?.workflowRun ? `${c.checkSuite.workflowRun.workflow.name} / ${c.name}` : c.name) : c.context}
-                  </strong>
-                  <span class="text-fg-muted">
-                    {' '}
-                    {c.__typename === 'CheckRun'
-                      ? c.title ?? (c.status === 'COMPLETED' ? (c.conclusion ?? '').toLowerCase() : c.status?.toLowerCase().replace(/_/g, ' '))
-                      : c.description}
-                  </span>
-                </span>
-                <Show when={c.isRequired}>
-                  <span class="Label">Required</span>
-                </Show>
-                <Show when={c.detailsUrl ?? c.targetUrl}>
-                  {(url) => (
-                    <a class="font-semibold" href={toAppUrl(url())}>
-                      Details
-                    </a>
-                  )}
-                </Show>
-              </div>
-            )}
-          </For>
-        </div>
-      </Show>
-    </Show>
+      }
+    />
   );
 }
 
@@ -350,6 +212,7 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
   const update = useAction(updatePullBranch);
   const updateWith = useAction(updatePullBranchWith);
   const [busy, setBusy] = createSignal(false);
+  const [cli, setCli] = createSignal(false);
   const run = async (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
     try {
@@ -362,24 +225,25 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
     }
   };
   const state = () => props.pull.mergeStateStatus;
-  const reviewCount = (s: string) => props.pull.latestOpinionatedReviews.nodes.filter((r) => r.state === s).length;
+  const conflicting = () => isConflicting(props.pull);
+  const showCli = () => {
+    setCli(true);
+    requestAnimationFrame(() => document.getElementById('merge-cli')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+  };
 
   // update-pr-from-base-branch: "Update branch | Rebase" whenever the branch is behind its base and you
   // can push to it — GitHub (and viewerCanUpdateBranch) only offer it when branch protection requires it.
-  const updatable = createMemo(() =>
-    feature('update-pr-from-base-branch') && props.pull.state === 'OPEN' && props.pull.headRef
-      ? getPullBranchUpdatable(
-          props.owner,
-          props.repo,
-          props.pull.number,
-          props.pull.isCrossRepository ? `${props.owner}:${props.pull.baseRefName}` : props.pull.baseRefName,
-        ).catch(() => false)
-      : false,
-  );
-  const updateAction = () => (
-    <Loading>
-      <Show when={updatable()}>{updateButtons()}</Show>
-    </Loading>
+  const updatable = createMemo(
+    () =>
+      feature('update-pr-from-base-branch') && props.pull.state === 'OPEN' && props.pull.headRef
+        ? getPullBranchUpdatable(
+            props.owner,
+            props.repo,
+            props.pull.number,
+            props.pull.isCrossRepository ? `${props.owner}:${props.pull.baseRefName}` : props.pull.baseRefName,
+          ).catch(() => false)
+        : false,
+    { name: 'mergeUpdatable' },
   );
   const updateButtons = () => (
     <div class="BtnGroup">
@@ -403,102 +267,72 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
       </button>
     </div>
   );
+  const updateAction = () => (
+    <Loading>
+      <Show when={updatable()}>{updateButtons()}</Show>
+    </Loading>
+  );
+
+  /** Why a BLOCKED pull request can't be merged yet. */
+  const blockedReason = () => {
+    const rollup = props.pull.commits.nodes[0]?.commit.statusCheckRollup;
+    const failingRequired = rollup?.contexts.nodes.some((c) => c.isRequired && checkOutcome(c) !== 'success' && checkOutcome(c) !== 'neutral');
+    if (props.pull.reviewDecision === 'REVIEW_REQUIRED') return 'At least 1 approving review is required by reviewers with write access.';
+    if (props.pull.reviewDecision === 'CHANGES_REQUESTED') return 'Changes were requested by reviewers with write access.';
+    if (failingRequired) return 'Required status checks have not succeeded yet.';
+    return 'The base branch requires all requirements to be met before merging.';
+  };
+
+  const conflictsSection = () => (
+    <MergeConflicts owner={props.owner} repo={props.repo} pull={props.pull} onCommandLine={showCli} onInsertComment={props.onInsertComment} />
+  );
 
   return (
     <>
-      <Show when={!props.pull.isDraft && props.pull.reviewDecision}>
-        {(d) => (
-          <Switch>
-            <Match when={d() === 'APPROVED'}>
-              <Section icon={checkCircleFillIcon} iconClass="text-fg-success" title="Changes approved">
-                {reviewCount('APPROVED')} approving review{reviewCount('APPROVED') === 1 ? '' : 's'} by reviewers with write access.
-              </Section>
-            </Match>
-            <Match when={d() === 'CHANGES_REQUESTED'}>
-              <Section icon={xCircleFillIcon} iconClass="text-fg-danger" title="Changes requested">
-                {reviewCount('CHANGES_REQUESTED')} review{reviewCount('CHANGES_REQUESTED') === 1 ? '' : 's'} requesting changes by reviewers with write
-                access.
-              </Section>
-            </Match>
-            <Match when={d() === 'REVIEW_REQUIRED'}>
-              <Section icon={alertFillIcon} iconClass="text-fg-danger" title="Review required">
-                At least 1 approving review is required by reviewers with write access.
-              </Section>
-            </Match>
-          </Switch>
-        )}
+      <Show when={!props.pull.isDraft}>
+        <MergeReviews pull={props.pull} owner={props.owner} />
       </Show>
 
-      <ChecksSection pull={props.pull} owner={props.owner} repo={props.repo} />
+      <MergeChecks pull={props.pull} owner={props.owner} repo={props.repo} conflicting={conflicting()} canPush={props.push} />
 
       <Show
         when={!props.pull.isDraft}
         fallback={
-          <Section
-            icon={gitPullRequestDraftIcon}
-            iconClass="text-fg-muted"
-            title="This pull request is still a work in progress"
-            action={
-              <Show when={props.pull.viewerCanUpdate}>
-                <button type="button" class="btn btn-sm" disabled={busy()} onClick={() => run(() => draft(props.pull.id, false))}>
-                  Ready for review
-                </button>
-              </Show>
-            }
-          >
-            Draft pull requests cannot be merged.
-          </Section>
+          <>
+            <MergeSection
+              icon={<StatusCircle tone="neutral" icon={gitPullRequestDraftIcon} />}
+              title="This pull request is still a work in progress"
+              desc="Draft pull requests cannot be merged."
+              action={
+                <Show when={props.pull.viewerCanUpdate}>
+                  <button type="button" class="btn btn-sm" disabled={busy()} onClick={() => run(() => draft(props.pull.id, false))}>
+                    Ready for review
+                  </button>
+                </Show>
+              }
+            />
+            <Show when={conflicting()}>{conflictsSection()}</Show>
+          </>
         }
       >
         <Switch>
-          <Match when={props.pull.mergeable === 'CONFLICTING' || state() === 'DIRTY'}>
-            <Section
-              icon={alertFillIcon}
-              iconClass="text-fg-danger"
-              title="This branch has conflicts that must be resolved"
-              action={
-                // quick-resolve-conflicts: plain buttons instead of GitHub's "Resolve conflicts ▾" menu.
-                <Show when={feature('quick-resolve-conflicts')}>
-                  <div class="BtnGroup">
-                    <Show when={props.pull.viewerCanUpdate}>
-                      <a
-                        class="btn btn-sm"
-                        href={`https://github.com/${props.owner}/${props.repo}/pull/${props.pull.number}/conflicts`}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Resolve conflicts in GitHub’s web editor"
-                      >
-                        Resolve conflicts
-                      </a>
-                    </Show>
-                    <Show when={props.onInsertComment}>
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        title="Ask Copilot to resolve conflicts"
-                        aria-label="Ask Copilot to resolve conflicts"
-                        onClick={() => props.onInsertComment!('@copilot resolve the merge conflicts in this pull request')}
-                      >
-                        <Octicon icon={copilotIcon} />
-                      </button>
-                    </Show>
-                  </div>
-                </Show>
-              }
-            >
-              {feature('quick-resolve-conflicts') ? 'Use the web editor or the command line' : 'Use the command line'} to resolve conflicts before continuing.
-            </Section>
-          </Match>
+          <Match when={conflicting()}>{conflictsSection()}</Match>
           <Match when={state() === 'UNKNOWN' || props.pull.mergeable === 'UNKNOWN'}>
-            <Section icon={dotFillIcon} iconClass="" spinner title="Checking for the ability to merge automatically…">
-              Hang in there while we check the branch’s status.
-            </Section>
+            <MergeSection
+              icon={<StatusCircle tone="neutral" icon={alertIcon} spinner />}
+              title="Checking for the ability to merge automatically…"
+              desc="Hang in there while we check the branch’s status."
+            />
           </Match>
           <Match when={state() === 'BEHIND'}>
-            <Section
-              icon={alertFillIcon}
-              iconClass="text-fg-attention"
+            <MergeSection
+              icon={<StatusCircle tone="neutral" icon={alertIcon} />}
               title="This branch is out-of-date with the base branch"
+              desc={
+                <>
+                  Merge the latest changes from <code class="font-mono">{props.pull.baseRefName}</code> into this branch.
+                </>
+              }
               action={
                 <Show when={props.pull.viewerCanUpdateBranch}>
                   <Show
@@ -518,49 +352,47 @@ function OpenBox(props: MergeBoxProps & { push: boolean }) {
                   </Show>
                 </Show>
               }
-            >
-              Merge the latest changes from <code class="font-mono">{props.pull.baseRefName}</code> into this branch.
-            </Section>
-          </Match>
-          <Match when={state() === 'BLOCKED'}>
-            <Section
-              icon={xCircleFillIcon}
-              iconClass="text-fg-danger"
-              title="Merging is blocked"
-              action={updateAction()}
-            >
-              The base branch requires all requirements to be met before merging.
-            </Section>
+            />
           </Match>
           <Match when={true}>
-            <Section
-              icon={checkCircleFillIcon}
-              iconClass="text-fg-success"
-              title="No conflicts with base branch"
+            <MergeSection
+              icon={<StatusCircle tone="success" icon={checkIcon} />}
+              title="This branch has no conflicts with the base branch"
+              desc={
+                <>
+                  <PrBaseCommit owner={props.owner} repo={props.repo} baseRef={props.pull.baseRefName} baseRefOid={props.pull.baseRefOid} headSha={props.pull.headRefOid} />
+                  Merging can be performed automatically.
+                </>
+              }
               action={updateAction()}
-            >
-              <PrBaseCommit owner={props.owner} repo={props.repo} baseRef={props.pull.baseRefName} baseRefOid={props.pull.baseRefOid} headSha={props.pull.headRefOid} />
-              Merging can be performed automatically.
-            </Section>
+            />
           </Match>
         </Switch>
+        <Show when={state() === 'BLOCKED' && !conflicting()}>
+          <MergeSection icon={<StatusCircle tone="danger" icon={xIcon} />} title="Merging is blocked" desc={blockedReason()} />
+        </Show>
       </Show>
 
-      <div class="px-4 py-3">
+      <div class="MergeBox-footer">
         <Show
           when={props.push}
           fallback={<p class="text-xs text-fg-muted">Only those with write access to this repository can merge pull requests.</p>}
         >
           <Show when={!props.pull.isDraft} fallback={<p class="text-xs text-fg-muted">Mark this pull request as ready for review to merge it.</p>}>
-            <MergeControls {...props} />
+            <MergeControls {...props} cliOpen={cli()} onCommandLine={() => (cli() ? setCli(false) : showCli())} />
           </Show>
+        </Show>
+        <Show when={cli()}>
+          <div id="merge-cli">
+            <CommandLineInstructions owner={props.owner} repo={props.repo} pull={props.pull} conflicting={conflicting()} />
+          </div>
         </Show>
       </div>
     </>
   );
 }
 
-function MergeControls(props: MergeBoxProps) {
+function MergeControls(props: MergeBoxProps & { cliOpen: boolean; onCommandLine: () => void }) {
   const repoCtx = useRepo();
   const merge = useAction(mergePull);
   const auto = useAction(setAutoMerge);
@@ -755,7 +587,10 @@ function MergeControls(props: MergeBoxProps) {
               </button>
             </Show>
             <span class="text-xs text-fg-muted">
-              You can also merge this with the command line.
+              You can also merge this with the command line.{' '}
+              <button type="button" class="btn-link text-xs" aria-expanded={props.cliOpen ? 'true' : 'false'} onClick={() => props.onCommandLine()}>
+                {props.cliOpen ? 'Hide command line instructions.' : 'View command line instructions.'}
+              </button>
             </span>
           </div>
         </div>

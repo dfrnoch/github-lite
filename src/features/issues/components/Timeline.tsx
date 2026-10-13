@@ -2,7 +2,7 @@ import { useLocation } from '@solidjs/router';
 import type { JSX } from '@solidjs/web';
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, IssueLabel, itemState, RelativeTime, StateIcon, toast, toastError } from '../../../components/ui';
+import { Avatar, AvatarStack, IssueLabel, itemState, RelativeTime, StateIcon, toast, toastError } from '../../../components/ui';
 import type { OcticonData } from '../../../icons/octicons';
 import {
   checkIcon,
@@ -444,6 +444,14 @@ function SubjectLink(props: { subject: RefSubject | null | undefined; currentRep
   );
 }
 
+/** A commit's distinct authors (a co-author trailer for the author themself is the same person). */
+const commitAvatars = (n: TimelineNode) => {
+  const nodes = n.commit?.authors?.nodes ?? [];
+  return nodes
+    .filter((a, i) => nodes.findIndex((x) => (x.user && a.user ? x.user.login === a.user.login : x.name === a.name)) === i)
+    .map((a) => ({ src: a.avatarUrl, login: a.user?.login }));
+};
+
 function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string }) {
   const first = () => props.nodes[0]?.commit?.authors?.nodes[0];
   return (
@@ -479,7 +487,7 @@ function CommitGroup(props: { nodes: TimelineNode[]; owner: string; repo: string
               <span class="relative z-1 bg-canvas text-fg-muted flex">
                 <Octicon icon={gitCommitIcon} />
               </span>
-              <Avatar src={n.commit?.authors?.nodes[0]?.avatarUrl} size={16} login={n.commit?.authors?.nodes[0]?.user?.login} hovercard />
+              <AvatarStack avatars={commitAvatars(n)} size={16} />
               <a
                 class="link-muted truncate min-w-0 flex-1"
                 href={`/${props.owner}/${props.repo}/commit/${n.commit?.oid}`}

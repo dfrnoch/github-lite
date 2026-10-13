@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import Octicon from '../../../components/Octicon';
-import { Avatar, RelativeTime } from '../../../components/ui';
+import { AvatarStack, RelativeTime } from '../../../components/ui';
 import { ellipsisIcon, historyIcon, versionsIcon } from '../../../icons/octicons';
 import { formatNumber } from '../../../lib/format';
 import { encodePath } from '../../../lib/github';
@@ -47,24 +47,35 @@ export default function LatestCommit(props: {
     <Show when={commit()}>
       {(c) => (
         <div class="Box-header flex items-center gap-2 py-3! text-sm flex-wrap">
-          <span class="AvatarStack">
-            <For each={c().authors.slice(0, 2)}>{(a) => <Avatar src={a.avatarUrl} size={24} login={a.user?.login} hovercard />}</For>
-          </span>
-          <span class="font-semibold">
-            <For each={c().authors.slice(0, 2)}>
-              {(a, i) => (
-                <>
-                  {i() > 0 ? <span class="font-normal text-fg-muted"> and </span> : ''}
-                  {a.user ? (
-                    <a class="link-plain" href={`/${a.user.login}`}>
-                      {a.user.login}
-                    </a>
-                  ) : (
-                    a.name
-                  )}
-                </>
-              )}
-            </For>
+          <AvatarStack
+            class="[--AvatarStack-ring:var(--bgColor-muted)]"
+            avatars={c().authors.map((a) => ({ src: a.avatarUrl, login: a.user?.login }))}
+            size={24}
+          />
+          <span class="font-semibold whitespace-nowrap">
+            <Show
+              when={c().authorCount <= 2}
+              fallback={
+                <span class="text-fg" title={c().authors.map((a) => a.user?.login ?? a.name).join(', ')}>
+                  {c().authorCount} people
+                </span>
+              }
+            >
+              <For each={c().authors}>
+                {(a, i) => (
+                  <>
+                    {i() > 0 ? <span class="font-normal text-fg-muted"> and </span> : ''}
+                    {a.user ? (
+                      <a class="link-plain" href={`/${a.user.login}`} data-hovercard-user={a.user.login}>
+                        {a.user.login}
+                      </a>
+                    ) : (
+                      a.name
+                    )}
+                  </>
+                )}
+              </For>
+            </Show>
           </span>
           <CommitMessage
             message={c().message.split('\n', 1)[0] ?? c().messageHeadline}

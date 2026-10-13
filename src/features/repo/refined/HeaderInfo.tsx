@@ -5,7 +5,7 @@ import { lockIcon, repoForkedIcon, starFillIcon, starIcon } from '../../../icons
 import { compactNumber, formatNumber } from '../../../lib/format';
 import { feature } from '../../refined';
 import { getRepo, getRepoHeaderInfo } from '../api';
-import CommitStatusIcon from '../components/CommitStatusIcon';
+import ChecksStatus from '../../../components/checks/ChecksStatus';
 
 /**
  * Refined GitHub additions to the "owner / repo" breadcrumb of the global
@@ -23,20 +23,20 @@ function useRepoKey(props: { owner: string; repo: string }) {
   });
 }
 
-/** repo-avatars: the owner's avatar before their name. */
+/** repo-avatars: the owner's avatar, rendered inside the owner crumb link (so it shares its hover). */
 export function RepoHeaderAvatar(props: { owner: string; repo: string }) {
   const key = useRepoKey(props);
   const repo = createMemo(() => getRepo(key().owner, key().repo));
   return (
     <Show when={feature('repo-avatars')}>
       <Errored fallback={null}>
-        <Loading fallback={<Avatar login={props.owner} size={16} class="hidden md:inline-block shrink-0 ml-1" />}>
+        <Loading fallback={<Avatar login={props.owner} size={16} class="hidden md:inline-block shrink-0" />}>
           <Avatar
             src={repo().owner.avatar_url}
             login={props.owner}
             size={16}
             square={repo().owner.type === 'Organization'}
-            class="hidden md:inline-block shrink-0 ml-1"
+            class="hidden md:inline-block shrink-0"
           />
         </Loading>
       </Errored>
@@ -53,15 +53,17 @@ export function RepoHeaderInfo(props: { owner: string; repo: string }) {
     <Show when={feature('repo-header-info')}>
       <Errored fallback={null}>
         <Loading>
-          <span class="hidden md:flex items-center gap-0.5 ml-1 text-fg-muted shrink-0">
+          {/* Every item is a 28px invisible button centred on the crumb line (like Refined GitHub's
+              `Button--invisible p-1` items), so icons, star count and CI glyph share one centre line. */}
+          <span class="hidden md:flex items-center gap-0.5 ml-1 shrink-0">
             <Show when={info().isPrivate}>
-              <span class="inline-flex p-1" title="Private repository">
+              <span class="AppHeader-context-icon" title="Private repository">
                 <Octicon icon={lockIcon} size={12} />
               </span>
             </Show>
             <Show when={info().parent}>
               {(parent) => (
-                <a class="AppHeader-context-item inline-flex! items-center text-fg-muted! px-1!" href={`/${parent()}`} title={`Forked from ${parent()}`}>
+                <a class="AppHeader-context-icon" href={`/${parent()}`} title={`Forked from ${parent()}`}>
                   <Octicon icon={repoForkedIcon} size={12} />
                 </a>
               )}
@@ -70,28 +72,20 @@ export function RepoHeaderInfo(props: { owner: string; repo: string }) {
               <Show
                 when={info().canSeeStargazers}
                 fallback={
-                  <span class="inline-flex items-center gap-1 px-1 text-sm" title={starTitle(info().stars, info().starred)}>
+                  <span class="AppHeader-context-icon" title={starTitle(info().stars, info().starred)}>
                     <StarIcon starred={info().starred} />
-                    {compactNumber(info().stars)}
+                    <span>{compactNumber(info().stars)}</span>
                   </span>
                 }
               >
-                <a
-                  class="AppHeader-context-item inline-flex! items-center gap-1 text-fg-muted! px-1!"
-                  href={`${base()}/stargazers`}
-                  title={starTitle(info().stars, info().starred)}
-                >
+                <a class="AppHeader-context-icon" href={`${base()}/stargazers`} title={starTitle(info().stars, info().starred)}>
                   <StarIcon starred={info().starred} />
-                  {compactNumber(info().stars)}
+                  <span>{compactNumber(info().stars)}</span>
                 </a>
               </Show>
             </Show>
             <Show when={info().ci}>
-              {(ci) => (
-                <span class="inline-flex px-1" title="CI status of latest commit">
-                  <CommitStatusIcon state={ci().state} href={`${base()}/commit/${ci().oid}`} owner={props.owner} repo={props.repo} sha={ci().oid} />
-                </span>
-              )}
+              {(ci) => <ChecksStatus class="AppHeader-context-icon" state={ci().state} owner={props.owner} repo={props.repo} sha={ci().oid} />}
             </Show>
           </span>
         </Loading>

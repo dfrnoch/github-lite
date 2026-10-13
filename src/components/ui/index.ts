@@ -1,5 +1,6 @@
 // Shared UI kit. Import from here: `import { Avatar, Dropdown } from '../components/ui'`.
 export { default as Avatar } from './Avatar';
+export { default as AvatarStack } from './AvatarStack';
 export { default as Blankslate } from './Blankslate';
 export { default as CopyButton } from './CopyButton';
 export { default as Dialog } from './Dialog';
