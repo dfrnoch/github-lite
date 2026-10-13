@@ -4,16 +4,17 @@
 # wraps src/ with Apple's converter, builds it with xcodebuild, and installs
 # the app to ~/Applications. Then enable it in Safari → Settings → Extensions.
 #
-# Usage: ./build.sh            (signs with the first "Developer ID Application" identity)
-#        TEAM_ID=XXXXXXXXXX ./build.sh
+# Signed with your "Apple Development" identity: Safari lists development-signed
+# extensions, but hides Developer ID builds until they're notarized.
+# Usage: ./build.sh  or  TEAM_ID=XXXXXXXXXX ./build.sh
 set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="GitHub Lite Redirect"
 BUNDLE_ID="dev.frnoch.github-lite-redirect"
 BUILD_DIR="$(pwd)/build"
-IDENTITY_LINE="$(security find-identity -v -p codesigning | grep 'Developer ID Application' | head -1)"
-TEAM_ID="${TEAM_ID:-$(sed -E 's/.*\(([A-Z0-9]{10})\)".*/\1/' <<<"$IDENTITY_LINE")}"
+DEV_CERT="$(security find-identity -v -p codesigning | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"')"
+TEAM_ID="${TEAM_ID:-$(security find-certificate -c "$DEV_CERT" -p | openssl x509 -noout -subject | sed -E 's/.*OU=([A-Z0-9]{10}).*/\1/')}"
 
 rm -rf "$BUILD_DIR"
 xcrun safari-web-extension-converter src \
@@ -33,7 +34,7 @@ xcodebuild \
   -configuration Release \
   -derivedDataPath "$BUILD_DIR/DerivedData" \
   CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="Developer ID Application" \
+  CODE_SIGN_IDENTITY="Apple Development" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   PROVISIONING_PROFILE_SPECIFIER="" \
   ENABLE_HARDENED_RUNTIME=YES \
