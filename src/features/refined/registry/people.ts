@@ -82,13 +82,6 @@ export const peopleFeatures: FeatureDef[] = [
     hotkeys: ["a"],
   },
   {
-    id: "pr-notification-link",
-    section: "Notifications",
-    description: "Points PR notifications to the Conversation tabs instead of the commits page, which may be a 404.",
-    status: 'native',
-    note: 'Notification links are built from the API subject URL, so pull requests always open on their Conversation tab.',
-  },
-  {
     id: "sticky-notifications-actions",
     section: "Notifications",
     description: "Make the notifications action bar sticky.",

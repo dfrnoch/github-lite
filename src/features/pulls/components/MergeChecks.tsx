@@ -90,7 +90,7 @@ export default function MergeChecks(props: { pull: PullDetail; owner: string; re
       >
         <Show when={open()}>
           <ul
-            class={['MergeBox-checks rgh-checks-list', { 'MergeBox-checks--unclipped': feature('unclip-checks'), 'rgh-checks-dim': dim() }]}
+            class={['MergeBox-checks rgh-checks-list', { 'rgh-checks-dim': dim() }]}
             aria-label="Checks"
           >
             <For each={shown()}>

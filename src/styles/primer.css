@@ -2263,9 +2263,6 @@ code.rgh-backticks {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.MergeBox-checks--unclipped {
-  max-height: none;
-}
 .MergeBox-check {
   display: flex;
   align-items: center;

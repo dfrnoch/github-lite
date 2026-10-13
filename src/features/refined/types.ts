@@ -9,14 +9,9 @@ export interface FeatureDef {
   /** Refined GitHub README section, used to group the settings page. */
   section: string;
   description: string;
-  /**
-   * - `todo` — not implemented yet (hidden from settings)
-   * - `done` — implemented here, gated by `feature(id)`
-   * - `native` — this app already behaves this way; nothing to toggle
-   * - `na` — not applicable to this app (see `note`)
-   */
-  status: 'todo' | 'done' | 'native' | 'na';
-  /** Why a feature is native / not applicable, or caveats of the implementation. */
+  /** `todo` — not implemented yet (hidden from settings); `done` — implemented, gated by `feature(id)`. */
+  status: 'todo' | 'done';
+  /** Caveats of the implementation, shown under the toggle. */
   note?: string;
   /** Defaults to true (Refined GitHub enables everything by default). */
   defaultEnabled?: boolean;

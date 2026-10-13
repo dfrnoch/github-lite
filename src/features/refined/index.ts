@@ -1,7 +1,6 @@
 import { createSignal } from 'solid-js';
 import { codeFeatures } from './registry/code';
 import { conversationsFeatures } from './registry/conversations';
-import { notApplicableFeatures } from './registry/na';
 import { peopleFeatures } from './registry/people';
 import { pullsFeatures } from './registry/pulls';
 import { repoFeatures } from './registry/repo';
@@ -16,7 +15,6 @@ export const FEATURES: FeatureDef[] = [
   ...conversationsFeatures,
   ...pullsFeatures,
   ...peopleFeatures,
-  ...notApplicableFeatures,
 ];
 
 const byId = new Map(FEATURES.map((f) => [f.id, f]));

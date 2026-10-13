@@ -25,8 +25,6 @@ export default function RefinedSettings() {
     }
     return [...map.entries()];
   });
-  const builtIn = createMemo(() => FEATURES.filter((f) => f.status === 'native' && matches(f)));
-  const notApplicable = createMemo(() => FEATURES.filter((f) => f.status === 'na' && matches(f)));
   const todo = createMemo(() => FEATURES.filter((f) => f.status === 'todo' && matches(f)));
   const enabledCount = createMemo(() => FEATURES.filter((f) => f.status === 'done' && feature(f.id)).length);
   const doneCount = () => FEATURES.filter((f) => f.status === 'done').length;
@@ -84,18 +82,6 @@ export default function RefinedSettings() {
         )}
       </For>
 
-      <Show when={builtIn().length}>
-        <details class="mb-4">
-          <summary class="cursor-pointer font-semibold text-sm py-2">Already built in ({builtIn().length})</summary>
-          <FeatureList features={builtIn()} />
-        </details>
-      </Show>
-      <Show when={notApplicable().length}>
-        <details class="mb-4">
-          <summary class="cursor-pointer font-semibold text-sm py-2">Not applicable to this app ({notApplicable().length})</summary>
-          <FeatureList features={notApplicable()} />
-        </details>
-      </Show>
       <Show when={todo().length}>
         <details class="mb-4">
           <summary class="cursor-pointer font-semibold text-sm py-2">Not implemented yet ({todo().length})</summary>
