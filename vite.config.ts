@@ -31,7 +31,10 @@ export default defineConfig(({ mode }) => {
       port: 3000,
     },
     test: {
-      environment: 'jsdom',
+      // No test touches the DOM, and Vitest's jsdom environment does not start
+      // on Bun's runtime. A DOM test can opt in with `// @vitest-environment jsdom`
+      // (run it with `bunx vitest` on Node).
+      environment: 'node',
       globals: false,
       setupFiles: ['./vitest-setup.ts'],
       isolate: false,

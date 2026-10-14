@@ -8,12 +8,12 @@
     "bun": ">=1.4.3"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "serve": "vite preview",
-    "test": "vitest",
-    "lint": "oxlint src",
-    "typecheck": "tsc --noEmit",
+    "dev": "bun --bun vite",
+    "build": "bun --bun vite build",
+    "serve": "bun --bun vite preview",
+    "test": "bun --bun vitest",
+    "lint": "bunx --bun oxlint src",
+    "typecheck": "bun check",
     "gen:markdown-css": "bun scripts/gen-markdown-css.mjs"
   },
   "license": "MIT",

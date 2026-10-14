@@ -53,9 +53,9 @@ A lightweight GitHub client. Routes mirror github.com URLs exactly (swap the hos
 
 ### Verifying
 
-- Package manager is **bun** (`bun install`, `bun add`, `bunx`). Never use npm/npx/pnpm in this repo.
+- Package manager and runtime are **bun** (`bun install`, `bun add`, `bunx`; the `dev`/`build`/`serve`/`test` scripts run Vite and Vitest on Bun's runtime via `bun --bun`). Never use npm/npx/pnpm in this repo.
 
-- `bunx tsc --noEmit` and `bunx oxlint src` must pass.
+- `bun check` (type check — not `tsc`) and `bunx oxlint src` must pass.
 - Dev server: `bun run dev` (check `curl -s localhost:3000 >/dev/null` first; one shared instance is usually already running).
 - Screenshot harness: `cd /tmp/shot-tool && GH_TOKEN=$(gh auth token) WAIT=2500 node app.mjs /tmp/appshots /owner/repo/path …` writes PNGs and prints console warnings/errors (Solid diagnostics included). `node eval.mjs <path> '<js expr>'` evaluates in the page.
 - **Never perform mutating API calls against real GitHub data while testing** (no creating/editing/deleting anything) — verify mutation UIs up to the submit button, and check request shapes against the REST docs.
