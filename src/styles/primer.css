@@ -1101,6 +1101,16 @@ dialog.Dialog::backdrop {
   color: var(--fgColor-disabled);
   cursor: default;
 }
+/* Phones: only Previous / current / Next (the numbered links would overflow). */
+@media (max-width: 543px) {
+  .pagination {
+    flex-wrap: wrap;
+  }
+  .pagination a:not([rel]),
+  .pagination .gap {
+    display: none;
+  }
+}
 
 /* ---------- Timeline ---------- */
 .TimelineItem {

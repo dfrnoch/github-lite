@@ -124,7 +124,7 @@ export default function RepoFiltersBar(props: {
           }
         }}
       />
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <FilterMenu
           label="Type"
           title="Select type"

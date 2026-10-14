@@ -746,7 +746,7 @@ function DiffFileView(props: {
     <div id={props.anchor} class="Box mb-4 scroll-mt-2" data-path={path()}>
       <div
         class={[
-          'Box-header sticky top-0 z-2 flex items-center gap-2 py-1.5! px-2! text-sm cursor-pointer',
+          'Box-header sticky top-0 z-2 flex flex-wrap sm:flex-nowrap items-center gap-2 py-1.5! px-2! text-sm cursor-pointer',
           { 'rounded-b-md': collapsed() || !loaded() },
         ]}
         onClick={(e) => {
@@ -766,7 +766,7 @@ function DiffFileView(props: {
           <Octicon icon={collapsed() ? chevronRightIcon : chevronDownIcon} />
         </button>
         <FileStatusIcon status={props.file.status} class="shrink-0" />
-        <span class="font-mono text-xs min-w-0 flex items-center gap-1 flex-wrap break-all">
+        <span class="font-mono text-xs min-w-0 max-sm:basis-[calc(100%-6rem)] flex items-center gap-1 flex-wrap break-all">
           <Show when={props.file.previous_filename && props.file.previous_filename !== props.file.filename}>
             <span class="text-fg-muted">{props.file.previous_filename}</span>
             <Octicon icon={arrowRightIcon} class="text-fg-muted" />

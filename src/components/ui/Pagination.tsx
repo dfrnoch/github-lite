@@ -41,7 +41,7 @@ export default function Pagination(props: { pageInfo: PageInfo; href: (page: num
             <For each={pageWindow(page(), last())}>
               {(p) =>
                 p == null ? (
-                  <span class="disabled">…</span>
+                  <span class="disabled gap">…</span>
                 ) : (
                   // Read page() inside JSX (the For callback body is not a tracking scope).
                   <Show when={p !== page()} fallback={<em aria-current="page">{p}</em>}>

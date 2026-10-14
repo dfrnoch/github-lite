@@ -247,7 +247,7 @@ export default function Inbox(props: { page: Page<NotificationThread>; query: In
       }
     >
       <div class={['Box transition-opacity', { 'opacity-60': props.pending }]}>
-        <div class="Box-header rgh-sticky-notifications flex items-center gap-3 py-2! px-4!">
+        <div class="Box-header rgh-sticky-notifications flex flex-wrap items-center gap-x-3 gap-y-2 py-2! px-4!">
           <input
             type="checkbox"
             aria-label="Select all notifications"
