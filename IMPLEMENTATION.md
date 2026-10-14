@@ -57,7 +57,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` todo · `[-]` not possible via the 
 - [x] List `/pulls` with filters (review status, draft, labels…)
 - [x] PR layout `/pull/:n` (title, state, branches, tabs with counts) — `usePull()` in src/features/pulls/context.ts
 - [x] Conversation tab: timeline (reviews, review comments, commits, force-pushes, status), merge box (merge/squash/rebase, delete branch, mergeability, checks summary), draft → ready, close/reopen, request reviewers, edit base branch
-- [x] Files changed `/pull/:n/files` (diff, review threads with reply/resolve, single comment / start review on pending review, submit comment/approve/request changes, mark viewed)
+- [x] Files changed `/pull/:n/files` (diff, review threads under their side in split view with reply/resolve, multi-line comments by dragging "+" or line numbers, single comment / start review on pending review, submit comment/approve/request changes, mark viewed)
 - [x] Commits `/pull/:n/commits`
 - [x] Checks `/pull/:n/checks` *(agent: actions)* — grouped by workflow/app, `?check_run_id=` details (summary, annotations), commit statuses
 - [x] Global `/pulls` (created / assigned / mentioned / review requested)

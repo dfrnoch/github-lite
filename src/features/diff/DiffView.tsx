@@ -476,10 +476,11 @@ function DiffFileView(props: {
   const [selection, setSelection] = createSignal<Selection | null>(null);
   const selectLine = (side: Side, n: number, shift: boolean) => {
     const cur = selection();
-    const next =
-      shift && cur && cur.side === side ? { side, start: Math.min(cur.start, n), end: Math.max(cur.start, n) } : { side, start: n, end: n };
+    select(shift && cur && cur.side === side ? { side, start: Math.min(cur.start, n), end: Math.max(cur.start, n) } : { side, start: n, end: n });
+  };
+  const select = (next: Selection) => {
     setSelection(next);
-    const s = side === 'LEFT' ? 'L' : 'R';
+    const s = next.side === 'LEFT' ? 'L' : 'R';
     history.replaceState(
       history.state,
       '',
@@ -492,10 +493,48 @@ function DiffFileView(props: {
       setSelection({ side: m[1] === 'L' ? 'LEFT' : 'RIGHT', start: Number(m[2]), end: Number(m[3] ?? m[2]) });
     }
   });
+  /** "+" on a line inside a multi-line selection comments on the whole selection (like github.com). */
   const comment = (side: Side, n: number) => {
     const s = selection();
-    const range = s && s.side === side && s.end === n && s.start < n ? s.start : undefined;
-    props.onAddComment?.({ path: path(), side, line: n, startLine: range, startSide: range ? side : undefined });
+    if (s && s.side === side && s.start < s.end && n >= s.start && n <= s.end) {
+      props.onAddComment?.({ path: path(), side, line: s.end, startLine: s.start, startSide: side });
+      return;
+    }
+    if (!s || s.side !== side || s.start !== n || s.end !== n) select({ side, start: n, end: n });
+    props.onAddComment?.({ path: path(), side, line: n });
+  };
+
+  // ---- drag selection: press "+" or a line number and drag over lines of the same side
+  let drag: { side: Side; anchor: number; comment: boolean; moved: boolean } | null = null;
+  const lineAt = (el: HTMLElement): [Side, number] | null => {
+    const num = el.closest<HTMLElement>('td.blob-num[data-line-number]');
+    if (num) return [num.dataset.side as Side, Number(num.dataset.lineNumber)];
+    const slot = el.closest<HTMLElement>('td[data-comment]')?.dataset.comment;
+    if (!slot) return null;
+    const [side, n] = slot.split(':');
+    return [side as Side, Number(n)];
+  };
+  const onBodyDown = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (e.button !== 0 || e.shiftKey || !target.closest('tbody[data-chunk]')) return;
+    const fromPlus = !!plus?.contains(target);
+    if (!fromPlus && !target.closest('td.blob-num[data-line-number]')) return;
+    const at = lineAt(target);
+    if (!at) return;
+    e.preventDefault(); // no text selection while dragging
+    drag = { side: at[0], anchor: at[1], comment: fromPlus, moved: false };
+    // "+" inside an existing range keeps it (until the pointer moves to another line).
+    if (!fromPlus) select({ side: at[0], start: at[1], end: at[1] });
+    const up = () => {
+      window.removeEventListener('mouseup', up);
+      const d = drag;
+      drag = null;
+      if (!d?.comment) return;
+      const s = selection();
+      if (d.moved && s) comment(s.side, s.end);
+      else comment(d.side, d.anchor);
+    };
+    window.addEventListener('mouseup', up);
   };
 
   // ---- segments: row chunks, split around the lines that carry review-comment slots
@@ -604,12 +643,22 @@ function DiffFileView(props: {
     return <tbody ref={el} data-chunk="" innerHTML={mounted() ? html() : placeholder()} />;
   };
 
+  /** Split view: a thread sits under the half of the diff it is attached to (old side left, new side right). */
   const ExtrasBody = (p: { side: Side; line: number }) => (
     <tbody>
       <tr>
-        <td colspan={props.split ? 4 : 3} class="border-y border-line-muted bg-canvas p-0 whitespace-normal font-sans">
+        <Show when={props.split && p.side === 'RIGHT'}>
+          <td colspan={2} class="border-y border-line-muted bg-canvas p-0" />
+        </Show>
+        <td
+          colspan={props.split ? 2 : 3}
+          class="border-y border-line-muted bg-canvas p-0 whitespace-normal font-sans"
+        >
           {props.renderExtras?.(path(), p.side, p.line)}
         </td>
+        <Show when={props.split && p.side === 'LEFT'}>
+          <td colspan={2} class="border-y border-line-muted bg-canvas p-0" />
+        </Show>
       </tr>
     </tbody>
   );
@@ -621,7 +670,8 @@ function DiffFileView(props: {
     const button = target.closest('button');
     if (button) {
       const cell = button.parentElement;
-      if (button === plus && cell?.dataset.comment) {
+      // Pointer presses on "+" are handled on mouseup (see `onBodyDown`); this is the keyboard path.
+      if (button === plus && cell?.dataset.comment && e.detail === 0) {
         const [side, n] = cell.dataset.comment.split(':');
         comment(side as Side, Number(n));
       } else if (button.dataset.expand != null) void expand(Number(button.dataset.expand));
@@ -629,7 +679,8 @@ function DiffFileView(props: {
     }
     const num = target.closest<HTMLElement>('td.blob-num[data-line-number]');
     if (num) {
-      selectLine(num.dataset.side as Side, Number(num.dataset.lineNumber), e.shiftKey);
+      // Plain presses already selected the line on mousedown.
+      if (e.shiftKey) selectLine(num.dataset.side as Side, Number(num.dataset.lineNumber), true);
       return;
     }
     const hunkRow = target.closest<HTMLElement>('tr.rgh-extend-diff-expander[data-hunk]');
@@ -639,6 +690,13 @@ function DiffFileView(props: {
   /** The "+" button, moved into whichever commentable code cell the pointer is over. */
   let plus: HTMLButtonElement | undefined;
   const onBodyOver = (e: MouseEvent) => {
+    if (drag) {
+      const at = lineAt(e.target as HTMLElement);
+      if (at && at[0] === drag.side && (drag.moved || at[1] !== drag.anchor)) {
+        drag.moved = true;
+        select({ side: drag.side, start: Math.min(drag.anchor, at[1]), end: Math.max(drag.anchor, at[1]) });
+      }
+    }
     if (!props.onAddComment) return;
     const cell = (e.target as HTMLElement).closest<HTMLElement>('td[data-comment]');
     if (!cell || plus?.parentElement === cell) return;
@@ -818,7 +876,13 @@ function DiffFileView(props: {
               <Show
                 when={props.split}
                 fallback={
-                  <table class="diff-table table-auto! min-w-full w-max" style={{ 'border-spacing': 0 }} onClick={onBodyClick} onMouseOver={onBodyOver}>
+                  <table
+                    class="diff-table diff-unified table-auto! min-w-full w-max"
+                    style={{ 'border-spacing': 0 }}
+                    onClick={onBodyClick}
+                    onMouseDown={onBodyDown}
+                    onMouseOver={onBodyOver}
+                  >
                     <tbody aria-hidden="true">
                       <tr style={{ visibility: 'collapse' }}>
                         <td class="blob-num" />
@@ -837,7 +901,13 @@ function DiffFileView(props: {
                   </table>
                 }
               >
-                <table class="diff-table" style={{ 'border-spacing': 0 }} onClick={onBodyClick} onMouseOver={onBodyOver}>
+                <table
+                  class="diff-table diff-split"
+                  style={{ 'border-spacing': 0 }}
+                  onClick={onBodyClick}
+                  onMouseDown={onBodyDown}
+                  onMouseOver={onBodyOver}
+                >
                   {/* Fixed layout sizes columns from the first row, so give it one cell per column. */}
                   <thead>
                     <tr class="h-0">

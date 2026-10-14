@@ -2473,3 +2473,78 @@ code.rgh-backticks {
 .ContributionCalendar-day.is-selected {
   stroke: var(--fgColor-default) !important;
 }
+
+/* ---------- Suggested changes ----------
+ * GitHub's markup leans on Primer utility classes we don't ship, so the whole
+ * block is styled here. */
+.js-suggested-changes-blob {
+  margin: 8px 0;
+  overflow: hidden;
+  border: 1px solid var(--borderColor-default);
+  border-radius: 6px;
+}
+.js-suggested-changes-blob > div:first-child {
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--fgColor-muted);
+  border-bottom: 1px solid var(--borderColor-default);
+}
+.js-suggested-changes-blob .blob-wrapper {
+  overflow-x: auto;
+}
+.js-suggested-changes-blob table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+.js-suggested-changes-blob tr {
+  background: none;
+  border: 0;
+}
+.js-suggested-changes-blob table td {
+  padding: 4px 8px;
+  border: 0;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 20px;
+  vertical-align: top;
+}
+.js-suggested-changes-blob table td.blob-num {
+  width: 1%;
+  min-width: 50px;
+  cursor: default;
+  text-align: right;
+  white-space: nowrap;
+}
+.js-suggested-changes-blob table td.blob-code-inner {
+  white-space: pre;
+  tab-size: 4;
+}
+.js-suggested-changes-blob .blob-code-marker-addition::before,
+.js-suggested-changes-blob .blob-code-marker-deletion::before {
+  display: inline-block;
+  width: 16px;
+  margin-left: -8px;
+  text-align: center;
+  color: var(--fgColor-muted);
+}
+.js-suggested-changes-blob .blob-code-marker-addition::before {
+  content: '+';
+}
+.js-suggested-changes-blob .blob-code-marker-deletion::before {
+  content: '-';
+}
+
+/* Selected diff lines (click / shift-click / drag on line numbers or "+"): accent tint with a bar on the left. */
+.diff-table .highlighted-line {
+  background-color: var(--bgColor-accent-muted);
+}
+.diff-table td.blob-num.highlighted-line {
+  color: var(--fgColor-default);
+}
+.diff-split td.blob-num.highlighted-line,
+.diff-unified tr:has(> .highlighted-line) > td:first-child {
+  box-shadow: inset 2px 0 0 var(--borderColor-accent-emphasis);
+}
