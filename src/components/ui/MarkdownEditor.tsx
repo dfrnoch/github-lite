@@ -28,6 +28,7 @@ import { renderMarkdown } from '../../lib/markdown';
 import Octicon from '../Octicon';
 import Dropdown from './Dropdown';
 import Markdown from './Markdown';
+import { createMentionSuggester } from './MentionSuggester';
 import Spinner from './Spinner';
 
 type Format = { before: string; after?: string; line?: boolean; placeholder?: string };
@@ -70,6 +71,7 @@ export default function MarkdownEditor(props: {
 }) {
   const [tab, setTab] = createSignal<'write' | 'preview'>('write');
   let textarea: HTMLTextAreaElement | undefined;
+  const mentions = createMentionSuggester(() => props.repo);
 
   // unfinished-comments: text typed here that hasn't been sent (edits start from the existing body).
   const initial = untrack(() => props.value);
@@ -187,7 +189,7 @@ export default function MarkdownEditor(props: {
           when={tab() === 'preview'}
           fallback={
             <textarea
-              ref={[(el: HTMLTextAreaElement) => (textarea = el), tabToIndent, oneKeyFormatting, fitTextarea]}
+              ref={[(el: HTMLTextAreaElement) => (textarea = el), mentions.attach, tabToIndent, oneKeyFormatting, fitTextarea]}
               id={props.id}
               class={['form-control border-none! shadow-none! bg-canvas', { 'rgh-monospace-field': !!props.monospace }]}
               style={{ 'min-height': `${props.minHeight ?? 120}px` }}
@@ -214,6 +216,7 @@ export default function MarkdownEditor(props: {
             </Loading>
           </div>
         </Show>
+        {mentions.view()}
       </div>
       <Show when={linkLoss()}>
         <div class="flash flash-warn mx-2 mb-2 flex items-center gap-2 text-sm">

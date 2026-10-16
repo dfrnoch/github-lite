@@ -34,7 +34,7 @@ import { signOut } from '../../lib/auth';
 import { useHotkey } from '../../lib/hotkeys';
 import { isDarkTheme, themeSettings, themeSummary } from '../../lib/theme';
 import Octicon from '../Octicon';
-import { Avatar, Dropdown, QUERY_KEYS, QueryInput } from '../ui';
+import { Avatar, Dropdown, Popover, QUERY_KEYS, QueryInput } from '../ui';
 import Drawer from './Drawer';
 import { headerContext } from './headerContext';
 
@@ -46,6 +46,7 @@ export default function AppHeader() {
   const hasUnread = createMemo(() => getUnreadNotifications());
   const [navOpen, setNavOpen] = createSignal(false);
   const [userOpen, setUserOpen] = createSignal(false);
+  const [userButton, setUserButton] = createSignal<HTMLButtonElement>();
   // Repo and org pages continue the header's background into their tab bar.
   const bordered = () => ctx().kind !== 'repo' && ctx().kind !== 'org' && ctx().kind !== 'owner';
 
@@ -160,7 +161,15 @@ export default function AppHeader() {
             <UnreadAnywhereButton />
           </Show>
         </div>
-        <button type="button" class="ml-1 rounded-full" aria-label="Open user navigation menu" onClick={() => setUserOpen(true)}>
+        <button
+          ref={setUserButton}
+          type="button"
+          class="ml-1 rounded-full"
+          aria-label="Open user navigation menu"
+          aria-haspopup="dialog"
+          aria-expanded={userOpen() ? 'true' : 'false'}
+          onClick={() => setUserOpen(!userOpen())}
+        >
           <Loading fallback={<span class="inline-block w-8 h-8 rounded-full bg-canvas-muted" />}>
             <Avatar src={viewer().avatar_url} login={viewer().login} size={32} />
           </Loading>
@@ -203,84 +212,89 @@ export default function AppHeader() {
         </Loading>
       </Drawer>
 
-      <Drawer
-        side="right"
+      <Popover
+        anchor={userButton()}
         open={userOpen()}
         onClose={() => setUserOpen(false)}
-        header={
-          <Loading>
-            <div class="flex items-center gap-2">
+        align="end"
+        caret={false}
+        focus
+        aria-label="User navigation"
+        class="w-[320px] max-w-[calc(100vw-16px)] p-2"
+      >
+        <Loading>
+          {/* Following a link inside closes the menu. */}
+          <nav onClick={(e) => (e.target as HTMLElement).closest('a') && setUserOpen(false)}>
+            <div class="flex items-center gap-2 px-2 pt-1 pb-2">
               <Avatar src={viewer().avatar_url} size={32} />
               <div class="min-w-0 leading-tight">
                 <div class="font-semibold truncate">{viewer().login}</div>
                 <div class="text-fg-muted text-sm truncate">{viewer().name}</div>
               </div>
             </div>
-          </Loading>
-        }
-      >
-        <Loading>
-          <ul class="NavList">
-            <li>
-              <a class="NavList-item" href={`/${viewer().login}`}>
-                <Octicon icon={personIcon} /> Your profile
-              </a>
-            </li>
-            <li>
-              <a class="NavList-item" href={userReposHref(viewer().login)}>
-                <Octicon icon={repoIcon} /> Your repositories
-              </a>
-            </li>
-            <li>
-              <a class="NavList-item" href={`/${viewer().login}?tab=stars`}>
-                <Octicon icon={starIcon} /> Your stars
-              </a>
-            </li>
-            <li>
-              <a class="NavList-item" href="/settings/organizations">
-                <Octicon icon={organizationIcon} /> Your organizations
-              </a>
-            </li>
-          </ul>
-          <hr class="NavList-divider" />
-          <ul class="NavList">
-            <li>
-              <a class="NavList-item" href="/settings/profile">
-                <Octicon icon={gearIcon} /> Settings
-              </a>
-            </li>
-            <li>
-              <a class="NavList-item" href="/settings/appearance">
-                <Octicon icon={themeSettings().mode === 'sync' ? deviceDesktopIcon : isDarkTheme(themeSettings().single) ? moonIcon : sunIcon} />
-                <span class="flex-1">Appearance</span>
-                <span class="text-xs text-fg-muted truncate">{themeSummary()}</span>
-              </a>
-            </li>
-            <li>
-              <a class="NavList-item" href="https://docs.github.com" target="_blank" rel="noreferrer">
-                <Octicon icon={bookIcon} /> GitHub Docs
-              </a>
-            </li>
-            <li>
-              <a class="NavList-item" href="https://github.com" target="_blank" rel="noreferrer">
-                <Octicon icon={codeIcon} /> Open github.com
-              </a>
-            </li>
-          </ul>
-          <hr class="NavList-divider" />
-          <button
-            type="button"
-            class="NavList-item w-full"
-            onClick={() => {
-              setUserOpen(false);
-              signOut();
-              navigate('/login');
-            }}
-          >
-            <Octicon icon={signOutIcon} /> Sign out
-          </button>
+            <hr class="NavList-divider" />
+            <ul class="NavList">
+              <li>
+                <a class="NavList-item" href={`/${viewer().login}`}>
+                  <Octicon icon={personIcon} /> Your profile
+                </a>
+              </li>
+              <li>
+                <a class="NavList-item" href={userReposHref(viewer().login)}>
+                  <Octicon icon={repoIcon} /> Your repositories
+                </a>
+              </li>
+              <li>
+                <a class="NavList-item" href={`/${viewer().login}?tab=stars`}>
+                  <Octicon icon={starIcon} /> Your stars
+                </a>
+              </li>
+              <li>
+                <a class="NavList-item" href="/settings/organizations">
+                  <Octicon icon={organizationIcon} /> Your organizations
+                </a>
+              </li>
+            </ul>
+            <hr class="NavList-divider" />
+            <ul class="NavList">
+              <li>
+                <a class="NavList-item" href="/settings/profile">
+                  <Octicon icon={gearIcon} /> Settings
+                </a>
+              </li>
+              <li>
+                <a class="NavList-item" href="/settings/appearance">
+                  <Octicon icon={themeSettings().mode === 'sync' ? deviceDesktopIcon : isDarkTheme(themeSettings().single) ? moonIcon : sunIcon} />
+                  <span class="flex-1">Appearance</span>
+                  <span class="text-xs text-fg-muted truncate">{themeSummary()}</span>
+                </a>
+              </li>
+              <li>
+                <a class="NavList-item" href="https://docs.github.com" target="_blank" rel="noreferrer">
+                  <Octicon icon={bookIcon} /> GitHub Docs
+                </a>
+              </li>
+              <li>
+                <a class="NavList-item" href="https://github.com" target="_blank" rel="noreferrer">
+                  <Octicon icon={codeIcon} /> Open github.com
+                </a>
+              </li>
+            </ul>
+            <hr class="NavList-divider" />
+            <button
+              type="button"
+              class="NavList-item w-full"
+              onClick={() => {
+                setUserOpen(false);
+                signOut();
+                navigate('/login');
+              }}
+            >
+              <Octicon icon={signOutIcon} /> Sign out
+            </button>
+          </nav>
         </Loading>
-      </Drawer>
+      </Popover>
     </header>
   );
 }

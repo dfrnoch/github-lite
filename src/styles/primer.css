@@ -2194,6 +2194,40 @@ code.rgh-backticks {
   display: none;
 }
 
+/* ---------- @-mention suggester (comment boxes) ---------- */
+.mention-suggester {
+  position: fixed;
+  z-index: 110;
+  min-width: 180px;
+  max-width: 260px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  font-size: 14px;
+  background-color: var(--overlay-bgColor);
+  border: 1px solid var(--overlay-borderColor, var(--borderColor-default));
+  border-radius: 6px;
+  box-shadow: var(--shadow-floating-small);
+}
+.mention-suggester li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mention-suggester-name {
+  color: var(--fgColor-muted);
+}
+.mention-suggester li[aria-selected='true'] {
+  color: var(--fgColor-onEmphasis);
+  background-color: var(--bgColor-accent-emphasis);
+}
+.mention-suggester li[aria-selected='true'] .mention-suggester-name {
+  color: inherit;
+}
+
 /* ---------- Popover (anchored overlay: hovercards, checks, verification) ---------- */
 .Popover-panel {
   position: fixed;
